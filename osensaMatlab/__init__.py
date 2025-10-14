@@ -10,7 +10,7 @@ DEFAULT SETTINGS:
     parity              = NONE
     stop bits           = 1
 """
-BAUDRATE = 9600
+BAUDRATE = 115200
 NUMBITS = serial.EIGHTBITS
 PARITY = serial.PARITY_NONE
 STOP = serial.STOPBITS_ONE
