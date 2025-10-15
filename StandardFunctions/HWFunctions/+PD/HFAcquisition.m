@@ -1,0 +1,13 @@
+classdef HFAcquisition
+%% value class with properties for acuisitions in pulse program
+%
+% ----------------------------------------------------------------------------
+% (C) Copyright 2024 Pure Devices GmbH, Wuerzburg, Germany
+% www.pure-devices.com
+% ----------------------------------------------------------------------------
+
+end
+
+
+%#function PD.SystemConstants
+
