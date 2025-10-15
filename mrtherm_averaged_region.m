@@ -4,7 +4,7 @@ close all;
 fName = 'exp1';
 
 % Initialize Osensa temperature sensor
-xx = enable_osensa("COM4");
+osensa_dev = enable_osensa("COM4");
 
 % Initialize MRI system parameters
 LoadSystem; % Load system parameters (reset to default: HW Seq AQ TX Grad)
@@ -37,22 +37,22 @@ Seq.AQSlice(1).PhaseOS(2) = 2;                      % oversampling phase(2)  1..
 orientation = 'zx';                                 % 'xy', 'yz', 'zx' for one of the cardinal planes (read-phase)
 switch orientation
   case 'xy'
-    Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
-    Seq.AQSlice(1).phi  = 0.5*pi;                   % 2nd rotation around y axis in RAD
-    Seq.AQSlice(1).theta= 0.0*pi;                   % 3rd rotation around z axis in RAD
+  Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
+  Seq.AQSlice(1).phi  = 0.5*pi;                   % 2nd rotation around y axis in RAD
+  Seq.AQSlice(1).theta= 0.0*pi;                   % 3rd rotation around z axis in RAD
   case 'yz'
-    Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
-    Seq.AQSlice(1).phi  = 0.0*pi;                   % 2nd rotation around y axis in RAD
-    Seq.AQSlice(1).theta= 0.0*pi;                   % 3rd rotation around z axis in RAD
+  Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
+  Seq.AQSlice(1).phi  = 0.0*pi;                   % 2nd rotation around y axis in RAD
+  Seq.AQSlice(1).theta= 0.0*pi;                   % 3rd rotation around z axis in RAD
   case 'zx'
-    Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
-    Seq.AQSlice(1).phi  = 0.0*pi;                   % 2nd rotation around y axis in RAD
-    Seq.AQSlice(1).theta= -0.5*pi;                  % 3rd rotation around z axis in RAD
+  Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
+  Seq.AQSlice(1).phi  = 0.0*pi;                   % 2nd rotation around y axis in RAD
+  Seq.AQSlice(1).theta= -0.5*pi;                  % 3rd rotation around z axis in RAD
   otherwise
-    if ~ischar(orientation)
-      orientation = num2str(orientation);
-    end
-    error('Unknown orientation "%s"\n', orientation);
+  if ~ischar(orientation)
+    orientation = num2str(orientation);
+  end
+  error('Unknown orientation "%s"\n', orientation);
 end
 
 %% Set up sequence visualization %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -76,49 +76,49 @@ Referencephase = 0;
 phase_diff_figure = figure('Name', 'Phase Difference vs. Time');
 
 while true
-    i = i + 1;
-    disp("Acquisition of Image " + num2str(i));
-
-    time = toc(tStart);
-    Timedata(i) = time;
-    
-    % Read Osensa temperature sensor at each acquisition
-    TemperatureData(i) = xx.read_channel_temp();
-
-    % Run MRI acquisition sequence
-[SeqLoop, mySave] = sequence_Flash(HW, Seq, AQ, TX, Grad, mySave);
-    Acquisitiondata(i) = SeqLoop;
-
-    % Extract phase data from acquired image
-    Imagephase = unwrap(angle(SeqLoop.data.Image(position, 1, position)));
-    Phasedata(i) = Imagephase;
-
-    % Compute phase difference
-    if i < 4
-        deltaphase = 0;
-    elseif i == 5
-        Referencephase = Phasedata(5);
-        deltaphase = 0;
-    else
-        deltaphase = Imagephase - Referencephase;
-    end
-
-    Deltaphase(i) = deltaphase;
-
-    % Plot phase difference over time
-    figure(phase_diff_figure);
-    hold on;
-    plot(gca, time, deltaphase, '-o');
-    xlabel('Time (s)');
-    ylabel('Phase difference (rad)');
-    title('Phase difference Vs Time');
-
-    pause(2); % Pausing for next acquisition
-
-    % Stop acquisition if measurement time is exceeded
-    if Timedata(i) > measurement_time
-        break;
-    end
+  i = i + 1;
+  disp("Acquisition of Image " + num2str(i));
+  
+  time = toc(tStart);
+  Timedata(i) = time;
+  
+  % Read Osensa temperature sensor at each acquisition
+  TemperatureData(i) = osensa_dev.read_channel_temp();
+  
+  % Run MRI acquisition sequence
+  [SeqLoop, mySave] = sequence_Flash(HW, Seq, AQ, TX, Grad, mySave);
+  Acquisitiondata(i) = SeqLoop;
+  
+  % Extract phase data from acquired image
+  Imagephase = unwrap(angle(SeqLoop.data.Image(position, 1, position)));
+  Phasedata(i) = Imagephase;
+  
+  % Compute phase difference
+  if i < 4
+    deltaphase = 0;
+  elseif i == 5
+    Referencephase = Phasedata(5);
+    deltaphase = 0;
+  else
+    deltaphase = Imagephase - Referencephase;
+  end
+  
+  Deltaphase(i) = deltaphase;
+  
+  % Plot phase difference over time
+  figure(phase_diff_figure);
+  hold on;
+  plot(gca, time, deltaphase, '-o');
+  xlabel('Time (s)');
+  ylabel('Phase difference (rad)');
+  title('Phase difference Vs Time');
+  
+  pause(2); % Pausing for next acquisition
+  
+  % Stop acquisition if measurement time is exceeded
+  if Timedata(i) > measurement_time
+    break;
+  end
 end
 
 % plot image and phase of the last image acquired
@@ -143,23 +143,19 @@ colorbar
 axis equal
 title('Image Phasemap')
 
-% Store data in a table
-DataTable = table(Timedata', TemperatureData', Phasedata', Deltaphase', ...
-    'VariableNames', {'Time_s', 'Temperature_C', 'Phase_rad', 'DeltaPhase_rad'});
-
 % Save all data
 save([fName '.mat'], 'Timedata', 'TemperatureData', 'Phasedata', 'Deltaphase', 'Acquisitiondata');
 csvwrite([fName '.csv'], [Timedata' TemperatureData' Phasedata' Deltaphase']);
 saveas(phase_diff_figure, [fName '.png']);
 
 % Close Osensa sensor
-xx.close();
+osensa_dev.close();
 disp("Osensa Transmitter OFF");
 
 % % plot deltaphase vs temperature
 figure;
 plot(TemperatureData, Deltaphase, 'o-','LineWidth',1.5);
-xlabel('Temperature (Â°C)');
+xlabel('Temperature (°C)');
 ylabel('Phase Difference (rad)');
 title('Phase Difference vs Temperature');
 grid on;
