@@ -18,6 +18,5 @@ HW.RX.LNAGain=10^(((-37.6936)-(-60))/20); % 22.3064 dB gain @ 5300056.7849 MHz F
 HW.RX.LNAGain=10^(((-38.4415)-(-60))/20); % 21.5585 dB gain @ 12300131.8212 MHz F=1.4811 dB (-60 dBm cal)
 HW.RX.LNAGain=10^(((-40.1317)-(-60))/20); % 19.8683 dB gain @ 24300260.1229 MHz F=1.5357 dB (-60 dBm cal)
 
-% when using internal switch of LNA (instead of switch in Rf-100 #15):
-% HW.TX.Max.PaUout(2) = min(HW.TX.Max.PaUout(2), 10);  % max transmit voltage
-% HW.TX.Def.PaUout(2) = min(HW.TX.Def.PaUout(2), 4);  % def transmit voltage
+HW.TX.Max.PaUout(2) = min(HW.TX.Max.PaUout(2), 10);  % max transmit voltage
+HW.TX.Def.PaUout(2) = min(HW.TX.Def.PaUout(2), 4);  % def transmit voltage

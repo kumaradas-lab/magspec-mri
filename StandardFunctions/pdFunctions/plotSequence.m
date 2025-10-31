@@ -30,7 +30,7 @@ function plotSequence(HW, Seq, AQ, TX, Grad)
 %                       (Default: HW.PlotSequence.controls.figureModes = false).
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2017-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2017-2020 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -488,7 +488,7 @@ switch get(eventData.NewValue, 'Tag')
     % Re-install data cursor update function. It might be lost if the figure
     % ancestor has changed.
     % FIXME: Can we track such a change? Can we un-register from the old figure?
-    HW = PD.HWClass.GetInstance();  % FIXME: This only works if HW is an object.
+    HW = PD.HW.GetInstance();  % FIXME: This only works if HW is an object.
     DataCursorUpdateFcns = getappdata(hFigure, 'DataCursorUpdateFcns');
     % FIXME: How to get the correct iDevice?
     iDevice = 1;

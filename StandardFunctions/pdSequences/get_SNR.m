@@ -113,7 +113,7 @@ function [AmpSnrHz, FdB, F, AllOutputs] = get_SNR(HW, showPlot, tEcho, fSampleDi
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -358,9 +358,9 @@ if showPlot
   plot(ax1, dataN.f_fft1_data(INroi,1,end), sqrt(PnoiseDensityPerBinSmooth(INroi)*HW.RX(iDevice).Rin), 'b'...
           , dataN.f_fft1_data(INroi,1,end), sqrt(PnoiseDensityMean*HW.RX(iDevice).Rin) * ones(size((dataN.f_fft1_data(INroi,1,end)))), '--b'...
           , dataN.f_fft1_data(INroi,1,end), UnoiseRinDensity *                  ones(size((dataN.f_fft1_data(INroi,1,end)))), '--g');
-  title(ax1, 'Noise Vrms/\surd{Hz}');
+  title(ax1, 'Noise Vrms/sqrt(Hz)');
   xlabel(ax1, 'frequency in Hz');
-  ylabel(ax1, 'Vrms/\surd{Hz}');
+  ylabel(ax1, 'Vrms/sqrt(Hz)');
   ylim(ax1, [0, Inf]);
   grid(ax1, 'on');
   legend(ax1, {'noise', 'mean noise', sprintf('%.0f Ohm noise', HW.RX(iDevice).Rin)}, 'Location', 'SouthEast');
@@ -400,9 +400,9 @@ if showPlot
 
   xlabel(ax3, 'time in s');
   ylabel(ax3, 'Vrms');
-  title(ax1, ['noise peak power = ' num2str(PnoisePeakdBm,'%.2f') ' dBm, noise figure = ' num2str(F,'%.2f') ' (' num2str(FdB,'%.1f') ' dB)']);
-  title(ax2, ['signal power = ' num2str(PsignaldBm,'%.2f') ' dBm, amplitude SNR = ' num2str(AmpSnrHz,'%.0f') ' \surd{Hz}']);
-  title(ax3, sprintf('max signal = %.3f %cVrms, noise = %.3f nVrms/\\surd{Hz}', Usignal*1e6, 181, UnoiseDensityMean*1e9));
+  title(ax1, ['noise peak power = ' num2str(PnoisePeakdBm,'%9.2f') ' dBm, Noise figure = ' num2str(F,'%9.2f') ' (' num2str(FdB,'%9.1f') ' dB)']);
+  title(ax2, ['signal power = ' num2str(PsignaldBm,'%9.2f') ' dBm, Amplitude SNR per Sqrt(Hz) = ' num2str(AmpSnrHz,'%9.0f')]);
+  title(ax3, sprintf('max signal = %9.3f %cVrms / noise %9.3f nVrms/sqrt(Hz)', Usignal*1e6, 181, UnoiseDensityMean*1e9));
   grid(ax3, 'on');
   drawnow();
 end

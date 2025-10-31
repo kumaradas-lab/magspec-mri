@@ -25,8 +25,8 @@ HW.TX.BlankAQ = 1;                      % switch TRx to 50 Ohm resistor during T
 
 %3V
 % HW.RX.LNAGain=10^(((-36.9297)-(-60))/20); % 23.0703 dB gain @ 22902123.1764 MHz F=1.2427 dB (-60 dBm cal)
-% HW.RX.LNAGain=10^(((-38.6551)-(-60))/20); % 21.3449 dB gain @ 22902189.6138 MHz F=1.8196 dB (-60 dBm cal) mit RF-100
-HW.RX.LNAGain=10^(((-35.9059)-(-60))/20); % 24.0941 dB gain @ 8065135.296 MHz F=0.92167 dB (-60 dBm cal)
+HW.RX.LNAGain=10^(((-38.6551)-(-60))/20); % 21.3449 dB gain @ 22902189.6138 MHz F=1.8196 dB (-60 dBm cal) mit RF-100
+
 
 
 HW.TX.Max.PaUout(2) = min(HW.TX.Max.PaUout(2), 100);  % max transmit voltage

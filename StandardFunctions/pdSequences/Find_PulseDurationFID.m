@@ -38,7 +38,7 @@ function [HW, mySave] = Find_PulseDurationFID(HW, mySave, minTime, doPlot, itera
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2021 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -192,42 +192,39 @@ else
   tFlip90 = tPulse90;
 end
 % calculate magnetic flux density of the transmit coil at HW.TX.AmpDef amplitude
-B1 = (1/(tFlip90*4)) / (HW.GammaDef/2/pi);
+B1 = (1/(tFlip90*4))/(HW.GammaDef/2/pi);
 
 
 %% Store calculated coil efficiency in file or display it on screen
 newPaUout2Amplitude = HW.TX(iDevice).PaUout2Amplitude;
 TXVoltage = HW.TX(iDevice).AmpDef / HW.TX(iDevice).PaUout2Amplitude(HW.TX(iDevice).ChannelDef);
-newPaUout2Amplitude(HW.TX(iDevice).ChannelDef) = B1 / TXVoltage;
-comment = sprintf('%s (tFlip90 = %.3f us @ %.3f V) from bulk FID by %s', ...
-  datestr(now, 'yyyy-mm-ddTHH:MM:SS'), tFlip90*1e6, TXVoltage, mfilename());
+newPaUout2Amplitude(HW.TX(iDevice).ChannelDef) = B1./(HW.TX(iDevice).AmpDef./HW.TX(iDevice).PaUout2Amplitude(HW.TX(iDevice).ChannelDef));
+comment = sprintf('%s (tFlip90 = %.3f %cs @ %.3f V) from bulk FID by %s', ...
+  datestr(now, 'yyyy-mm-ddTHH:MM:SS'), tFlip90*1e6, 181, ...
+  TXVoltage, mfilename());
 
-newCalLine = sprintf('HW.TX(%d).PaUout2Amplitude = [%.6f, %.6f]*1e-6;', ...
+newCalLine = sprintf('HW.TX(%d).PaUout2Amplitude = [%.6f, %.6f]*1e-6', ...
   iDevice, newPaUout2Amplitude*1e6);
 
 if ~isempty(HW.TX(iDevice).CoilName)
-  newCalLine = sprintf('if strcmp(HW.TX(%d).CoilName, ''%s''),  %s  end', ...
+  newCalLine = sprintf('if strcmp(HW.TX(%d).CoilName, ''%s''),  %s;  end', ...
     iDevice, HW.TX(iDevice).CoilName, newCalLine);
 end
 
 if iDevice > 1
-  newCalLine = sprintf('if numel(HW.TX) >= %d,  %s  end', ...
+  newCalLine = sprintf('if numel(HW.TX) >= %d,  %s;  end', ...
     iDevice, newCalLine);
 end
 
-newCalLine = sprintf('%s  %% %s\n', newCalLine, comment);
+newCalLine = sprintf('%s;  %% %s\n', newCalLine, comment);
 % FIXME: Add consistency checks
 savePulseFile = true;
 if savePulseFile
-  if ~isempty(HW.TX(iDevice).PaUout2AmplitudePath) ...
-      && (isemptyfield(mySave, 'DummySerial') ...
-          || mySave.DummySerial(min(iDevice, numel(mySave.DummySerial))) <= 0)
+  if ~isempty(HW.TX(iDevice).PaUout2AmplitudePath) && ...
+      (isemptyfield(mySave, 'DummySerial') || mySave.DummySerial <= 0)
     if ~exist(HW.TX(iDevice).PaUout2AmplitudePath, 'file')
       newCalLine = ['% factor from voltage amplitude at the coil input to B1+ field strength in T/V', ...
         sprintf('\n'), newCalLine];
-    end
-    if ~exist(fileparts(HW.TX(iDevice).PaUout2AmplitudePath), 'dir')
-      mkdir(fileparts(HW.TX(iDevice).PaUout2AmplitudePath));
     end
     fid = fopen(HW.TX(iDevice).PaUout2AmplitudePath, 'a+');
     fwrite(fid, newCalLine);

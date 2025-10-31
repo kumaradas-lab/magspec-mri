@@ -4,7 +4,7 @@ function [Network, SeqOut] = sequence_Network_Gain(HW, Seq, Network)
 %   [Network, SeqOut] = sequence_Network_Gain(HW, Seq, Network)
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2015-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2015-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %-------------------------------------------------------------------------------
 
@@ -129,12 +129,6 @@ end
 for t = 1:HW.Grad(iDevice).n
   Grad(t).Time = NaN;
   Grad(t).Amp = 0;
-end
-
-if HW.RX(iDevice).ClampCoil.Enable
-  % extent last tRep with acquisition for clamp coil signal
-  Seq.tRep(end) = max(Seq.tRep(end), ...
-    AQ.Start(end) + AQ.nSamples(end)/AQ.fSample(end) + HW.RX(iDevice).ClampCoil.tPostset + 0.1e-3);
 end
 
 %% measurement

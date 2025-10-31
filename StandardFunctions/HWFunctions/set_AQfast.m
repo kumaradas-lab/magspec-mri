@@ -4,13 +4,12 @@ function [hfacquisition, AQPhaseCorr] = set_AQfast(HW, HFAQ, tActEnd, CLTime, Of
 %   [hfacquisition, AQPhaseCorr] = set_AQfast(HW, HFAQ, tActEnd, Offset)
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
 end
 
 
-%#function PD.HFAcquisition
 %#function isemptyfield
 

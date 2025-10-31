@@ -113,11 +113,6 @@ function [SeqOut, dataOut, data, data_1D] = sequence_MPS(HW, Seq)
 %           For values larger than one, additionally the *first* AQmode-1
 %           periods of the slowest MPS frequency are not acquired.
 %
-%     AQDataMode
-%           Select data mode (bit width) for transmission of received signal
-%           between console and PC.
-%           (Default: 3*(HW.MMRT.FPGA_Firmware >= 20221129) )
-%
 %     average
 %           Number of averages (complete experiment including Seq.nPrepare).
 %           (Default: 1)
@@ -174,7 +169,7 @@ function [SeqOut, dataOut, data, data_1D] = sequence_MPS(HW, Seq)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2021 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -201,11 +196,6 @@ if isemptyfield(Seq, 'AQmode')
   % >1 for AQmode-1 slow periods at start + one slow period at end
   Seq.AQmode = 3+1;
 end
-if isemptyfield(Seq, 'AQDataMode')
-  % data mode (bit width) for transmission of received signal between console and PC
-  Seq.AQDataMode = 3*(HW.MMRT(iDevice).FPGA_Firmware >= 20221129);
-end
-
 if isemptyfield(Seq, 'phaseGrad'), Seq.phaseGrad = 0; end  % phase of gradient oscillation in rad
 if isemptyfield(Seq, 'nPhaseGrad'), Seq.nPhaseGrad = 1; end  % number of (consecutive) phase steps
 if isemptyfield(Seq, 'RampGrad'), Seq.RampGrad = true; end  % ramp gradient amplitude at start and end of tRep
@@ -249,11 +239,6 @@ end
 if isemptyfield(Seq, 'tRep')
   % set one tRep
   Seq.tRep = Seq.tEndGrad + (max(HW.Grad(iDevice).TimeDelay(Seq.GradMPS)) + Seq.CLTime)*(Seq.AQmode~=0);
-  if HW.RX(iDevice).ClampCoil.Enable
-    % extent for coil blank signal if necessary
-    Seq.tRep = max(Seq.tRep, ...
-      Seq.tEndGrad + HW.RX(iDevice).ClampCoil.tPostset + 0.1e-3);
-  end
 end
 
 if isemptyfield(Seq, 'average'), Seq.average = 1; end  % number of averages
@@ -272,15 +257,10 @@ if numel(Seq.tSampleGrad) < nGrads, Seq.tSampleGrad = Seq.tSampleGrad(1) * ones(
 if numel(Seq.phaseGrad) < nGrads, Seq.phaseGrad = Seq.phaseGrad(1) * ones(size(Seq.GradMPS)); end
 if numel(Seq.phaseGradIncrement) < nGrads, Seq.phaseGradIncrement = Seq.phaseGradIncrement(1) * ones(size(Seq.GradMPS)); end
 
-
 %%
 Seq.tRep = Seq.tRep * ones(1, Seq.nMeasurements+Seq.nPrepare); %  tRep
 
 AQ.fSample = HW.RX(iDevice).fSample./round(HW.RX(iDevice).fSample./Seq.fSampleAQ);
-
-% round Seq.fGrad such that it matches an integer number of AQ samples
-Seq.fGrad = AQ.fSample./round(AQ.fSample./Seq.fGrad);
-
 AQ.Start = [nan(1, Seq.nPrepare), ...
   ones(1, Seq.nMeasurements)*1./AQ.fSample*3+(HW.RX(iDevice).nSampleRXLatenz+2)./HW.RX(iDevice).fSample];
 switch Seq.AQmode
@@ -298,13 +278,6 @@ switch Seq.AQmode
     AQ.Start = [nan(1, Seq.nPrepare), ...
       ones(1, Seq.nMeasurements) * (floor((Seq.tEndGrad*AQ.fSample(1) - AQ.nSamples(1)) - max(AQ.fSample./Seq.fGrad)) - 0.5)./AQ.fSample];
 end
-
-% acquisition must span an integer number of the slowest fGrad
-% FIXME: This doesn't work correctly if the higher gradient frequencies aren't
-% (integer) harmonics of the lowest gradient frequency.
-maxSamplesPerPeriod = round(max(AQ.fSample./Seq.fGrad));
-AQ.nSamples = floor(AQ.nSamples/maxSamplesPerPeriod) * maxSamplesPerPeriod;
-
 Seq.MissingSamples = Seq.tEndGrad*AQ.fSample(1)-AQ.nSamples(1);
 % AQ.Frequency = 125e6/6000;
 AQ.Frequency = Seq.fAQ;
@@ -317,8 +290,6 @@ AQ.Repeat = 0;
 % first rf pulse. (Make sure that that frequency is 0 by prepending a short rf
 % pulse with 0 amplitude and 0 frequency.)
 AQ.ResetPhases = 1;
-AQ.DataMode = Seq.AQDataMode;
-
 
 oldPaEnable = HW.Grad(iDevice).PaEnable;
 guard = onCleanup(@() ResetPaEnable(HW, oldPaEnable, iDevice));

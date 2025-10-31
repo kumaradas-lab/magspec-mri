@@ -3,7 +3,7 @@ function [pulseData] = Pulse_Rect_Composite_x90y180x90(HW, Center, Pulse, vararg
 %
 %   pulseData = Pulse_Rect_Composite_x90y180x90(HW, Center, Pulse)
 % or:
-%   pulseData = Pulse_Rect_Composite_x90y180x90(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments, MaxLength, Frequency, Phase)
+%   pulseData = Pulse_Rect_Composite_x90y180x90(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments,  maxLength, Frequency, Phase)
 % additionally:
 %   excitationAngleFactor = Pulse_Rect_Composite_x90y180x90(HW, 'Amp')
 %   bandwidthFactor = Pulse_Rect_Composite_x90y180x90(HW, 'Time')
@@ -56,9 +56,9 @@ function [pulseData] = Pulse_Rect_Composite_x90y180x90(HW, Center, Pulse, vararg
 % the duration of the pulse to have the same bandwidth (FWHM) as a rect pulse.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2016-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2020 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
-% ------------------------------------------------------------------------------
+%-------------------------------------------------------------------------------
 
 %% check input
 if nargin == 2
@@ -72,7 +72,7 @@ if nargin == 2
   end
   return;
 end
-
+    
 %% Convert from syntax (2) to syntax (1)
 if ~isstruct(Pulse), Pulse = struct('Bandwidth', Pulse); end
 if nargin > 3, Pulse.FlipAngle = varargin{1}; end
@@ -92,23 +92,15 @@ Pulse = set_EmptyField(Pulse, 'Bandwidth', max(1/Pulse.MaxLength, 2e3));  % FIXM
 Pulse = set_EmptyField(Pulse, 'iDevice', 1);
 
 %% composite pulse
-% Use gamma that better matches the frequency of the pulse
-% FIXME: Could this be an issue with (very) off-center slice pulses?
-if abs(Pulse.Frequency - HW.fLarmorX) < abs(Pulse.Frequency - HW.fLarmor)
-  tFlipPi = pi/HW.GammaX / HW.TX(Pulse.iDevice).AmpDef;
-else
-  tFlipPi = HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec / HW.TX(Pulse.iDevice).AmpDef;
-end
+tFlipPi = HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec / HW.TX(Pulse.iDevice).AmpDef;
 
-BlockLength = 1/Pulse.Bandwidth;
+BlockLength = 1/Pulse.Bandwidth * 0.999;
 
 gain = HW.TX(Pulse.iDevice).AmpDef * 2*tFlipPi * ...
-  (Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / BlockLength;
+  (Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / (BlockLength/0.998);
 
-if Pulse.MaxLength + 1/HW.TX(Pulse.iDevice).fSample < BlockLength
-  error('PD:Pulse_Rect_Composite_x90y180x90:MaxLengthTooShort', ...
-    'MaxLength of rf pulse is %.3f %cs too short.', ...
-    (BlockLength - Pulse.MaxLength)*1e6, char(181));
+if Pulse.MaxLength < BlockLength
+  error('PD:Pulse_Rect_Composite_x90y180x90:MaxLengthTooShort', 'MaxLength is too short');
 end
 
 if Pulse.MaxNumberOfSegments < 3

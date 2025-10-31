@@ -2,7 +2,7 @@ classdef SliceSelectType < uint32
   %% Enumeration class for identification of sequence in Slice Select GUI
   %
   % ----------------------------------------------------------------------------
-  % (C) Copyright 2018-2024 Pure Devices GmbH, Wuerzburg, Germany
+  % (C) Copyright 2018 Pure Devices GmbH, Wuerzburg, Germany
   % www.pure-devices.com
   % ----------------------------------------------------------------------------
 
@@ -33,7 +33,7 @@ classdef SliceSelectType < uint32
         end
       end
 
-      if isscalar(this), str = str{1}; end
+      if numel(this) == 1, str = str{1}; end
     end
 
   end

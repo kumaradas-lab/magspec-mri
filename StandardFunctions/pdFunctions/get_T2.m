@@ -215,7 +215,7 @@ t2 = NaN; T2 = NaN;
 if SeqOut{1}.FitT2
   if SeqOut{1}.nEchos <= 2 % check for sufficient number of echoes
     warning('get_T2: Number of Echoes too low for accurate fitting. Must be > 2.');
-     return
+    return
   end
   if Seq.separateFID
     % FIXME: Instead of fitting, the corrected FID should be "attached" to the

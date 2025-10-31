@@ -150,7 +150,7 @@ function [t1, T1, data, SeqOut] = sequence_Recovery(HW, Seq)
 %   SeqOut  Structure with actually used measurement parameters.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -391,7 +391,7 @@ if Seq.PreProcessSequence
     if ~isempty(Seq.Spoil) && any(t==Seq.Spoil.UseCoordinate)
       Grad(t).Time = cumsum([Seq.Spoil.tStart; Seq.Spoil.tRamp; Seq.Spoil.Duration-2*Seq.Spoil.tRamp; Seq.Spoil.tRamp]) * ones(1, n);
       Grad(t).Amp = [0; Seq.Spoil.Amplitude; Seq.Spoil.Amplitude; 0] * ones(1, n);
-      if Seq.tRelax == 0  %
+      if Seq.tRelax == 0  % 
         if any(Grad(t).Time(end,:) + TX.Start(1,:) + 100e-6 > Seq.tRep) || ...
             Seq.Spoil.PreparationOnly
           Grad(t).Time(:,2:end) = NaN;
@@ -441,7 +441,7 @@ end
 if Seq.fitT1
   if Seq.nFids >= 3
     try
-      if isscalar(Seq.fitExp.CorrectFrequencyDrift) && Seq.fitExp.CorrectFrequencyDrift
+      if numel(Seq.fitExp.CorrectFrequencyDrift) == 1 && Seq.fitExp.CorrectFrequencyDrift
         Seq.fitExp.CorrectFrequencyDrift = data(1).time_all(:,1,end-Seq.nFids+1:end);
       end
       if Seq.tRelax ~= 0

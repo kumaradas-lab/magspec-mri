@@ -3,7 +3,7 @@ function [pulseData] = Pulse_Rect_Composite180_Levitt_11(HW, Center, Pulse, vara
 %
 %   pulseData = Pulse_Rect_Composite180_Levitt_11(HW, Center, Pulse)
 % or:
-%   pulseData = Pulse_Rect_Composite180_Levitt_11(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments, MaxLength, Frequency, Phase)
+%   pulseData = Pulse_Rect_Composite180_Levitt_11(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments,  MaxLength, Frequency, Phase)
 % additionally:
 %   excitationAngleFactor = Pulse_Rect_Composite180_Levitt_11(HW, 'Amp')
 %   bandwidthFactor = Pulse_Rect_Composite180_Levitt_11(HW, 'Time')
@@ -57,13 +57,13 @@ function [pulseData] = Pulse_Rect_Composite180_Levitt_11(HW, Center, Pulse, vara
 % the duration of the pulse to have the same bandwidth (FWHM) as a rect pulse.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2017-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2017-2020 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
 %% composite settings
 FlipAngleComposite = [270; 360;  90; 270; 360;  90];
-FlipPhaseComposite = [180;   0;  90; 270;  90;   0] - 90;
+FlipPhaseComposite = [180;   0;  90; 270;  90;   0];
 
 %% check input
 if nargin == 2

@@ -3,7 +3,7 @@ function [pulseData] = Pulse_RaisedCos(HW, Center, Pulse, varargin)
 %
 %   pulseData = Pulse_RaisedCos(HW, Center, Pulse)
 % or:
-%   pulseData = Pulse_RaisedCos(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments, MaxLength, Frequency, Phase)
+%   pulseData = Pulse_RaisedCos(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments,  maxLength, Frequency, Phase)
 % additionally:
 %   excitationAngleFactor = Pulse_RaisedCos(HW, 'Amp')
 %   bandwidthFactor = Pulse_RaisedCos(HW, 'Time')
@@ -60,7 +60,7 @@ function [pulseData] = Pulse_RaisedCos(HW, Center, Pulse, varargin)
 % the duration of the pulse to have the same bandwidth (FWHM) as a rect pulse.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2014-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2014-2020 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %-------------------------------------------------------------------------------
 
@@ -127,17 +127,9 @@ pulseData.Frequency = zeros(numberOfSegments,1) + Pulse.Frequency;
 % normalized amplitude at tShape
 B1Shape = cos(pi/2 * tShape / pulseDuration * numberOfZeroCrossings).^2;
 % amplitude (in Tesla) of the B1+ field in the coil
-% Use gamma that better matches the frequency of the pulse
-% FIXME: Could this be an issue with (very) off-center slice pulses?
-if abs(Pulse.Frequency - HW.fLarmorX) < abs(Pulse.Frequency - HW.fLarmor)
-  pulseData.Amplitude = abs(B1Shape) * ...
-    (2*pi/HW.GammaX * Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / ...
-    sum(pulseData.Duration.*B1Shape, 1);
-else
-  pulseData.Amplitude = abs(B1Shape) * ...
-    (2*HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec * Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / ...
-    sum(pulseData.Duration.*B1Shape, 1);
-end
+pulseData.Amplitude = abs(B1Shape) * ...
+  (2*HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec * Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / ...
+  sum(pulseData.Duration.*B1Shape, 1);
 % Phase of pulse segments (no negative Amplitude is allowed, so you have to add
 % 180 degrees to the phase to get an equivalent)
 pulseData.Phase = angle(B1Shape)/pi*180 + 0 + Pulse.Phase;

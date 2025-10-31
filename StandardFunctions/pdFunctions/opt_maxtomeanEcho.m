@@ -34,7 +34,7 @@ function [absmean, lastData_1D] = opt_maxtomeanEcho(HW, Seq, Shim)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -64,173 +64,110 @@ if ~isempty(Seq.guiInterruptHandle) && ishghandle(Seq.guiInterruptHandle) && ~ge
   error('PD:opt_maxtomeanEcho:GuiAbort', 'Measurement aborted from GUI');
 end
 
-
-%% check heat development in coil groups due to shim
-Dac2Amp_xyzB = HW.Grad(Seq.SliceSelect.iDevice).Dac2Amp(HW.Grad(Seq.SliceSelect.iDevice).xyzB);
-
+%% Spin Echo measurement
 % FIXME: Support shimming with all available gradient channels (of multiple
 % devices)
 usedShims = HW.Grad(Seq.SliceSelect.iDevice).ShimGradients~=0;
-
-currentShim = Shim + Seq.ShimStart(usedShims) - Seq.ShimStep(usedShims)./0.05;
-
-% check temperature
-usedThermalGroup = HW.Grad(Seq.SliceSelect.iDevice).CoilThermalGroup(usedShims);
-usedShimsIdx = find(usedShims);
-for iCoilGroup = 1:max(usedThermalGroup)
-  iGrad = usedShimsIdx(usedThermalGroup == iCoilGroup);
-  currentCurrent = currentShim .* HW.Grad(Seq.SliceSelect.iDevice).Amp2LoadIin(iGrad);
-  powerGroup = sum(HW.Grad(Seq.SliceSelect.iDevice).LoadRin(iGrad) .* currentCurrent.^2);
-  if powerGroup >= HW.Grad(Seq.SliceSelect.iDevice).CoilPowerDissipation(iCoilGroup)/2
-    % Power due to shim is >=50% of the power that can be dissipated.
-    warning('PD:FindShim:HighShimStep', ...
-      'Total power for shim in coil group %d is very high (%.3f W). Skipping step!', ...
-      iCoilGroup, powerGroup);
-
-    absmean = 1e12;
-    plotProgress(HW, Seq, false);
-    return;
+Dac2Amp_xyzB = HW.Grad(Seq.SliceSelect.iDevice).Dac2Amp(HW.Grad(Seq.SliceSelect.iDevice).xyzB);
+if all(abs(Shim+Seq.ShimStart(usedShims)-Seq.ShimStep(usedShims)./0.05)./Dac2Amp_xyzB(usedShims) <= 6400)
+  isHWstruct = ~isa(HW, 'PD.HW');
+  
+  HW.Grad(Seq.SliceSelect.iDevice).AmpOffset(usedShims) = Shim + Seq.ShimStart(usedShims) - Seq.ShimStep(usedShims)./0.05;
+  HW.Grad(Seq.SliceSelect.iDevice).AmpOffset(~usedShims) = 0;
+  if isHWstruct
+    HW.MagnetShim = [HW.Grad(:).AmpOffset];
   end
-end
-
-
-%% Spin Echo measurement
-isHWstruct = ~isa(HW, 'PD.HWClass');
-
-HW.Grad(Seq.SliceSelect.iDevice).AmpOffset(usedShims) = currentShim;
-if isHWstruct
-  HW.MagnetShim = [HW.Grad(:).AmpOffset];
-end
-
-if Seq.verbose
   shimAmpStr = sprintf(' % +8.3f,', HW.Grad(Seq.SliceSelect.iDevice).AmpOffset(usedShims)*1e3);
   shimDacStr = sprintf('% +7.1f, ', HW.Grad(Seq.SliceSelect.iDevice).AmpOffset(usedShims)./Dac2Amp_xyzB(usedShims));
   disp(['Shim', shimAmpStr(1:end-1), ' mT/m (', shimDacStr(1:end-2) ' DAC)']);
   % disp(HW.Grad(Seq.SliceSelect.iDevice).AmpOffset);
-end
-
-if Seq.use_nEchos_Frequency == 1
-  if isempty(fOffsetFIDw), fOffsetFIDw = 0; end
-  if ~isemptyfield(HW.FindFrequencySweep, 'shiftB0') ...
-      && HW.FindFrequencySweep.shiftB0 ...
-      && ~(isempty(HW.B0Target) || ~isfinite(HW.B0Target))
-    newB0shift = HW.Grad(Seq.SliceSelect.iDevice).AmpOffset(4) + fOffsetFIDw / HW.GammaDef * 2*pi;
-    newB0 = HW.B0Target;
-    if abs(newB0shift) > ...
-        HW.Grad(Seq.SliceSelect.iDevice).HoldShimNormMax(4) * HW.Grad(Seq.SliceSelect.iDevice).MaxAmp(4)
-      desiredB0shift = newB0shift;
-      newB0shift = sign(newB0shift) * HW.Grad(Seq.SliceSelect.iDevice).HoldShimNormMax(4) * HW.Grad(Seq.SliceSelect.iDevice).MaxAmp(4);
-      newB0 = newB0 - (desiredB0shift - newB0shift);
-      warning('PD:AutoFrequencyShift:B0ShiftExceeded', ...
-        ['The required B0 shift (%.1f %cT) is larger than the maximum shift (%.1f %cT).\n', ...
-        'Consider setting a different HW.B0Target. Adjusting HW.fLarmor to stay in range.'], ...
-        desiredB0shift*1e6, 181, HW.Grad.HoldShimNormMax(4)*HW.Grad.MaxAmp(4)*1e6, 181);
-    end
-    HW.Grad(Seq.SliceSelect.iDevice).AmpOffset(4) = newB0shift;
-    HW.B0 = newB0;
-  else
+  if Seq.use_Find_Frequency_FID == 1
+    mySave = [];
+    [HW, ~]  = Find_Frequency_FID( HW, mySave,0,1,0.2e-3);
+    warning('PD:OpenMatlab:UseFindFrequency', ...
+      '"Seq.use_Find_Frequency_FID" is deprecated. Use "Seq.use_nEchos_Frequency" instead.');
+    warning('off', 'PD:OpenMatlab:UseFindFrequency');
+  end
+  if Seq.use_Find_Frequency_Sweep == 1
+    mySave = [];
+    [HW, ~] = Find_Frequency_Sweep(HW, mySave, 0, 100000, 0, HW.tFlip90Def, 20);
+    warning('PD:OpenMatlab:UseFindFrequency', ...
+      '"Seq.use_Find_Frequency_Sweep" is deprecated. Use "Seq.use_nEchos_Frequency" instead.');
+    warning('off', 'PD:OpenMatlab:UseFindFrequency');
+  end
+  if Seq.use_nEchos_Frequency == 1
+    if isempty(fOffsetFIDw), fOffsetFIDw = 0; end
     HW.fLarmor = HW.fLarmor - double(fOffsetFIDw);
   end
-end
-if Seq.use_Find_Frequency_FID == 1
-  mySave = [];
-  [HW, ~]  = Find_Frequency_FID( HW, mySave,0,1,0.2e-3);
-  warning('PD:OpenMatlab:UseFindFrequency', ...
-    '"Seq.use_Find_Frequency_FID" is deprecated. Use "Seq.use_nEchos_Frequency" instead.');
-  warning('off', 'PD:OpenMatlab:UseFindFrequency');
-end
-if Seq.use_Find_Frequency_Sweep == 1
-  mySave = [];
-  [HW, ~] = Find_Frequency_Sweep(HW, mySave, 0, 100000, 0, HW.tFlip90Def, 20);
-  warning('PD:OpenMatlab:UseFindFrequency', ...
-    '"Seq.use_Find_Frequency_Sweep" is deprecated. Use "Seq.use_nEchos_Frequency" instead.');
-  warning('off', 'PD:OpenMatlab:UseFindFrequency');
-end
-if Seq.Reinitialize
-  pause(Seq.RepetitionTime - (now - last_call)*24*60*60);
-  last_call = now;
-end
-if firstLoop
-  % Pre-Loops for sample with T1 big compared to tRep
-  SeqPreLoop = Seq;
-  % SeqPreLoop.plot = 1;
-  SeqPreLoop.IgnoreTimingError = 1;  % Don't emit warnings if timing fails in pre-loops
-  plotProgress(HW, SeqPreLoop, true);  % create window before starting sequence
-  if SeqPreLoop.nPreLoop > 0
-    if isHWstruct
-      fLarmor_orig = HW.fLarmor;
-    end
-    SeqPreLoop.Reinitialize = 1;
-    for iPreLoop = 1:SeqPreLoop.nPreLoop
-      if isemptyfield(Seq, 'ShimSequence')
-        [dataPre, SeqOutPre] = sequence_EchoStandard(HW, SeqPreLoop, Seq.SliceSelect);
-      else
-        [SeqOutPre, ~] = Seq.ShimSequence(HW, SeqPreLoop);
-        dataPre = SeqOutPre.data;
+  if Seq.Reinitialize
+    pause(Seq.RepetitionTime - (now - last_call)*24*60*60);
+    last_call = now;
+  end
+  if firstLoop
+    % Pre-Loops for sample with T1 big compared to tRep
+    SeqPreLoop = Seq;
+    % SeqPreLoop.plot = 1;
+    SeqPreLoop.IgnoreTimingError = 1;  % Don't emit warnings if timing fails in pre-loops
+    plotProgress(HW, SeqPreLoop, true);  % create window before starting sequence
+    if SeqPreLoop.nPreLoop > 0
+      if isHWstruct
+        fLarmor_orig = HW.fLarmor;
       end
-      if Seq.use_nEchos_Frequency
-        iAQ = find([SeqOutPre.AQ(:).Device] == Seq.SliceSelect.iDevice, 1, 'first');  % FIXME: Support multi-channel?
-        if isHWstruct
-          old_fOffsetFIDw = fOffsetFIDw;
-        end
-        fOffsetFIDw = get_MeanPhaseDiffWeighted(dataPre(iAQ).data(1:SeqOutPre.AQ(iAQ).nSamples(1,SeqOutPre.nEchos+1),1,SeqOutPre.nEchos+1)) * ...
-          SeqOutPre.AQ(iAQ).fSample(1,SeqOutPre.nEchos+1) / 2/pi;
-        if isHWstruct
-          fOffsetFIDw = fOffsetFIDw + old_fOffsetFIDw;
-          HW.fLarmor = fLarmor_orig;
-        end
-        if ~isemptyfield(HW.FindFrequencySweep, 'shiftB0') ...
-            && HW.FindFrequencySweep.shiftB0 ...
-            && ~(isempty(HW.B0Target) || ~isfinite(HW.B0Target))
-          newB0shift = HW.Grad(Seq.SliceSelect.iDevice).AmpOffset(4) + fOffsetFIDw / HW.GammaDef * 2*pi;
-          newB0 = HW.B0Target;
-          if abs(newB0shift) > ...
-              HW.Grad(Seq.SliceSelect.iDevice).HoldShimNormMax(4) * HW.Grad(Seq.SliceSelect.iDevice).MaxAmp(4)
-            desiredB0shift = newB0shift;
-            newB0shift = sign(newB0shift) * HW.Grad(Seq.SliceSelect.iDevice).HoldShimNormMax(4) * HW.Grad(Seq.SliceSelect.iDevice).MaxAmp(4);
-            newB0 = newB0 - (desiredB0shift - newB0shift);
-            warning('PD:AutoFrequencyShift:B0ShiftExceeded', ...
-              ['The required B0 shift (%.1f %cT) is larger than the maximum shift (%.1f %cT).\n', ...
-              'Consider setting a different HW.B0Target. Adjusting HW.fLarmor to stay in range.'], ...
-              desiredB0shift*1e6, 181, HW.Grad.HoldShimNormMax(4)*HW.Grad.MaxAmp(4)*1e6, 181);
-          end
-          HW.Grad(Seq.SliceSelect.iDevice).AmpOffset(4) = newB0shift;
-          HW.B0 = newB0;
+      SeqPreLoop.Reinitialize = 1;
+      for iPreLoop = 1:SeqPreLoop.nPreLoop
+        if isemptyfield(Seq, 'ShimSequence')
+          [dataPre, SeqOutPre] = sequence_EchoStandard(HW, SeqPreLoop, Seq.SliceSelect);
         else
+          [SeqOutPre, ~] = Seq.ShimSequence(HW, SeqPreLoop);
+          dataPre = SeqOutPre.data;
+        end
+        if Seq.use_nEchos_Frequency
+          iAQ = find([SeqOutPre.AQ(:).Device] == Seq.SliceSelect.iDevice, 1, 'first');  % FIXME: Support multi-channel?
+          if isHWstruct
+            old_fOffsetFIDw = fOffsetFIDw;
+          end
+          fOffsetFIDw = get_MeanPhaseDiffWeighted(dataPre(iAQ).data(1:SeqOutPre.AQ(iAQ).nSamples(1,SeqOutPre.nEchos+1),1,SeqOutPre.nEchos+1)) * ...
+            SeqOutPre.AQ(iAQ).fSample(1) / 2/pi;
+          if isHWstruct
+            fOffsetFIDw = fOffsetFIDw + old_fOffsetFIDw;
+            HW.fLarmor = fLarmor_orig;
+          end
           HW.fLarmor = HW.fLarmor - double(fOffsetFIDw);
         end
+        SeqPreLoop.Reinitialize = Seq.Reinitialize;
       end
-      SeqPreLoop.Reinitialize = Seq.Reinitialize;
+      clear SeqOutPre dataPre
     end
-    clear SeqOutPre dataPre
   end
-end
-firstLoop = false;
+  firstLoop = false;
 
-if isemptyfield(Seq, 'ShimSequence')
-  [data, SeqOut, data_1D] = sequence_EchoStandard(HW, Seq, Seq.SliceSelect);
+  if isemptyfield(Seq, 'ShimSequence')
+    [data, SeqOut, data_1D] = sequence_EchoStandard(HW, Seq, Seq.SliceSelect);
+  else
+    [SeqOut, ~] = Seq.ShimSequence(HW, Seq);
+    data = SeqOut.data;
+    [SeqOut, data_1D] = get_data_1D(SeqOut, data, 1);
+    % plot_data_1D(HW, data_1D);
+  end
+
+  lastData_1D = data_1D;
+
+  iAQ = find([SeqOut.AQ(:).Device] == Seq.SliceSelect.iDevice, 1, 'first');  % FIXME: Support multi-channel?
+  if Seq.use_nEchos_Frequency
+    if isHWstruct
+      old_fOffsetFIDw = fOffsetFIDw;
+    end
+    fOffsetFIDw = get_MeanPhaseDiffWeighted(data(iAQ).data(1:SeqOut.AQ(iAQ).nSamples(1,SeqOut.nEchos+1),1,SeqOut.nEchos+1)) * ...
+      SeqOut.AQ(iAQ).fSample(1) / 2/pi;
+    if isHWstruct
+      fOffsetFIDw = fOffsetFIDw + old_fOffsetFIDw;
+    end
+  end
+  echo = abs(data(iAQ).data(:,1,Seq.nEchos+1)) .* Seq.FIDWindowFunction(numel(data(iAQ).data(:,1,Seq.nEchos+1)));
+  absmean = 1/mean(echo);
 else
-  [SeqOut, ~] = Seq.ShimSequence(HW, Seq);
-  data = SeqOut.data;
-  [SeqOut, data_1D] = get_data_1D(SeqOut, data, 1);
-  % plot_data_1D(HW, data_1D);
+  absmean = 1e12;
 end
-
-lastData_1D = data_1D;
-
-iAQ = find([SeqOut.AQ(:).Device] == Seq.SliceSelect.iDevice, 1, 'first');  % FIXME: Support multi-channel?
-if Seq.use_nEchos_Frequency
-  if isHWstruct
-    old_fOffsetFIDw = fOffsetFIDw;
-  end
-  fOffsetFIDw = get_MeanPhaseDiffWeighted(data(iAQ).data(1:SeqOut.AQ(iAQ).nSamples(1,SeqOut.nEchos+1),1,SeqOut.nEchos+1)) * ...
-    SeqOut.AQ(iAQ).fSample(1,SeqOut.nEchos+1) / 2/pi;
-  if isHWstruct
-    fOffsetFIDw = fOffsetFIDw + old_fOffsetFIDw;
-  end
-end
-echo = abs(data(iAQ).data(:,1,Seq.nEchos+1)) .* Seq.FIDWindowFunction(numel(data(iAQ).data(:,1,Seq.nEchos+1)));
-absmean = 1/mean(echo);
 
 
 %% plot graph with development of the optimization parameters and target
@@ -272,25 +209,19 @@ plotProgress(HW, Seq, false);
         colorOrder = cat(1, colorOrder{:});
         hg_props.axes{1}.props.ColorOrder = colorOrder(1:sum(usedShims),:);
         hg_props.axes{1}.props.LineStyleOrder = {'-', '--'};
-        hg_props.axes{1}.props.Tag = 'shim_amp';
-        hg_props.axes{1}.xlabel = 'Iteration';
         hg_props.axes{1}.ylabel = 'Shim in T/m';
         hg_props.axes{1}.legend.labels = HW.Grad(Seq.SliceSelect.iDevice).Name(usedShims);
         hg_props.axes{1}.legend.props.Box = 'off';
-        hg_props.axes{1}.legend.props.Orientation = 'vertical';
-        hg_props.axes{1}.legend.props.Location = 'northeast';
+        hg_props.axes{1}.legend.props.Orientation = 'horizontal';
+        hg_props.axes{1}.legend.props.Location = 'northoutside';
 
         % Mean RX B1
-        hg_props.axes{2}.xlabel = 'Iteration';
         hg_props.axes{2}.ylabel = sprintf('Mean Abs %s in %s', ...
           HW.RX(Seq.SliceSelect.iDevice).AmplitudeName, HW.RX(Seq.SliceSelect.iDevice).AmplitudeUnit);
         hg_props.axes{2}.props.YLim = [0 Inf];
-        hg_props.axes{2}.props.Tag = 'shim_mean_rx_amp';
         % all axes
         hg_props.allAxes.props.XLim = [0, Seq.iterations];
         hg_props.allAxes.props.Box = 'on';
-        hg_props.allAxes.props.XMinorGrid = 'on';
-        hg_props.allAxes.props.YMinorGrid = 'on';
         % figure
         if ishghandle(Seq.plotProgress) && isprop(Seq.plotProgress, 'Name')
           hg_props.figure.props.Name = 'Shim Progress';

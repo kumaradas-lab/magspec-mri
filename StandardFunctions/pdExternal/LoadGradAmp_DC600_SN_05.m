@@ -1,40 +1,35 @@
-%% Calibration values for gradient amplifier DC-600
+HW.Grad.ExtGradSN = 5;
 
-if ~exist('iDevice', 'var'), iDevice = 1; end
+HW.Grad.PowerDown=0;
+HW.Grad.PaEnable=1;
 
-HW.Grad(iDevice).ExtGradSN = 5;                               % serial number
-HW.Grad(iDevice).ExtGradType = 'DC600';
+% Grad Arrays
+HW.Grad.PaCurrentControlled=[1,1,1,1];                  % If current controlled set 1, if voltage controlled set 0
 
-HW.Grad(iDevice).PowerDown = 0;                               % power down amplifier after some time (sleep)
-HW.Grad(iDevice).PaEnable = 1;                                % un-mute the amplifier
+HW.Grad.PaRin=[24e3,24e3,24e3,24e3];                    % INA137 input impedance
 
-HW.Grad(iDevice).PaCurrentControlled(1:4) = [1, 1, 1, 1];     % if current controlled, set to 1; if voltage controlled, set to 0
+HW.Grad.PaOffsetU=[0,0,0,0];                            % Offset voltage
+HW.Grad.PaOffsetI=[-0.0021933,0.003974,0.00016173,0.0040016]; % Offset current
 
-HW.Grad(iDevice).PaRin(1:4) = [24e3, 24e3, 24e3, 24e3];       % INA137 input impedance
+HW.Grad.PaUin2PaUout=[0,0,0,0];                         % Voltage Gain
+HW.Grad.PaUin2PaIout=([0.33108,0.33731,0.33135,0.33866]-HW.Grad.PaOffsetI)./1; % Input voltage to output current ratio
 
-HW.Grad(iDevice).PaOffsetU(1:4) = [0, 0, 0, 0];               % offset voltage in V
-HW.Grad(iDevice).PaOffsetI(1:4) = [-0.0021933, 0.003974, 0.00016173, 0.0040016];  % offset current in A
+HW.Grad.PaPmaxInt=[80,80,80,80];                        % Maximum internal power dissipation
 
-HW.Grad(iDevice).PaUin2PaUout(1:4) = [0, 0, 0, 0];            % Voltage gain in V/V
-HW.Grad(iDevice).PaUin2PaIout(1:4) = ([0.33108,0.33731,0.33135,0.33866] - HW.Grad(iDevice).PaOffsetI(1:4)) ./ 1;  % amplification in A/V
+HW.Grad.PaRout=[15000,15000,15000,15000];               % Ouput impedance
 
-HW.Grad(iDevice).PaPmaxInt(1:4) = [80, 80, 80, 80];           % maximum internal power dissipation in W
+HW.Grad.tRamp=18e-6;                                    % minimum ramp time
+HW.Grad.tEC=50e-6;                                      % Setting time;
+HW.Grad.SystemTimeDelay(1:3) = [1.7784e-05   2.0488e-05   2.1112e-05]; % Time delay of grad amp
 
-HW.Grad(iDevice).PaRout(1:4) = [15000, 15000, 15000, 15000];  % output impedance in Ohm
-
-HW.Grad(iDevice).tRamp = 18e-6;                               % minimum ramp time in s
-HW.Grad(iDevice).tEC = 50e-6;                                 % eddy current time in s
-HW.Grad(iDevice).SystemTimeDelay(HW.Grad.xyzB(1:3)) = [51.614, 48.260, 37.014]*1e-6;  % time delay of gradient amplifier in s
-HW.Grad(iDevice).MaxAmpSlice = 0.1;                           % maximum gradient amplitude for slice selection in T/m
-
-HW.Grad(iDevice).Status1 = 1;                                 % power supply of DC-600 ok
-HW.Grad(iDevice).Status2 = 1;                                 % gradient and temperature of DC-600 ok
+HW.Grad.Status1=1;                                      % Power supply ok of DC600
+HW.Grad.Status2=1;                                      % Graient and temperatur ok of DC600
 
 % Piezo
-HW.Grad.LoadRin(4) = 100;  % resistance parallel to Piezo in Ohm
+HW.Grad.LoadRin(4)=100;  %x y z B0 resistance parallel to Piezo
 % name for Plot
-HW.Grad(iDevice).Name(4) = {'Piezo Current'};
-HW.Grad(iDevice).AmpUnit(4) = {'A'};
-HW.Grad(iDevice).AmpUnitScale(4) = 1;
-% efficiency
-HW.Grad(iDevice).LoadIin2Amp(4) = 1;  % 1 A per Ampere
+HW.Grad.Name(4)={'Piezo Current'};
+HW.Grad.AmpUnit(4)={'A'};
+HW.Grad.AmpUnitScale(4)=1;
+% efficence
+HW.Grad.LoadIin2Amp(4)=1; % 1 A per Amper

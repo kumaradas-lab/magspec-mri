@@ -5,7 +5,7 @@ function [HW, mySave] = Find_ReferenceFID(HW, mySave, Seq, SliceSelect)
 % (without any chemical shifts).
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2016-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2021 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -51,7 +51,7 @@ HW.Spectro.useSliceSelect = SeqOut.useSliceSelect;
 
 
 % write new reference FID to file
-if (isfield(HW, 'Spectro') || isa(HW, 'PD.HWClass')) && ...
+if (isfield(HW, 'Spectro') || isa(HW, 'PD.HW')) && ...
     ~isemptyfield(HW.Spectro, 'ReferenceFidPath')
   fprintf('Saving Reference FID to file "%s"\n', HW.Spectro.ReferenceFidPath)
   Spectro.ReferenceFid = HW.Spectro.ReferenceFid;

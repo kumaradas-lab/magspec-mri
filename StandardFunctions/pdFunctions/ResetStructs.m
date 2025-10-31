@@ -3,17 +3,11 @@
 % commonly used fields.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
-
-%% Initialize blank structures
-Seq = struct();
-TX = struct();
-AQ = struct();
-Grad = struct();
-
+clear Seq TX AQ Grad
 
 %% Sequence parameters
 

@@ -24,7 +24,7 @@ function [SeqOut, data] = SearchLiftUserPositionAuto(HW, Seq)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2018-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2018 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -32,7 +32,7 @@ function [SeqOut, data] = SearchLiftUserPositionAuto(HW, Seq)
 if nargin ~= 2
   error('Correct syntax is: SearchLiftUserPositionAuto(HW, Seq)');
 end
-if ~(isa(HW, 'PD.HWClass') || ~isemptyfield(HW, 'Lift')) ...
+if ~(isa(HW, 'PD.HW') || ~isemptyfield(HW, 'Lift')) ...
     || ~isa(HW.Lift, 'PD.SampleLift') || ~isvalid(HW.Lift)
   error('You must have a sample lift to use this function');
 end

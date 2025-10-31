@@ -8,7 +8,7 @@ function [Seq, data_1D, data_S_AQs_TRs] = Postprocessing(nargout_set_sequence, .
 % See also: get_data, get_data_1d
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2016-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2020 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -34,11 +34,10 @@ if nargout_set_sequence > 2
   [Seq, data_S_AQs_TRs] = get_data(Seq, raw_data_AQs, num_averages, Channel, iDevice, nucleusX);
 else
   data_S_AQs_TRs = struct('time_of_tRep', NaN, 'time_all', NaN, ...
-    'data', NaN, 'averages', [], 'overflow', [], ...
-    'device', NaN, 'channel', NaN, 'nucleusX', NaN, ...
-    'f_fft1_data', [], 'fft1_data', [], ...
-    'cic_N', NaN, 'cic_M', NaN, 'cic_corr', [], 'timestamp', [], ...
-    'Amplitude2Norm', [], 'Amplitude2Uin', [], 'WindowPhaseOffset', []);
+  'data', NaN, 'averages', [], 'channel', NaN, 'device', NaN, 'nucleusX', NaN, ...
+  'f_fft1_data', [], 'fft1_data', [], ...
+  'cic_N', NaN, 'cic_M', NaN, 'cic_corr', [], ...
+  'Amplitude2Norm', [], 'Amplitude2Uin', [], 'WindowPhaseOffset', []);
 end
 
 %% data_1D (all samples divided by NaN at AQ window borders)
@@ -46,8 +45,7 @@ if nargout_set_sequence > 3
   [Seq, data_1D] = get_data_1D(Seq, data_S_AQs_TRs, Channel, iDevice, nucleusX);
 else
   data_1D = struct('time_of_tRep', NaN, 'time_all', NaN, ...
-    'data', NaN, 'AqFrequency', NaN, 'Amplitude2Norm', [], ...
-    'device', NaN, 'channel', NaN, 'nucleusX', NaN);
+  'data', NaN, 'AqFrequency', NaN, 'channel', NaN, 'device', NaN, 'nucleusX', NaN);
 end
 
 end

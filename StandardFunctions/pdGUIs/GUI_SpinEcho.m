@@ -21,7 +21,7 @@ function varargout = GUI_SpinEcho(varargin)
 % See also: GUIDE, GUIDATA, GUIHANDLES
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -48,9 +48,6 @@ else
 end
 % End initialization code - DO NOT EDIT
 
-end
-
-
 % --- Executes just before GUI_SpinEcho is made visible.
 function GUI_SpinEcho_OpeningFcn(hObject, eventdata, handles, varargin)
 % This function has no output args, see OutputFcn.
@@ -71,18 +68,8 @@ if strcmp(get(hObject,'Visible'),'off')
 %     plot(rand(5));
 end
 
-if evalin('base', 'exist(''HW'', ''var'')')
-  HW = evalin('base', 'HW');
-
-  set(handles.edit_shimX, 'String', num2str(HW.MagnetShim(1)*1e3, '%.3f'));
-  set(handles.edit_shimY, 'String', num2str(HW.MagnetShim(2)*1e3, '%.3f'));
-  set(handles.edit_shimZ, 'String', num2str(HW.MagnetShim(3)*1e3, '%.3f'));
-end
-
 % UIWAIT makes GUI_SpinEcho wait for user response (see UIRESUME)
-% uiwait(handles.figure_SpinEcho);
-
-end
+% uiwait(handles.figure1);
 
 
 % --- Outputs from this function are returned to the command line.
@@ -95,38 +82,12 @@ function varargout = GUI_SpinEcho_OutputFcn(hObject, eventdata, handles)
 % Get default command line output from handles structure
 varargout{1} = handles.output;
 
-end
-
-
-function figure_SpinEcho_SizeChangeFcn(hObject, eventdata, handles)
-% executes on size change
-
-% keep controls in upper right corner
-figPos = get(hObject, 'Position');
-controlsPos = get(handles.panel_controls_content, 'Position');
-controlsPos(1:2) = figPos(3:4)-controlsPos(3:4);
-set(handles.panel_controls_content, 'Position', controlsPos);
-
-% keep popupmenu close to upper border
-popupPos = get(handles.popupmenu_axes_large, 'Position');
-popupPos(2) = figPos(4) - 32;
-set(handles.popupmenu_axes_large, 'Position', popupPos);
-
-% resize large axes to fit available space
-axesPos = get(handles.axes_large, 'Position');
-axesPos(3:4) = figPos(3:4) - [(1120-595), (732-620)];
-set(handles.axes_large, 'Position', axesPos);
-
-end
-
 
 % --------------------------------------------------------------------
 function FileMenu_Callback(hObject, eventdata, handles)
 % hObject    handle to FileMenu (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
-end
 
 
 % --------------------------------------------------------------------
@@ -139,56 +100,46 @@ if ~isequal(file, 0)
     open(file);
 end
 
-end
-
-
 % --------------------------------------------------------------------
 function PrintMenuItem_Callback(hObject, eventdata, handles)
 % hObject    handle to PrintMenuItem (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-printdlg(handles.figure_SpinEcho)
-
-end
-
+printdlg(handles.figure1)
 
 % --------------------------------------------------------------------
 function CloseMenuItem_Callback(hObject, eventdata, handles)
 % hObject    handle to CloseMenuItem (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-selection = questdlg(['Close ' get(handles.figure_SpinEcho,'Name') '?'],...
-                     ['Close ' get(handles.figure_SpinEcho,'Name') '...'],...
+selection = questdlg(['Close ' get(handles.figure1,'Name') '?'],...
+                     ['Close ' get(handles.figure1,'Name') '...'],...
                      'Yes', 'No', 'Yes');
 if ~strcmp(selection, 'Yes')
     return;
 end
 
-delete(handles.figure_SpinEcho)
-
-end
+delete(handles.figure1)
 
 
-% --- Executes on selection change in popupmenu_axes_large.
-function popupmenu_axes_large_Callback(hObject, eventdata, handles)
-% hObject    handle to popupmenu_axes_large (see GCBO)
+% --- Executes on selection change in popupmenu1.
+function popupmenu1_Callback(hObject, eventdata, handles)
+% hObject    handle to popupmenu1 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: contents = get(hObject,'String') returns popupmenu_axes_large contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from popupmenu_axes_large
-if ~handles.Running
+% Hints: contents = get(hObject,'String') returns popupmenu1 contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from popupmenu1
+if ~handles.Runing
     handles.refreshPlot=1;
     guidata(hObject, handles);
-    pushbutton_update_Callback(hObject, eventdata, handles)
-end
-
+    pushbutton4_Callback(hObject, eventdata, handles)
 end
 
 
 % --- Executes during object creation, after setting all properties.
-function popupmenu_axes_large_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to popupmenu_axes_large (see GCBO)
+function popupmenu1_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to popupmenu1 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
@@ -200,23 +151,20 @@ end
 
 % set(hObject, 'String', {'plot(rand(5))', 'plot(sin(1:0.01:25))', 'bar(1:.5:10)', 'plot(membrane)', 'surf(peaks)'});
 
-end
 
 
-function edit_p90_Callback(hObject, eventdata, handles)
-% hObject    handle to edit_p90 (see GCBO)
+function edit1_Callback(hObject, eventdata, handles)
+% hObject    handle to edit1 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: get(hObject,'String') returns contents of edit_p90 as text
-%        str2double(get(hObject,'String')) returns contents of edit_p90 as a double
-
-end
+% Hints: get(hObject,'String') returns contents of edit1 as text
+%        str2double(get(hObject,'String')) returns contents of edit1 as a double
 
 
 % --- Executes during object creation, after setting all properties.
-function edit_p90_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit_p90 (see GCBO)
+function edit1_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit1 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
@@ -226,23 +174,20 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-end
 
 
-function edit_p180_Callback(hObject, eventdata, handles)
-% hObject    handle to edit_p180 (see GCBO)
+function edit2_Callback(hObject, eventdata, handles)
+% hObject    handle to edit2 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: get(hObject,'String') returns contents of edit_p180 as text
-%        str2double(get(hObject,'String')) returns contents of edit_p180 as a double
-
-end
+% Hints: get(hObject,'String') returns contents of edit2 as text
+%        str2double(get(hObject,'String')) returns contents of edit2 as a double
 
 
 % --- Executes during object creation, after setting all properties.
-function edit_p180_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit_p180 (see GCBO)
+function edit2_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit2 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
@@ -252,23 +197,20 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-end
 
 
-function edit_tEcho_Callback(hObject, eventdata, handles)
-% hObject    handle to edit_tEcho (see GCBO)
+function edit3_Callback(hObject, eventdata, handles)
+% hObject    handle to edit3 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: get(hObject,'String') returns contents of edit_tEcho as text
-%        str2double(get(hObject,'String')) returns contents of edit_tEcho as a double
-
-end
+% Hints: get(hObject,'String') returns contents of edit3 as text
+%        str2double(get(hObject,'String')) returns contents of edit3 as a double
 
 
 % --- Executes during object creation, after setting all properties.
-function edit_tEcho_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit_tEcho (see GCBO)
+function edit3_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit3 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
@@ -278,23 +220,20 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-end
 
 
-function edit_nEchoes_Callback(hObject, eventdata, handles)
-% hObject    handle to edit_nEchoes (see GCBO)
+function edit4_Callback(hObject, eventdata, handles)
+% hObject    handle to edit4 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: get(hObject,'String') returns contents of edit_nEchoes as text
-%        str2double(get(hObject,'String')) returns contents of edit_nEchoes as a double
-
-end
+% Hints: get(hObject,'String') returns contents of edit4 as text
+%        str2double(get(hObject,'String')) returns contents of edit4 as a double
 
 
 % --- Executes during object creation, after setting all properties.
-function edit_nEchoes_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit_nEchoes (see GCBO)
+function edit4_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit4 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
@@ -304,29 +243,24 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-end
 
-
-% --- Executes on selection change in popupmenu_axes_small.
-function popupmenu_axes_small_Callback(hObject, eventdata, handles)
-% hObject    handle to popupmenu_axes_small (see GCBO)
+% --- Executes on selection change in popupmenu2.
+function popupmenu2_Callback(hObject, eventdata, handles)
+% hObject    handle to popupmenu2 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: contents = cellstr(get(hObject,'String')) returns popupmenu_axes_small contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from popupmenu_axes_small
-if ~handles.Running
+% Hints: contents = cellstr(get(hObject,'String')) returns popupmenu2 contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from popupmenu2
+if ~handles.Runing
     handles.refreshPlot=1;
     guidata(hObject, handles);
-    pushbutton_update_Callback(hObject, eventdata, handles)
+    pushbutton4_Callback(hObject, eventdata, handles)
 end
-
-end
-
 
 % --- Executes during object creation, after setting all properties.
-function popupmenu_axes_small_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to popupmenu_axes_small (see GCBO)
+function popupmenu2_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to popupmenu2 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
@@ -336,25 +270,23 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-end
 
-
-% --- Executes on button press in pushbutton_update.
-function pushbutton_update_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton_update (see GCBO)
+% --- Executes on button press in pushbutton4.
+function pushbutton4_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton4 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 if ~isfield(handles, 'Update'),  handles.Update = 1;  end
 handles.Update = 1;
-if ~isfield(handles, 'Running'),  handles.Running = 0;  end
+if ~isfield(handles, 'Runing'),  handles.Runing = 0;  end  % FIXME: Fix typo "Runing" -> "Running"
 if ~isfield(handles, 'Cal'),     handles.Cal.Cal = 0;  end
 if ~isfield(handles.Cal, 'Cal'), handles.Cal.Cal = 0;  end
 %if isfield(handles, 'talker'), talker = handles.talker;  end
 mySave = [];
 if isfield(handles, 'mySave'),  mySave = handles.mySave;  end
 if ~isfield(handles, 'refreshPlot'),  handles.refreshPlot = 0;  end
-handles.Running = 1;
+handles.Runing = 1;
 guidata(hObject, handles);
 % FIXME: Support multiple MMRT devices
 if isemptyfield(handles, 'iDevice'),  handles.iDevice = 1;  end
@@ -362,18 +294,10 @@ if isemptyfield(handles, 'iDevice'),  handles.iDevice = 1;  end
 if evalin('base', 'exist(''HW'', ''var'')')
   HW = evalin('base', 'HW');
 end
-if exist('HW', 'var') && isa(HW, 'PD.HWClass')
+if exist('HW', 'var') && isa(HW, 'PD.HW')
   ResetStructs;
 else
-  if isfield(HW, 'MagnetShim')
-    oldShim = HW.MagnetShim;
-  else
-    oldShim = [];
-  end
   LoadSystem;
-  if ~isempty(oldShim)
-    HW.MagnetShim = oldShim;
-  end
 end
 if evalin('base', 'exist(''mySave'', ''var'')')
   mySave = evalin('base', 'mySave');
@@ -387,17 +311,9 @@ handles.Seq = Seq;
 handles.Seq.Cal = 0;
 handles.Seq.plot = 0;
 handles.Seq.plotTR = 0;
-handles.Seq.firstTR = 1;
+handles.Seq.firtstTR = 1;
 if ~isfield(handles, 'SeqOut'),  handles.SeqOut = [];  end
-set(handles.pushbutton_shimX_minus, 'Enable', 'on');
-set(handles.pushbutton_shimX_plus, 'Enable', 'on');
-set(handles.pushbutton_shimY_minus, 'Enable', 'on');
-set(handles.pushbutton_shimY_plus, 'Enable', 'on');
-set(handles.pushbutton_shimZ_minus, 'Enable', 'on');
-set(handles.pushbutton_shimZ_plus, 'Enable', 'on');
-set(handles.pushbutton_save_shim, 'Enable', 'on');
-
-while ((get(handles.checkbox_repetition, 'Value') && get(handles.radiobutton2, 'Value')) || handles.Update)
+while ((get(handles.checkbox2, 'Value') && get(handles.radiobutton2,'Value')) || handles.Update)
   handles.Seq.plotAllHandle = [];
   handles.Seq.plotFidHandle = [];
   handles.Seq.plotEchoesHandle = [];
@@ -405,79 +321,60 @@ while ((get(handles.checkbox_repetition, 'Value') && get(handles.radiobutton2, '
   handles.Update = 0;
   handles.Seq.tOffset = 0;
 
-  handles.Seq.DigitalIOEnable = 0;
+  handles.Seq.DigitalIOEnable = 1;
   if handles.Seq.DigitalIOEnable
     handles.Seq.DigitalIO.SetTime = [-1e-6;  0;  1e-6 ];  % DigitalIO trigger output at center of excitation pulse
     handles.Seq.DigitalIO.SetValue = [   0;  1;     0 ];  % DigitalIO output 1 raising edge at center of excitation pulse
   end
 
   if ~isfield(handles, 'SeqOut'),handles.SeqOut.StartSequenceTime=now*24*3600;end
-  if (get(handles.checkbox_repetition, 'Value') && ~handles.Seq.firstTR)
-    if str2double(get(handles.edit_repetition_time, 'String'))*1e-3 > 2.5 || ...
-      (get(handles.checkbox_calibrate, 'Value') && handles.HW.FindFrequencyPause > 2.5)
-      % handles.Seq.StartSequenceTime = handles.SeqOut.StartSequenceTime + str2double(get(handles.edit_repetition_time, 'String'))*1e-3;
+  if (get(handles.checkbox2, 'Value') && ~handles.Seq.firtstTR)
+    if str2double(get(handles.edit7, 'String'))*1e-3>2.5;
+      % handles.Seq.StartSequenceTime = handles.SeqOut.StartSequenceTime + str2double(get(handles.edit7, 'String'))*1e-3;
       handles.Seq.tOffset = handles.HW.tRepInit;
     end
     handles.Seq.StartSequenceTime = [];
     handles.Seq.Reinitialize = 0;
-    handles.Seq.TimeFromLastSequence = str2double(get(handles.edit_repetition_time, 'String'))*1e-3 - sum(handles.SeqOut.tRep);
-    handles.Seq.TimeToNextSequence = str2double(get(handles.edit_repetition_time, 'String'))*1e-3;
+    handles.Seq.TimeFromLastSequence = str2double(get(handles.edit7, 'String'))*1e-3 - sum(handles.SeqOut.tRep);
+    handles.Seq.TimeToNextSequence = str2double(get(handles.edit7, 'String'))*1e-3;
   else
     handles.Seq.StartSequenceTime = [];
     handles.Seq.Reinitialize = 1;
     handles.Seq.TimeFromLastSequence = [];
-    handles.Seq.TimeToNextSequence = str2double(get(handles.edit_repetition_time, 'String'))*1e-3;
+    handles.Seq.TimeToNextSequence = str2double(get(handles.edit7, 'String'))*1e-3;
   end
 
-  handles.Seq.firstTR = 0;
+  handles.Seq.firtstTR = 0;
   if ~handles.refreshPlot
-    handles.Seq.notCalibrate=double(~get(handles.checkbox_calibrate, 'Value'));
-    if isnan(str2double(get(handles.edit_fLarmor, 'String'))*1e6);
-      if ~isa(handles.HW, 'PD.HWClass')
-        % update with current settings from base workspace
-        handles.HW = evalin('base', 'HW');
-      end
+    handles.Seq.notCalibrate=double(~get(handles.checkbox3, 'Value'));
+    if isnan(str2double(get(handles.edit6, 'String'))*1e6);
       [handles.HW, handles.mySave] = Find_Frequency_Sweep(handles.HW, handles.mySave, 600*handles.Seq.notCalibrate);
       assignin('base', 'mySave', handles.mySave);
-      if ~isa(handles.HW, 'PD.HWClass')
-        % keep track of potential changes of shim setting during frequency sweep
-        HW_old = evalin('base', 'HW');
-        handles.HW.MagnetShim = HW_old.MagnetShim;
-      end
-      if ~isa(HW, 'PD.HWClass'),  assignin('base', 'HW', handles.HW);  end
-      figure(handles.figure_SpinEcho);
-      set(handles.edit_fLarmor, 'String', ['auto ', num2str(handles.HW.fLarmor/1e6, '%3.6f')]);
+      if ~isa(HW, 'PD.HW'),  assignin('base', 'HW', handles.HW);  end
+      figure(handles.figure1);
+      set(handles.edit6, 'String', ['auto ', num2str(handles.HW.fLarmor/1e6, '%3.6f')]);
     else
-      handles.HW.fLarmor = str2double(get(handles.edit_fLarmor, 'String'))*1e6;
+      handles.HW.fLarmor = str2double(get(handles.edit6, 'String'))*1e6;
       handles.HW.B0 = handles.HW.fLarmor/handles.HW.GammaDef*2*pi;
       if ~handles.Seq.notCalibrate
-        if ~isa(handles.HW, 'PD.HWClass')
-          % update with current settings from base workspace
-          handles.HW = evalin('base', 'HW');
-        end
         [handles.HW, handles.mySave] = Find_Frequency_Sweep(handles.HW, handles.mySave, 600*handles.Seq.notCalibrate);
         assignin('base', 'mySave', handles.mySave);
-        if ~isa(handles.HW, 'PD.HWClass')
-          % keep track of potential changes of shim setting during frequency sweep
-          HW_old = evalin('base', 'HW');
-          handles.HW.MagnetShim = HW_old.MagnetShim;
-        end
-        if ~isa(HW, 'PD.HWClass'),  assignin('base', 'HW', handles.HW);  end
-        figure(handles.figure_SpinEcho);
-        set(handles.edit_fLarmor, 'String', ['auto ', num2str(handles.HW.fLarmor/1e6,'%3.6f')]);
+        if ~isa(HW, 'PD.HW'),  assignin('base', 'HW', handles.HW);  end
+        figure(handles.figure1);
+        set(handles.edit6, 'String', ['auto ', num2str(handles.HW.fLarmor/1e6,'%3.6f')]);
       end
     end
   end
 
-  popup_sel_String = get(handles.pushbutton_update, 'String');
+  popup_sel_String = get(handles.pushbutton4, 'String');
   switch popup_sel_String
     case 'B1+'
-      if isnan(str2double(get(handles.edit_p90, 'String'))*1e-6);
+      if isnan(str2double(get(handles.edit1, 'String'))*1e-6);
         [handles.HW, handles.mySave] = Find_PulseDuration(handles.HW, handles.mySave, 0, 1);
       else
-        [handles.HW, handles.mySave] = Find_PulseDuration(handles.HW, handles.mySave, 0, 1, 3, get(handles.edit_p90, 'String')*1e-6);
+        [handles.HW, handles.mySave] = Find_PulseDuration(handles.HW, handles.mySave, 0, 1, 3, get(handles.edit1, 'String')*1e-6);
       end
-      if exist('HW', 'var') && isa(HW, 'PD.HWClass')
+      if exist('HW', 'var') && isa(HW, 'PD.HW')
         ResetStructs;
       else
         LoadSystem;
@@ -485,118 +382,114 @@ while ((get(handles.checkbox_repetition, 'Value') && get(handles.radiobutton2, '
       handles.HW = HW;
       handles.mySave = mySave;
       assignin('base', 'mySave', handles.mySave);
-      if ~isa(HW, 'PD.HWClass'),  assignin('base', 'HW', handles.HW);  end
-      set(handles.edit_p90, 'String', ['def ', num2str(handles.HW.tFlip90Def*1e6, '%3.3f')]);
-      set(handles.edit_p180, 'String', ['def ', num2str(handles.HW.tFlip180Def*1e6, '%3.3f')]);
+      if ~isa(HW, 'PD.HW'),  assignin('base', 'HW', handles.HW);  end
+      set(handles.edit1, 'String', ['def ', num2str(handles.HW.tFlip90Def*1e6, '%3.3f')]);
+      set(handles.edit2, 'String', ['def ', num2str(handles.HW.tFlip180Def*1e6, '%3.3f')]);
       handles.Seq.p90 = handles.HW.tFlip90Def;
       handles.Seq.p180 = handles.HW.tFlip180Def;
-      figure(handles.figure_SpinEcho);
+      figure(handles.figure1);
 
     case 'B0'
       t = handles.HW.FindFrequencyPlot;
       handles.HW.FindFrequencyPlot = 1;
       [handles.HW, handles.mySave] = Find_Frequency_Sweep(handles.HW, handles.mySave, 0, [], 1);
       assignin('base', 'mySave', handles.mySave);
-      if ~isa(HW, 'PD.HWClass'),  assignin('base', 'HW', handles.HW);  end
-      figure(handles.figure_SpinEcho);
+      if ~isa(HW, 'PD.HW'),  assignin('base', 'HW', handles.HW);  end
+      figure(handles.figure1);
       handles.HW.FindFrequencyPlot = t;
-      set(handles.edit_fLarmor, 'String', ['auto ', num2str(handles.HW.fLarmor/1e6,'%3.6f')]);
+      set(handles.edit6, 'String', ['auto ', num2str(handles.HW.fLarmor/1e6,'%3.6f')]);
 
     case 'Shim'
       [handles.HW, handles.mySave] = Find_Shim(handles.HW, handles.mySave, 0, 1);
       assignin('base', 'mySave', handles.mySave);
-      if ~isa(HW, 'PD.HWClass'),  assignin('base', 'HW', handles.HW);  end
-
-      set(handles.edit_shimX, 'String', num2str(handles.HW.MagnetShim(1)*1e3, '%.3f'));
-      set(handles.edit_shimY, 'String', num2str(handles.HW.MagnetShim(2)*1e3, '%.3f'));
-      set(handles.edit_shimZ, 'String', num2str(handles.HW.MagnetShim(3)*1e3, '%.3f'));
+      if ~isa(HW, 'PD.HW'),  assignin('base', 'HW', handles.HW);  end
 
     otherwise
 
-      popup_sel_index = get(handles.popupmenu_axes_large, 'Value');
+      popup_sel_index = get(handles.popupmenu1, 'Value');
       switch popup_sel_index
         case 1
-          handles.Seq.plot = 0;
-          handles.Seq.plotAllHandle = handles.axes_large;
-          if popup_sel_index == get(handles.popupmenu_axes_small, 'Value')
-            set(handles.popupmenu_axes_small, 'Value', 2);
+            handles.Seq.plot = 0;
+          handles.Seq.plotAllHandle = handles.axes3;
+          if popup_sel_index == get(handles.popupmenu2, 'Value')
+            set(handles.popupmenu2, 'Value', 2);
           end
 
         case 2
-          handles.Seq.plotFidHandle = handles.axes_large;
-          if popup_sel_index == get(handles.popupmenu_axes_small, 'Value')
-            set(handles.popupmenu_axes_small, 'Value', 1);
+          handles.Seq.plotFidHandle = handles.axes3;
+          if popup_sel_index == get(handles.popupmenu2, 'Value')
+            set(handles.popupmenu2, 'Value', 1);
           end
 
         case 3
-          handles.Seq.plotEchoesHandle = handles.axes_large;
-          if popup_sel_index == get(handles.popupmenu_axes_small, 'Value')
-            set(handles.popupmenu_axes_small, 'Value', 1);
+          handles.Seq.plotEchoesHandle = handles.axes3;
+          if popup_sel_index == get(handles.popupmenu2, 'Value')
+            set(handles.popupmenu2, 'Value', 1);
           end
 
         case 4
-          handles.Seq.plotMaxEchoesHandle = handles.axes_large;
-          if popup_sel_index == get(handles.popupmenu_axes_small, 'Value')
-            set(handles.popupmenu_axes_small, 'Value', 1);
+          handles.Seq.plotMaxEchoesHandle = handles.axes3;
+          if popup_sel_index == get(handles.popupmenu2, 'Value')
+            set(handles.popupmenu2, 'Value', 1);
           end
 
       end
 
-      popup_sel_index = get(handles.popupmenu_axes_small, 'Value');
+      popup_sel_index = get(handles.popupmenu2, 'Value');
       switch popup_sel_index
         case 1
-          handles.Seq.plotAllHandle = handles.axes_small;
+          handles.Seq.plotAllHandle = handles.axes2;
         case 2
-          handles.Seq.plotFidHandle = handles.axes_small;
+          handles.Seq.plotFidHandle = handles.axes2;
         case 3
-          handles.Seq.plotEchoesHandle = handles.axes_small;
+          handles.Seq.plotEchoesHandle = handles.axes2;
         case 4
-          handles.Seq.plotMaxEchoesHandle = handles.axes_small;
+          handles.Seq.plotMaxEchoesHandle = handles.axes2;
       end
 
 
       if ~handles.refreshPlot
-        if isnan(str2double(get(handles.edit_p90, 'String')))
-          set(handles.edit_p90, 'String', ['def ', num2str(handles.HW.tFlip90Def*1e6, '%3.3f')])
+        if isnan(str2double(get(handles.edit1, 'String')))
+          set(handles.edit1, 'String', ['def ', num2str(handles.HW.tFlip90Def*1e6, '%3.3f')])
           handles.Seq.p90 = handles.HW.tFlip90Def;
         else
-          handles.Seq.p90 = str2double(get(handles.edit_p90, 'String'))/1e6;
+          handles.Seq.p90 = str2double(get(handles.edit1, 'String'))/1e6;
         end
 
-        if isnan(str2double(get(handles.edit_p180, 'String')))
-          set(handles.edit_p180, 'String', ['def ', num2str(handles.HW.tFlip180Def*1e6,'%3.3f')])
+        if isnan(str2double(get(handles.edit2, 'String')))
+          set(handles.edit2, 'String', ['def ', num2str(handles.HW.tFlip180Def*1e6,'%3.3f')])
           handles.Seq.p180 = handles.HW.tFlip180Def;
         else
-          handles.Seq.p180 = str2double(get(handles.edit_p180, 'String'))/1e6;
+          handles.Seq.p180 = str2double(get(handles.edit2, 'String'))/1e6;
         end
 
-        if isnan(str2double(get(handles.edit_tEcho, 'String')))
-          set(handles.edit_tEcho, 'String', ['def ', num2str(10,'%3.0f')])
+        if isnan(str2double(get(handles.edit3, 'String')))
+          set(handles.edit3, 'String', ['def ', num2str(10,'%3.0f')])
           handles.Seq.tEcho = 10e-3;
         else
-          handles.Seq.tEcho = str2double(get(handles.edit_tEcho, 'String'))/1e3;
+          handles.Seq.tEcho = str2double(get(handles.edit3, 'String'))/1e3;
         end
 
-        if isnan(str2double(get(handles.edit_nEchoes, 'String')))
-          set(handles.edit_nEchoes, 'String', ['def ', num2str(1,'%3.0f')])
+        if isnan(str2double(get(handles.edit4, 'String')))
+          set(handles.edit4, 'String', ['def ', num2str(1,'%3.0f')])
           handles.Seq.nEchos = 1;
         else
-          handles.Seq.nEchos = str2double(get(handles.edit_nEchoes, 'String'));
+          handles.Seq.nEchos = str2double(get(handles.edit4, 'String'));
         end
 
-        if get(handles.checkbox_unit_B1, 'Value')
+        if get(handles.checkbox1, 'Value')
           handles.Seq.B1Amp2Str = 1e6;
-          set(handles.text_unit_B1, 'String', [char(181) 'T'])
+          set(handles.text10, 'String', [char(181) 'T'])
         else
           handles.Seq.B1Amp2Str = handles.HW.GammaDef/2/pi/1000;
-          set(handles.text_unit_B1, 'String', 'kHz')
+          set(handles.text10, 'String', 'kHz')
         end
 
-        if isnan(str2double(get(handles.edit_B1, 'String')));
-          set(handles.edit_B1, 'String', ['def ', num2str(handles.HW.TX(handles.iDevice).AmpDef*handles.Seq.B1Amp2Str,'%3.6f')])
+        if isnan(str2double(get(handles.edit5, 'String')));
+          set(handles.edit5, 'String', ['def ', num2str(handles.HW.TX(handles.iDevice).AmpDef*handles.Seq.B1Amp2Str,'%3.6f')])
           handles.Seq.TXAmp = handles.HW.TX(handles.iDevice).AmpDef;
         else
-          handles.Seq.TXAmp = str2double(get(handles.edit_B1, 'String'))/handles.Seq.B1Amp2Str;
+          handles.Seq.TXAmp = str2double(get(handles.edit5, 'String'))/handles.Seq.B1Amp2Str;
         end
 
 
@@ -617,11 +510,7 @@ while ((get(handles.checkbox_repetition, 'Value') && get(handles.radiobutton2, '
         end
 
         if handles.Seq.nEchos==0,  handles.Seq.AQFID = 1;  end
-        handles.Running = 1;
-        if ~isa(handles.HW, 'PD.HWClass')
-          % update with current settings before overriding handles
-          handles.HW = evalin('base', 'HW');
-        end
+        handles.Runing = 1;
         guidata(hObject, handles);
         [handles.data, handles.SeqOut] = sequence_EchoStandard(handles.HW, handles.Seq);
         drawnow();
@@ -636,11 +525,7 @@ while ((get(handles.checkbox_repetition, 'Value') && get(handles.radiobutton2, '
         handles.Seq.plotMaxEchoesHandle = [];
       else
         Channel = 1;  % FIXME: Add support for multiple acquisition channels?
-        if isfield(handles.SeqOut.AQ(1), 'Device')
-          iAQ = find([handles.SeqOut.AQ(:).Channel] == Channel & [handles.SeqOut.AQ(:).Device] == handles.iDevice, 1, 'first');
-        else
-          iAQ = 1;
-        end
+        iAQ = find([handles.SeqOut.AQ(:).Channel] == Channel & [handles.SeqOut.AQ(:).Device] == handles.iDevice, 1, 'first');
       end
 
       %% plotFidHandle
@@ -837,95 +722,83 @@ while ((get(handles.checkbox_repetition, 'Value') && get(handles.radiobutton2, '
       end
       %%
 
-      if ~isa(handles.HW, 'PD.HWClass')
-        % update with current settings before overriding handles
-        handles.HW = evalin('base', 'HW');
-      end
 
       % handles.HW.ReInit = 0;
       % handles.HW.tRepInit = 0.005;
   end
 
   set(handles.radiobutton2, 'Value', 1);
-  handles.Seq.firstTR = 0;
+  handles.Seq.firtstTR = 0;
   guidata(hObject, handles);
   uipanel1_SelectionChangeFcn(hObject, eventdata, handles);
 end
 % handles.HW.tRepInit = 0.3;
 % handles.HW.ReInit = 1;
-handles.Running = 0;
+handles.Runing = 0;
 guidata(hObject, handles);
 
-end
 
 
-% --- Executes on button press in checkbox_unit_B1.
-function checkbox_unit_B1_Callback(hObject, eventdata, handles)
-% hObject    handle to checkbox_unit_B1 (see GCBO)
+% --- Executes on button press in checkbox1.
+function checkbox1_Callback(hObject, eventdata, handles)
+% hObject    handle to checkbox1 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hint: get(hObject,'Value') returns toggle state of checkbox_unit_B1
-if get(handles.checkbox_unit_B1, 'Value')
-  handles.Seq.B1Amp2Str=1e6;
-  set(handles.text_unit_B1, 'String', [char(181) 'T'])
-else
-  handles.Seq.B1Amp2Str=handles.HW.GammaDef/2/pi/1000;
-  set(handles.text_unit_B1, 'String', 'kHz')
-end
+% Hint: get(hObject,'Value') returns toggle state of checkbox1
+        if get(handles.checkbox1, 'Value')
+            handles.Seq.B1Amp2Str=1e6;
+            set(handles.text10, 'String', [char(181) 'T'])
+        else
+            handles.Seq.B1Amp2Str=handles.HW.GammaDef/2/pi/1000;
+            set(handles.text10, 'String', 'kHz')
+        end
 
-if isfield(handles,'Seq')
-  if isfield(handles.Seq,'TXAmp')
-    if isfield(handles.Seq,'B1Amp2Str')
-      if isnan(str2double(get(handles.edit_B1, 'String')));
-        set(handles.edit_B1, 'String', ['def ', num2str(handles.Seq.TXAmp*handles.Seq.B1Amp2Str,'%3.6f')])
-      else
-        set(handles.edit_B1, 'String', num2str(handles.Seq.TXAmp*handles.Seq.B1Amp2Str,'%3.6f'))
-      end
-    end
-  end
-end
-
-end
+        if isfield(handles,'Seq')
+            if isfield(handles.Seq,'TXAmp')
+                if isfield(handles.Seq,'B1Amp2Str')
+                    if isnan(str2double(get(handles.edit5, 'String')));
+                        set(handles.edit5, 'String', ['def ', num2str(handles.Seq.TXAmp*handles.Seq.B1Amp2Str,'%3.6f')])
+                    else
+                        set(handles.edit5, 'String', num2str(handles.Seq.TXAmp*handles.Seq.B1Amp2Str,'%3.6f'))
+                    end
+                end
+            end
+        end
 
 
-% --- Executes on button press in checkbox_repetition.
-function checkbox_repetition_Callback(hObject, eventdata, handles)
-% hObject    handle to checkbox_repetition (see GCBO)
+% --- Executes on button press in checkbox2.
+function checkbox2_Callback(hObject, eventdata, handles)
+% hObject    handle to checkbox2 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hint: get(hObject,'Value') returns toggle state of checkbox_repetition
-if get(handles.checkbox_repetition, 'Value')
-    pushbutton_update_Callback(hObject, eventdata, handles)
+% Hint: get(hObject,'Value') returns toggle state of checkbox2
+if get(handles.checkbox2, 'Value')
+    pushbutton4_Callback(hObject, eventdata, handles)
 end
 
-end
 
 
-function edit_B1_Callback(hObject, eventdata, handles)
-% hObject    handle to edit_B1 (see GCBO)
+function edit5_Callback(hObject, eventdata, handles)
+% hObject    handle to edit5 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: get(hObject,'String') returns contents of edit_B1 as text
-%        str2double(get(hObject,'String')) returns contents of edit_B1 as a double
-
-end
+% Hints: get(hObject,'String') returns contents of edit5 as text
+%        str2double(get(hObject,'String')) returns contents of edit5 as a double
 
 
 % --- Executes during object creation, after setting all properties.
-function edit_B1_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit_B1 (see GCBO)
+function edit5_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit5 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: edit controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-  set(hObject,'BackgroundColor','white');
-end
-
+    set(hObject,'BackgroundColor','white');
 end
 
 
@@ -943,381 +816,41 @@ function uipanel1_SelectionChangeFcn(hObject, eventdata, handles)
 % handles.Cal.open=get(handles.radiobutton4,'Value');
 % handles.Cal.terminated=get(handles.radiobutton5,'Value');
 
-if get(handles.radiobutton2,'Value'),  set(handles.pushbutton_update, 'String', 'Update'); end
-if get(handles.radiobutton3,'Value'),  set(handles.pushbutton_update, 'String', 'B1+'); end
-if get(handles.radiobutton4,'Value'),  set(handles.pushbutton_update, 'String', 'B0'); end
-if get(handles.radiobutton5,'Value'),  set(handles.pushbutton_update, 'String', 'Shim'); end
+if get(handles.radiobutton2,'Value'); set(handles.pushbutton4, 'String','Update');end
+if get(handles.radiobutton3,'Value'); set(handles.pushbutton4, 'String','B1+');end
+if get(handles.radiobutton4,'Value'); set(handles.pushbutton4, 'String','B0');end
+if get(handles.radiobutton5,'Value'); set(handles.pushbutton4, 'String','Shim');end
 
 guidata(hObject, handles);
 
-end
 
 
-function edit_fLarmor_Callback(hObject, eventdata, handles)
-% hObject    handle to edit_fLarmor (see GCBO)
+function edit6_Callback(hObject, eventdata, handles)
+% hObject    handle to edit6 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: get(hObject,'String') returns contents of edit_fLarmor as text
-%        str2double(get(hObject,'String')) returns contents of edit_fLarmor as a double
-
-end
+% Hints: get(hObject,'String') returns contents of edit6 as text
+%        str2double(get(hObject,'String')) returns contents of edit6 as a double
 
 
 % --- Executes during object creation, after setting all properties.
-function edit_fLarmor_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit_fLarmor (see GCBO)
+function edit6_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit6 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: edit controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-  set(hObject,'BackgroundColor','white');
+    set(hObject,'BackgroundColor','white');
 end
 
-end
 
-
-% --- Executes on button press in checkbox_calibrate.
-function checkbox_calibrate_Callback(hObject, eventdata, handles)
-% hObject    handle to checkbox_calibrate (see GCBO)
+% --- Executes on button press in checkbox3.
+function checkbox3_Callback(hObject, eventdata, handles)
+% hObject    handle to checkbox3 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hint: get(hObject,'Value') returns toggle state of checkbox_calibrate
-
-end
-
-
-function edit_shimX_Callback(hObject, eventdata, handles)
-% hObject    handle to edit_shimX (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of edit_shimX as text
-%        str2double(get(hObject,'String')) returns contents of edit_shimX as a double
-
-shimX = str2double(get(hObject, 'String'));
-if isfinite(shimX)
-  handles.HW.MagnetShim(1) = shimX/1e3;
-else
-  set(hObject, 'String', num2str(handles.HW.MagnetShim(1)*1e3, '%.3f'));
-end
-
-end
-
-
-% --- Executes during object creation, after setting all properties.
-function edit_shimX_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit_shimX (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-  set(hObject,'BackgroundColor','white');
-end
-
-end
-
-
-function edit_shimX_inc_Callback(hObject, eventdata, handles)
-% hObject    handle to edit_shimX_inc (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of edit_shimX_inc as text
-%        str2double(get(hObject,'String')) returns contents of edit_shimX_inc as a double
-
-shimX = str2double(get(hObject, 'String'));
-if ~isfinite(shimX)
-  set(hObject, 'String', '0.500');
-end
-
-end
-
-
-% --- Executes during object creation, after setting all properties.
-function edit_shimX_inc_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit_shimX_inc (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-  set(hObject,'BackgroundColor','white');
-end
-
-end
-
-
-% --- Executes on button press in pushbutton_shimX_minus.
-function pushbutton_shimX_minus_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton_shimX_minus (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-shimXinc = str2double(get(handles.edit_shimX_inc, 'String'))*1e-3;
-
-if ~isa(handles.HW, 'PD.HWClass'),  handles.HW = evalin('base', 'HW');  end
-handles.HW.MagnetShim(1) = handles.HW.MagnetShim(1) - shimXinc;
-if ~isa(handles.HW, 'PD.HWClass'),  assignin('base', 'HW', handles.HW);  end
-
-set(handles.edit_shimX, 'String', num2str(handles.HW.MagnetShim(1)*1e3, '%.3f'));
-
-end
-
-
-% --- Executes on button press in pushbutton_shimX_minus.
-function pushbutton_shimX_plus_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton_shimX_plus (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-shimXinc = str2double(get(handles.edit_shimX_inc, 'String'))*1e-3;
-
-if ~isa(handles.HW, 'PD.HWClass'),  handles.HW = evalin('base', 'HW');  end
-handles.HW.MagnetShim(1) = handles.HW.MagnetShim(1) + shimXinc;
-if ~isa(handles.HW, 'PD.HWClass'),  assignin('base', 'HW', handles.HW);  end
-
-set(handles.edit_shimX, 'String', num2str(handles.HW.MagnetShim(1)*1e3, '%.3f'));
-
-end
-
-
-function edit_shimY_Callback(hObject, eventdata, handles)
-% hObject    handle to edit_shimY (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of edit_shimY as text
-%        str2double(get(hObject,'String')) returns contents of edit_shimY as a double
-
-shimY = str2double(get(hObject, 'String'));
-if isfinite(shimY)
-  handles.HW.MagnetShim(2) = shimY/1e3;
-else
-  set(hObject, 'String', num2str(handles.HW.MagnetShim(2)*1e3, '%.3f'));
-end
-
-end
-
-
-% --- Executes during object creation, after setting all properties.
-function edit_shimY_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit_shimY (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-  set(hObject,'BackgroundColor','white');
-end
-
-end
-
-
-function edit_shimY_inc_Callback(hObject, eventdata, handles)
-% hObject    handle to edit_shimY_inc (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of edit_shimY_inc as text
-%        str2double(get(hObject,'String')) returns contents of edit_shimY_inc as a double
-
-shimY = str2double(get(hObject, 'String'));
-if ~isfinite(shimY)
-  set(hObject, 'String', '0.500');
-end
-
-end
-
-
-% --- Executes during object creation, after setting all properties.
-function edit_shimY_inc_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit_shimY_inc (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-  set(hObject,'BackgroundColor','white');
-end
-
-end
-
-
-% --- Executes on button press in pushbutton_shimX_minus.
-function pushbutton_shimY_minus_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton_shimY_minus (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-shimYinc = str2double(get(handles.edit_shimY_inc, 'String'))*1e-3;
-
-if ~isa(handles.HW, 'PD.HWClass'),  handles.HW = evalin('base', 'HW');  end
-handles.HW.MagnetShim(2) = handles.HW.MagnetShim(2) - shimYinc;
-if ~isa(handles.HW, 'PD.HWClass'),  assignin('base', 'HW', handles.HW);  end
-
-set(handles.edit_shimY, 'String', num2str(handles.HW.MagnetShim(2)*1e3, '%.3f'));
-
-end
-
-
-% --- Executes on button press in pushbutton_shimX_minus.
-function pushbutton_shimY_plus_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton_shimY_plus (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-shimYinc = str2double(get(handles.edit_shimY_inc, 'String'))*1e-3;
-
-if ~isa(handles.HW, 'PD.HWClass'),  handles.HW = evalin('base', 'HW');  end
-handles.HW.MagnetShim(2) = handles.HW.MagnetShim(2) + shimYinc;
-if ~isa(handles.HW, 'PD.HWClass'),  assignin('base', 'HW', handles.HW);  end
-
-set(handles.edit_shimY, 'String', num2str(handles.HW.MagnetShim(2)*1e3, '%.3f'));
-
-end
-
-
-function edit_shimZ_Callback(hObject, eventdata, handles)
-% hObject    handle to edit_shimZ (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of edit_shimY as text
-%        str2double(get(hObject,'String')) returns contents of edit_shimY as a double
-
-shimZ = str2double(get(hObject, 'String'));
-if isfinite(shimZ)
-  handles.HW.MagnetShim(3) = shimZ/1e3;
-else
-  set(hObject, 'String', num2str(handles.HW.MagnetShim(3)*1e3, '%.3f'));
-end
-
-end
-
-
-% --- Executes during object creation, after setting all properties.
-function edit_shimZ_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit_shimZ (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-  set(hObject,'BackgroundColor','white');
-end
-
-end
-
-
-function edit_shimZ_inc_Callback(hObject, eventdata, handles)
-% hObject    handle to edit_shimZ_inc (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of edit_shimY_inc as text
-%        str2double(get(hObject,'String')) returns contents of edit_shimY_inc as a double
-
-shimZ = str2double(get(hObject, 'String'));
-if ~isfinite(shimZ)
-  set(hObject, 'String', '0.500');
-end
-
-end
-
-
-% --- Executes during object creation, after setting all properties.
-function edit_shimZ_inc_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit_shimZ_inc (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-  set(hObject,'BackgroundColor','white');
-end
-
-end
-
-
-% --- Executes on button press in pushbutton_shimX_minus.
-function pushbutton_shimZ_minus_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton_shimZ_minus (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-shimZinc = str2double(get(handles.edit_shimZ_inc, 'String'))*1e-3;
-
-if ~isa(handles.HW, 'PD.HWClass'),  handles.HW = evalin('base', 'HW');  end
-handles.HW.MagnetShim(3) = handles.HW.MagnetShim(3) - shimZinc;
-if ~isa(handles.HW, 'PD.HWClass'),  assignin('base', 'HW', handles.HW);  end
-
-set(handles.edit_shimZ, 'String', num2str(handles.HW.MagnetShim(3)*1e3, '%.3f'));
-
-end
-
-
-% --- Executes on button press in pushbutton_shimX_minus.
-function pushbutton_shimZ_plus_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton_shimZ_plus (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-shimZinc = str2double(get(handles.edit_shimZ_inc, 'String'))*1e-3;
-
-if ~isa(handles.HW, 'PD.HWClass'),  handles.HW = evalin('base', 'HW');  end
-handles.HW.MagnetShim(3) = handles.HW.MagnetShim(3) + shimZinc;
-if ~isa(handles.HW, 'PD.HWClass'),  assignin('base', 'HW', handles.HW);  end
-
-set(handles.edit_shimZ, 'String', num2str(handles.HW.MagnetShim(3)*1e3, '%.3f'));
-
-end
-
-
-% --- Executes on button press in pushbutton_shimX_minus.
-function pushbutton_save_shim_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton_save_shim (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-if ~isa(handles.HW, 'PD.HWClass'),  handles.HW = evalin('base', 'HW');  end
-shimGradIdxStr = sprintf('%d,', find(handles.HW.Grad(handles.iDevice).ShimGradients~=0));
-shimElemStr = sprintf('%6.9f, ', handles.HW.Grad(handles.iDevice).AmpOffset(handles.HW.Grad(handles.iDevice).ShimGradients~=0));
-
-ShimSequenceStr = sprintf(' using "%s"', mfilename());
-
-if numel(handles.HW.Grad) > 1
-  newCalLine = sprintf(['HW.Grad(%d).AmpOffset([%s]) = [%s]; ', ...
-    ' %% %s manually%s, x y z in T/m and B0 in T\n'], ...
-    handles.iDevice, shimGradIdxStr(1:end-1), shimElemStr(1:end-2), ...
-    datestr(now, 'yyyy-mm-ddTHH:MM:SS'), ShimSequenceStr);
-else
-  newCalLine = sprintf(['HW.MagnetShim([%s]) = [%s]; ', ...
-    ' %% %s manually%s, x y z in T/m and B0 in T\n'], ...
-    shimGradIdxStr(1:end-1), shimElemStr(1:end-2), ...
-    datestr(now, 'yyyy-mm-ddTHH:MM:SS'), ShimSequenceStr);
-end
-
-if ~exist(fileparts(handles.HW.MagnetShimPath), 'dir')
-  mkdir(fileparts(handles.HW.MagnetShimPath));
-end
-fid = fopen(handles.HW.MagnetShimPath, 'a+');
-fwrite(fid, newCalLine);
-fclose(fid);
-disp('A new line was added to the following file: ');
-disp(handles.HW.MagnetShimPath);
-fprintf('\n');
-disp(newCalLine);
-fprintf('\n');
-
-end
+% Hint: get(hObject,'Value') returns toggle state of checkbox3

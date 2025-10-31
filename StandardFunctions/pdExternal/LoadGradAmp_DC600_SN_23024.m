@@ -12,7 +12,6 @@
 % Take care to turn on both(!) DC-600. Power on detection is not reliable.
 
 HW.Grad.ExtGradSN = 23024;
-HW.Grad.ExtGradType = 'DC600';
 
 HW.Grad.PowerDown=0;
 HW.Grad.PaEnable=1;
@@ -44,11 +43,6 @@ HW.Grad.PaRout=[15000,15000,15000,15000];               % Output impedance
 
 %% Gradient system
 
-% ACHTUNG: Kopie in LoadSystem_Specific!
-% Gradient efficiency must be reset here because it might have been changed when
-% switching to the external power supply.
-HW.Grad.LoadIin2Amp = [0.0303227, 0.0342713, 0.0334524, 0.102177];  % 2020-07-16T15:52:40, x y z B0  (T/(m*A)) Tesla per Meter per Ampere
-
 % Zuordnung Gradienten Richtung und DAC Channel
 HW.Grad.x = 1;
 HW.Grad.y = 2;
@@ -66,29 +60,16 @@ HW.Grad.MaxAmpSlice = 0.040;
 
 
 % parameters for heat development model
-HW.Grad.CoilThermalGroup = [1, 1, 1, 2];  % assignment of gradient coils to thermal groups
 % Group 1: imaging gradient system
-HW.Grad.CoilPowerDissipation(1) = 5;  % power dissipation at maximum temperature in Watt
-HW.Grad.CoilTemperatur(1) = 20;  % resting temperature for each coil group in degrees C
-HW.Grad.CoilMaxTemperature(1) = 60;  % maximum temperature for each coil group in degrees C
 % Group 2: slice gradient
-HW.Grad.CoilTemperatur(2) = 40;  % resting temperature for each coil group in degrees C
-HW.Grad.CoilMaxTemperature(2) = 60;  % maximum temperature for each coil group in degrees C
-% mass of copper in coils in kg
-mass_x = 200e-3;
-mass_y = 450e-3;
-mass_z = 250e-3;
-% mass_slice = 1.6;
-heatcap_copper = 385; % heat capacity of copper in J/kg/K
-% thermal capacity for each coil group in J/K
-HW.Grad.CoilThermalCapacity(1) = (mass_x+mass_y+mass_z)*heatcap_copper;  % imaging gradients
-% HW.Grad.CoilThermalCapacity(2) = mass_slice*heatcap_copper;  % slice gradient
-% 1000 W * 10 s / 2.5 K (measured at gradient surface)
-% Estimate that temperature of coils might rise twice as fast.
-HW.Grad.CoilThermalCapacity(2) = 2000;  % slice gradient
+% FIXME: Adjust to meaningful values for each group
+HW.Grad.CoilPowerDissipation(:) = 5;  % power dissipation at maximum temperature for each coil group in Watt
+HW.Grad.CoilTemperatur(:) = 20;  % resting temperature for each coil group in degrees C
+HW.Grad.CoilMaxTemperature(:) = 60;  % maximum temperature for each coil group in degrees C
+HW.Grad.CoilThermalCapacity(:) = 0.06*0.5*0.5*3*0.8*1000;  % thermal capacity for each coil group in J/K
 % parameters for fuse blow model
-HW.Grad.CoilMaxDcCurrent(1:3) = [2, 2, 2];  % maximum (nominal) DC current of fuse in Ampere
-HW.Grad.CoilCurrentSquareTime(1:3) = [0.9, 0.9, 0.9] * 0.95;  % time-lag fuse parameter (maximum "accumulated heat") in A^2*sec
+HW.Grad.CoilMaxDcCurrent = [2, 2, 2, 4];  % maximum (nominal) DC current of fuse in Ampere
+HW.Grad.CoilCurrentSquareTime = [0.9, 0.9, 0.9, 1] * 0.95;  % time-lag fuse parameter (maximum "accumulated heat") in A^2*sec
 
 HW.Grad.PaUoutMax = [60, 60, 60, 64];
 HW.Grad.PaUoutMin = -HW.Grad.PaUoutMax;
