@@ -40,7 +40,7 @@ function amp = get_RX_Amplitude(HW, amp, outType, varargin)
 %   dataUin = get_RX_Amplitude(SeqOut.HW, data.data, 'Uin', 'AQ', SeqOut.AQ);
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2020-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2020 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -50,9 +50,9 @@ if nargin < 3
     'The first three input arguments must be set.');
 end
 
-if ~isa(HW, 'PD.HWClass') && ~isstruct(HW)
+if ~isa(HW, 'PD.HW') && ~isstruct(HW)
   error('PD:query_RX_Amplitude:InvalidHW', ...
-    'The first input argument must be a PD.HWClass object or struct.');
+    'The first input argument must be a PD.HW object or struct.');
 end
 
 if ~isnumeric(amp)
@@ -136,7 +136,7 @@ if (isa(HW.RX(iDevice), 'PD.RX') || isfield(HW.RX(iDevice), 'Calibration')) && .
     isfield(HW.RX(iDevice).Calibration, 'Frequency') && ...
     ~isempty(HW.RX(iDevice).Calibration.Frequency)
   frequency = HW.fLarmor;
-  if isfield(AQ, 'Frequency')
+  if isfield(AQ, 'Gain')
     frequency = AQ.Frequency;
   end
 

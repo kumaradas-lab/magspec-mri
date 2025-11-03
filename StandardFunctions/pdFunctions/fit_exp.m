@@ -15,7 +15,7 @@ function [T, fitExpSettings] = fit_exp(data, time, hParent, CorrectFrequencyOffs
 % Free parameters of the objective functions are written using capital letters.
 %
 % INPUT:
-%   data      Vector or array with complex data to be fitted. In case this is an
+%   data      Vector or array with complex data to be fitted. In case this is a
 %             array, "time" must also be passed as a array where the samples
 %             of the same acquisition window run along the first dimension and
 %             the acquisitions run along the third (or second) dimension.
@@ -34,23 +34,12 @@ function [T, fitExpSettings] = fit_exp(data, time, hParent, CorrectFrequencyOffs
 %             Boolean value that enables the correction of the signal phase by
 %             the offset to the Larmor frequency (default: 1 if data is a 3d
 %             array, 0 otherwise).
-%   CorrectMeanFrequencyOffset
-%             Boolean value that selects whether the average frequency offset of
-%             all acquisitions will be corrected (true), or whether the
-%             frequency offset is corrected independently for each acquisition
-%             window (false). It is always treated as false if
-%             CorrectFrequencyDrift is not false. (Default: true)
 %   CorrectFrequencyDrift
 %             Boolean value or array the same size as "data" that enables the
 %             correction of the signal phase by the linear drift with respect to
 %             the Larmor frequency (default: 0). If the real time of the
 %             measurement differs from the values in "time", pass the values
 %             that should be used for the linear regression in this switch.
-%   CorrectFrequencyReferenceTime
-%             Scalar or array with the reference time for each echo (or FID) in
-%             the input data. If omitted or empty, the time of the sample with
-%             the highest amplitude (on average) for each echo (or FID) is used
-%             as the reference time.
 %   CorrectPhaseOffset
 %             Boolean value that enables a rotation of the measurement signal
 %             such that the average of the imaginary part of the first or last
@@ -88,17 +77,12 @@ function [T, fitExpSettings] = fit_exp(data, time, hParent, CorrectFrequencyOffs
 %             0:  Least squares search using Matlab's fminsearch (default).
 %             1:  Weighted linearized fit for the single exponential fit.
 %                 Faster than fminsearch but non-positive values are ignored.
-%                 This might lead to deviations if noisy data at low amplitudes
+%                 This might lead to deviations if noisy data at low  amplitudes
 %                 crosses the base line.
 %             2:  Regression using numeric integration (c.f.
 %                 https://math.stackexchange.com/a/1897000 )
 %                 This is not strictly a least squares fit but it is faster than
 %                 fminsearch while also including data below the base line.
-%   SingleExpFixTau
-%             Integer value with a fixed decay constant in seconds. If this is
-%             non-empty, the decay constant isn't determined from the data, but
-%             the given decay constant is used. All other parameters are still
-%             optimized. (Default: [])
 %   DoubleExp Boolean value that enables an additional double exponential fit of
 %             the data (default: true). If true, a single exponential fit is
 %             also performed.
@@ -198,7 +182,7 @@ function [T, fitExpSettings] = fit_exp(data, time, hParent, CorrectFrequencyOffs
 %           the actually used settings.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -219,28 +203,14 @@ else
 end
 
 fitExpSettings = set_EmptyField(fitExpSettings, 'hParent', 0);
-if isemptyfield(fitExpSettings, 'CorrectFrequencyOffset')
-  fitExpSettings.CorrectFrequencyOffset = ...
-    (ndims(data) == 3) && (size(data, 1) > 1);
-end
-if isemptyfield(fitExpSettings, 'CorrectMeanFrequencyOffset')
-  fitExpSettings.CorrectMeanFrequencyOffset = true;
-end
-if isemptyfield(fitExpSettings, 'CorrectFrequencyDrift')
-  fitExpSettings.CorrectFrequencyDrift = 0;
-end
-if ~isfield(fitExpSettings, 'CorrectFrequencyReferenceTime')
-  fitExpSettings.CorrectFrequencyReferenceTime = [];
-end
+fitExpSettings = set_EmptyField(fitExpSettings, 'CorrectFrequencyOffset', (ndims(data) == 3) && (size(data, 1) > 1));
+fitExpSettings = set_EmptyField(fitExpSettings, 'CorrectFrequencyDrift', 0);
 fitExpSettings = set_EmptyField(fitExpSettings, 'CorrectPhaseOffset', 1);
 fitExpSettings = set_EmptyField(fitExpSettings, 'EndOffset', 0);
 fitExpSettings = set_EmptyField(fitExpSettings, 'CorrectPhaseOffsetAtEnd', fitExpSettings.EndOffset);
 fitExpSettings = set_EmptyField(fitExpSettings, 'RingFilter', 1);
 fitExpSettings = set_EmptyField(fitExpSettings, 'SingleExp', 1);
 fitExpSettings = set_EmptyField(fitExpSettings, 'SingleExpFitType', 0);
-if ~isfield(fitExpSettings, 'SingleExpFixTau')
-  fitExpSettings.SingleExpFixTau = [];
-end
 fitExpSettings = set_EmptyField(fitExpSettings, 'DoubleExp', 1);
 fitExpSettings = set_EmptyField(fitExpSettings, 'hasFID', 0);
 fitExpSettings = set_EmptyField(fitExpSettings, 'FIDMean', 0);
@@ -257,10 +227,8 @@ if fitExpSettings.FrequencyFilter.UseFilter
       'FrequencyFilter.Bandwidth must be set.']);
   end
   fitExpSettings.FrequencyFilter = set_EmptyField(fitExpSettings.FrequencyFilter, 'ZeroFillFactor', 5);
-  if (fitExpSettings.FrequencyFilter.ZeroFillFactor-1)/2 ...
-      ~= round((fitExpSettings.FrequencyFilter.ZeroFillFactor-1)/2)
-    error('PD:fit_exp:UseFilterZeroFillFactorNotOdd', ...
-      'FrequencyFilter.ZeroFillFactor must be an odd number.');
+  if (fitExpSettings.FrequencyFilter.ZeroFillFactor-1)/2 ~= round((fitExpSettings.FrequencyFilter.ZeroFillFactor-1)/2)
+    error('PD:fit_exp:UseFilterZeroFillFactorNotOdd', 'FrequencyFilter.ZeroFillFactor must be an odd number.');
   end
 end
 
@@ -321,30 +289,15 @@ if fitExpSettings.CorrectFrequencyOffset
     [phasePerSec, phasePerSecStd] = get_MeanPhaseDiffWeighted(data, 1, 'omitnan');
     phasePerSec = bsxfun(@rdivide, phasePerSec, diff(time(1:2,1,:), 1, 1));
     phasePerSecStd = bsxfun(@rdivide, phasePerSecStd, diff(time(1:2,1,:), 1, 1));
-    if isempty(fitExpSettings.CorrectFrequencyReferenceTime)
-      % Use sample with highest amplitude in most tReps as the reference time.
-      % FIXME: This should either be the echo time (for echoes) or the center of
-      % the excitation pulse (for FIDs).
-      isMaxDataCount = sum(bsxfun(@eq, abs(data), max(abs(data), [], 1)), 3);
-      refFreqTime = time(find(isMaxDataCount == max(isMaxDataCount), 1, 'first'),:,:);
-      if fitExpSettings.hasFID
-        if fitExpSettings.FIDMean
-          refFreqTime(1) = mean(time(:,:,1), 1, 'omitnan');
-        else
-          refFreqTime(1) = time(1);
-        end
+    % Use sample with highest amplitude in most tReps as the reference time.
+    isMaxDataCount = sum(bsxfun(@eq, abs(data), max(abs(data), [], 1)), 3);
+    refFreqTime = time(find(isMaxDataCount == max(isMaxDataCount), 1, 'first'),:,:);
+    if fitExpSettings.hasFID
+      if fitExpSettings.FIDMean
+        refFreqTime(1) = mean(time(:,:,1), 1, 'omitnan');
+      else
+        refFreqTime(1) = time(1);
       end
-    elseif isscalar(fitExpSettings.CorrectFrequencyReferenceTime)
-      refFreqTime = ...
-        fitExpSettings.CorrectFrequencyReferenceTime ...
-        .* ones(size(phasePerSec));
-    elseif all(size(fitExpSettings.CorrectFrequencyReferenceTime) ...
-        == size(phasePerSec))
-      refFreqTime = fitExpSettings.CorrectFrequencyReferenceTime;
-    else
-      error('PD:fit_exp:CorrectFrequencyReferenceTimeInvalidSize', ...
-        ['CorrectFrequencyReferenceTime must be a scalar or ', ...
-        'must match the number of echoes/FIDs in all trains.']);
     end
     % Use mean amplitude and standard error of mean phase drift as weights.
     weights = (mean(abs(data), 1, 'omitnan')./phasePerSecStd).^2;
@@ -354,8 +307,7 @@ if fitExpSettings.CorrectFrequencyOffset
     if numel(fitExpSettings.CorrectFrequencyDrift) > 1 || fitExpSettings.CorrectFrequencyDrift
       % Correct linear frequency drift as well.
       if numel(fitExpSettings.CorrectFrequencyDrift) > 1
-        refFreqDriftTime = ...
-          fitExpSettings.CorrectFrequencyDrift(find(isMaxDataCount == max(isMaxDataCount), 1, 'first'),:,:);
+        refFreqDriftTime = fitExpSettings.CorrectFrequencyDrift(find(isMaxDataCount == max(isMaxDataCount), 1, 'first'),:,:);
       else
         refFreqDriftTime = refFreqTime;
       end
@@ -365,17 +317,9 @@ if fitExpSettings.CorrectFrequencyOffset
       dataFrequencyCorrected = bsxfun(@times, data, ...
         exp(-1i * bsxfun(@times, polyval(P, refFreqDriftTime), bsxfun(@minus, time, refFreqTime))));
     else
-      if fitExpSettings.CorrectMeanFrequencyOffset
-        % Correct all acquisition windows with the (same) average frequency
-        % offset.
-        meanPhasePerSec = sum(phasePerSec(validData).*weights) ./ sum(weights);
-      else
-        % Use frequency offset determined independently for each acquisition
-        % window.
-        meanPhasePerSec = phasePerSec;
-      end
-      dataFrequencyCorrected = data ...
-        .* exp(-1i * bsxfun(@times, meanPhasePerSec, bsxfun(@minus, time, refFreqTime)));
+      % Correct mean frequency offset only.
+      meanPhasePerSec = sum(phasePerSec(validData).*weights, 3) / sum(weights, 3);
+      dataFrequencyCorrected = data .* exp(-1i * meanPhasePerSec * bsxfun(@minus, time, refFreqTime));
     end
   end
 else
@@ -600,94 +544,45 @@ if fitExpSettings.SingleExp || fitExpSettings.DoubleExp
   % single exponential fit
   if fitExpSettings.EndOffset
     switch fitExpSettings.SingleExpFitType
-      case 1  % Weighted Linearized Fit
-        if isempty(fitExpSettings.SingleExpFixTau)
-          % estimate offset C of the exponential decay: y = A*exp(-t/tau) + C
-          maxAmp = max(dataPhaseCorrectedRealFit) - min(dataPhaseCorrectedRealFit);
-          C_estimated = min(dataPhaseCorrectedRealFit) - maxAmp/100;
-          % Solve v(t) = y(t) - C = A*e^(-t/tau) <=> log(v(t)) = log(A) - 1/tau * t
-          X = [ones(length(timeCorrectedFit), 1), reshape(timeCorrectedFit, length(timeCorrectedFit), 1)];
+      case 1 % WeightedLinearizedFit
+        % estimate offset C of the exponential decay: y = A*exp(-t/tau) + C
+        maxAmp = max(dataPhaseCorrectedRealFit) - min(dataPhaseCorrectedRealFit);
+        C_estimated = min(dataPhaseCorrectedRealFit) - maxAmp/100;
+        % Solve v(t) = y(t) - C = A*e^(-t/tau) <=> log(v(t)) = log(A) - 1/tau * t
+        X = [ones(length(timeCorrectedFit), 1) timeCorrectedFit.'];
 
-          % search best offset C
-          C = fminsearch(@(c) linearizedFit(timeCorrectedFit, dataPhaseCorrectedRealFit, X, c), ...
-                         C_estimated, optimset('TolX', 1e-4*abs(maxAmp)));
+        % search best offset C
+        C = fminsearch(@(c) linearizedFit(timeCorrectedFit, dataPhaseCorrectedRealFit, X, c), ...
+                       C_estimated, optimset('TolX', 1e-4*abs(maxAmp)));
 
-          [T.errorSingle, coeff] = linearizedFit(timeCorrectedFit, dataPhaseCorrectedRealFit, X, C);
-          T.xminSingle = [C, coeff];
-        else
-          % estimate offset C of the exponential decay: y = A*exp(-t/tau) + C
-          maxAmp = max(dataPhaseCorrectedRealFit) - min(dataPhaseCorrectedRealFit);
-          C_estimated = min(dataPhaseCorrectedRealFit) - maxAmp/100;
-          % Solve v(t) = y(t) - C = A*e^(-t/tau) <=> log(v(t)) = log(A) - 1/tau * t
-          X = ones(length(timeCorrectedFit), 1);
+        [T.errorSingle, coeff] = linearizedFit(timeCorrectedFit, dataPhaseCorrectedRealFit, X, C);
+        T.xminSingle = [C coeff];
 
-          % search best offset C
-          C = fminsearch(@(c) linearizedFitFixDecay(timeCorrectedFit, dataPhaseCorrectedRealFit, X, c, ...
-                                                    fitExpSettings.SingleExpFixTau), ...
-                         C_estimated, optimset('TolX', 1e-4*abs(maxAmp)));
+      case 2 % Numerical Integration
+        [T.errorSingle, T.xminSingle] = integrNumExp(timeCorrectedFit(:).', dataPhaseCorrectedRealFit(:).', true);
 
-          [T.errorSingle, coeff] = ...
-            linearizedFitFixDecay(timeCorrectedFit, dataPhaseCorrectedRealFit, X, ...
-                                  C, fitExpSettings.SingleExpFixTau);
-          T.xminSingle = [C, coeff];
-        end
-
-      case 2  % Numerical Integration
-        [T.errorSingle, T.xminSingle] = ...
-          integrNumExp(timeCorrectedFit(:).', dataPhaseCorrectedRealFit(:).', ...
-                       true, fitExpSettings.SingleExpFixTau);
-
-      otherwise  % least squares search
-        if isempty(fitExpSettings.SingleExpFixTau)
-          [T.xminSingle, T.errorSingle, T.exitflagSingle, T.outputSingle] = ...
-            fminsearch(@(x) lsqFitExp(timeCorrectedFit, dataPhaseCorrectedRealFit, x), T.xstart, ...
-                       optimset('MaxFunEvals', 1000, 'TolX', 1e-4*abs(T.xstart(2)), 'TolFun', maxerror, 'Display', 'off'));
-        else
-          [T.xminSingle, T.errorSingle, T.exitflagSingle, T.outputSingle] = ...
-            fminsearch(@(x) lsqFitExpFixDecay(timeCorrectedFit, dataPhaseCorrectedRealFit, x, ...
-                                              fitExpSettings.SingleExpFixTau, fitExpSettings.EndOffset), ...
-                       T.xstart(1:2), ...
-                       optimset('MaxFunEvals', 1000, 'TolX', 1e-4*abs(T.xstart(2)), 'TolFun', maxerror, 'Display', 'off'));
-          T.xminSingle = [T.xminSingle, fitExpSettings.SingleExpFixTau];
-        end
+      otherwise % least squares search
+        [T.xminSingle, T.errorSingle, T.exitflagSingle, T.outputSingle] = ...
+          fminsearch(@(x) lsqFitExp(timeCorrectedFit, dataPhaseCorrectedRealFit, x), T.xstart, ...
+                     optimset('MaxFunEvals', 1000, 'TolX', 1e-4*abs(T.xstart(2)), 'TolFun', maxerror, 'Display', 'off'));
     end
   else
     switch fitExpSettings.SingleExpFitType
-      case 1 % Weighted Linearized Fit
-        if isempty(fitExpSettings.SingleExpFixTau)
-          % linearize exponential function: y(t) = A*e^(-t/tau) <=> log(y) = log(A) - t/tau
-          X = [ones(length(timeCorrectedFit), 1), reshape(timeCorrectedFit, length(timeCorrectedFit), 1)];
-          [T.errorSingle, coeff] = linearizedFit(timeCorrectedFit, dataPhaseCorrectedRealFit, X, 0);
-          T.xminSingle = [0, coeff];
-        else
-          % linearize exponential function: y(t) = A*e^(-t/tau) <=> log(y) = log(A) - t/tau
-          X = ones(length(timeCorrectedFit), 1);
-          [T.errorSingle, coeff] = ...
-            linearizedFitFixDecay(timeCorrectedFit, dataPhaseCorrectedRealFit, X, ...
-                                  0, fitExpSettings.SingleExpFixTau);
-          T.xminSingle = [0, coeff];
-        end
+      case 1 % WeightedLinearizedFit
+        % linearize exponential function: y(t) = A*e^(-t/tau) <=> log(y) = log(A) - t/tau
+        X = [ones(length(timeCorrectedFit), 1) timeCorrectedFit.'];
+        [T.errorSingle, coeff] = linearizedFit(timeCorrectedFit, dataPhaseCorrectedRealFit, X, 0);
+        T.xminSingle = [0 coeff];
 
       case 2 % Numerical Integration
-        [T.errorSingle, coeff] = ...
-          integrNumExp(timeCorrectedFit(:).', dataPhaseCorrectedRealFit(:).', ...
-                       false, fitExpSettings.SingleExpFixTau);
-        T.xminSingle = [0, coeff];
+        [T.errorSingle, coeff] = integrNumExp(timeCorrectedFit(:).', dataPhaseCorrectedRealFit(:).', false);
+        T.xminSingle = [0 coeff];
 
       otherwise % least squares search
-        if isempty(fitExpSettings.SingleExpFixTau)
-          [T.xminSingle, T.errorSingle, T.exitflagSingle, T.outputSingle] = ...
-            fminsearch(@(x) lsqFitExp(timeCorrectedFit, dataPhaseCorrectedRealFit, x), T.xstart(2:3), ...
-                       optimset('MaxFunEvals', 1000, 'TolX', 1e-4*abs(T.xstart(2)), 'TolFun', maxerror, 'Display', 'off'));
-          T.xminSingle = [0 T.xminSingle(1:2)];
-        else
-          [T.xminSingle, T.errorSingle, T.exitflagSingle, T.outputSingle] = ...
-            fminsearch(@(x) lsqFitExpFixDecay(timeCorrectedFit, dataPhaseCorrectedRealFit, x, ...
-                                              fitExpSettings.SingleExpFixTau, fitExpSettings.EndOffset), ...
-                       T.xstart(2), ...
-                       optimset('MaxFunEvals', 1000, 'TolX', 1e-4*abs(T.xstart(2)), 'TolFun', maxerror, 'Display', 'off'));
-          T.xminSingle = [0, T.xminSingle(1), fitExpSettings.SingleExpFixTau];
-        end
+        [T.xminSingle, T.errorSingle, T.exitflagSingle, T.outputSingle] = ...
+          fminsearch(@(x) lsqFitExp(timeCorrectedFit, dataPhaseCorrectedRealFit, x), T.xstart(2:3), ...
+                     optimset('MaxFunEvals', 1000, 'TolX', 1e-4*abs(T.xstart(2)), 'TolFun', maxerror, 'Display', 'off'));
+        T.xminSingle = [0 T.xminSingle(1:2)];
     end
   end
   T.xminSingle(1:2) = T.xminSingle(1:2) / AmpScale;
@@ -701,11 +596,7 @@ if fitExpSettings.SingleExp || fitExpSettings.DoubleExp
   if ishghandle(fitExpSettings.hParent, 'figure') || ...
     ishghandle(fitExpSettings.hParent, 'uipanel') || fitExpSettings.hParent
     hLines1(end+1) = plot(ax(1), T.functionTime, T.functionAmpSingle, 'b--');
-    if T.xminSingle(3) > 10
-      title_str = sprintf('\\tau = %.3f s', T.xminSingle(3));
-    else
-      title_str = sprintf('\\tau = %.3f ms', T.xminSingle(3)*1000);
-    end
+    title_str = sprintf('\\tau = %.3f ms', T.xminSingle(3)*1000);
     legendCell = [legendCell, 'single expo.'];
   end
   T.tau = T.xminSingle(3);
@@ -750,20 +641,9 @@ if fitExpSettings.DoubleExp
   if ishghandle(fitExpSettings.hParent, 'figure') || ...
       ishghandle(fitExpSettings.hParent, 'uipanel') || fitExpSettings.hParent
     hLines1(end+1) = plot(ax(1), T.functionTime, T.functionAmpDouble, 'b-.');
-    if T.xminDouble(3) > 10
-      title_str = [title_str '', ...
-        ' || \tau_1 = ' num2str(T.xminDouble(3), '%.3f') ' s @ ' num2str(T.tau1w*100, '%.1f') '%'];
-    else
-      title_str = [title_str '', ...
-        ' || \tau_1 = ' num2str(T.xminDouble(3)*1000, '%.3f') ' ms @ ' num2str(T.tau1w*100, '%.1f') '%'];
-    end
-    if T.xminDouble(5) > 10
-      title_str = [title_str '', ...
-        ' || \tau_2 = ' num2str(T.xminDouble(5), '%.3f') ' s @ ' num2str(T.tau2w*100, '%.1f') '%'];
-    else
-      title_str = [title_str '', ...
-        ' || \tau_2 = ' num2str(T.xminDouble(5)*1000, '%.3f') ' ms @ ' num2str(T.tau2w*100, '%.1f') '%'];
-    end
+    title_str = [title_str ' || ', ...
+    '\tau_1 = ' num2str(T.xminDouble(3)*1000, '%10.3f') ' ms @ ' num2str(T.tau1w*100, '%10.1f') '% || ', ...
+    '\tau_2 = ' num2str(T.xminDouble(5)*1000, '%10.3f') ' ms @ ' num2str(T.tau2w*100, '%10.1f') '%'];
     legendCell = [legendCell, 'double expo.'];
   end
 end
@@ -809,8 +689,7 @@ dataOffset = data - C;
 isPositive = dataOffset > eps;
 
 % use squared amplitudes as weights in linearized fit
-b = (diag(dataOffset(isPositive))*X(isPositive,:)) ...
-  \ (dataOffset(isPositive) .* log(dataOffset(isPositive)));
+b = (diag(dataOffset(isPositive))*X(isPositive,:)) \ (dataOffset(isPositive) .* log(dataOffset(isPositive))).';
 
 % calculate fitted data
 y = exp(b(1))*exp(time*b(2));
@@ -818,143 +697,70 @@ y = exp(b(1))*exp(time*b(2));
 % RMS deviation to data
 dev = sum((dataOffset - y).^2);
 
-coeff = [exp(b(1)), -1/b(2)];
+coeff = [b(1) -1/b(2)];
 
 end
 
 
-function [dev, coeff] = linearizedFitFixDecay(time, data, X, C, tau)
-%% Find solution of the exponential decay: y = A*exp(-t/tau) + C with fix tau
-
-% linearize exponential function: y(t) = A*e^(-t/tau) <=> log(y) = log(A) - t/tau
-
-% remove offset C before linearization
-dataOffset = data - C;
-
-% dismiss non-positive values
-isPositive = dataOffset > eps;
-
-% use squared amplitudes as weights in linearized fit
-b = (diag(dataOffset(isPositive))*X(isPositive,:)) ...
-  \ (dataOffset(isPositive) .* (log(dataOffset(isPositive))+time(isPositive)/tau));
-
-% calculate fitted data
-y = exp(b(1))*exp(-time/tau);
-
-% RMS deviation to data
-dev = sum((dataOffset - y).^2);
-
-coeff = [exp(b(1)), tau];
-
-end
-
-
-function [dev, coeff] = integrNumExp(time, data, hasOffset, tau)
+function [dev, coeff] = integrNumExp(time, data, hasOffset)
 %% numerically integrate the solution
 % c.f.: https://de.scribd.com/doc/14674814/Regressions-et-equations-integrales
 
 % numerical approximation of integral
 S = cumsum([0, 1/2 * (data(2:end) + data(1:end-1)) .* (time(2:end) - time(1:end-1))]);
 
-if isempty(tau)
-  if hasOffset
-    % fit with offset
-    % y = a + b * exp(c * time)
+if hasOffset
+  % fit with offset
+  % y = a + b * exp(c * time)
 
-    % corresponding integral equation is:
-    % y - (a + b * exp(c * time(1))) = - a*c*(time-time(1)) + c * integ(y, x1, x)
-    % Hence the approx. linear equation to solve is:
-    % y - y(1) ?= -a*c*(time-time(1)) + c * S
-    % quadratic deviation to real solution:
-    % sum( (-a*c*(time-time(1)) + c*S - (y-y(1))).^2 )
+  % corresponding integral equation is:
+  % y - (a + b * exp(c * time(1))) = - a*c*(time-time(1)) + c * integ(y, x1, x)
+  % Hence the approx. linear equation to solve is:
+  % y - y(1) ?= -a*c*(time-time(1)) + c * S
+  % quadratic deviation to real solution:
+  % sum( (-a*c*(time-time(1)) + c*S - (y-y(1))).^2 )
 
-    % solve linear equation for (-a*c) and (c)
-    off_diag = sum(S.*(time-time(1)));
-    k = [sum(S.^2), off_diag; off_diag, sum((time-time(1)).^2)] \ ...
-      [sum(S.*(data-data(1))); sum((time-time(1)).*(data-data(1)))];
+  % solve linear equation for (-a*c) and (c)
+  off_diag = sum(S.*(time-time(1)));
+  k = [sum(S.^2), off_diag; off_diag, sum((time-time(1)).^2)] \ ...
+    [sum(S.*(data-data(1))); sum((time-time(1)).*(data-data(1)))];
 
-    % determine b
-    T = exp(k(1)*time);
-    l = [sum(T.^2), sum(T); sum(T), numel(time)] \ [sum(T.*data); sum(data)];
+  % determine b
+  T = exp(k(1)*time);
+  l = [sum(T.^2), sum(T); sum(T), numel(time)] \ [sum(T.*data); sum(data)];
 
-    coeff = [-k(2)/k(1), l(1), -1/k(1)];  % a, b, -1/c
+  coeff = [-k(2)/k(1), l(1), -1/k(1)];  % a, b, -1/c
 
-    % calculate fitted data
-    y = coeff(1) + coeff(2) * exp(k(1)*time);
+  % calculate fitted data
+  y = coeff(1) + coeff(2) * exp(k(1)*time);
 
-  else
-    % fit without offset
-    % y = b * exp(c * time)
-
-    % corresponding integral equation is:
-    % y - b * exp(c * time(1)) = c * integ(y, x1, x)
-    % Hence the approx. linear equation to solve is:
-    % y - y(1) ?= c * S
-    % quadratic deviation to real solution:
-    % sum( (c*S - (y-y(1))).^2 )
-
-    % solve linear equation for (c)
-    c = S.' \ (data - data(1)).';
-    % c = (S.*(data - data(1))).' \ ((data - data(1)).^2).';
-    % c = sum(S.*(data - data(1))) / sum(S.^2);
-
-    % determine b by linear regression
-    b = exp(c * time).' \ data.';
-
-    coeff = [b, -1/c];
-
-    % calculate fitted data
-    y = b * exp(c*time);
-
-  end
 else
-  if hasOffset
-    % fit with offset and given c (-1/tau)
-    % y = a + b * exp(c * time)
+  % fit without offset
+  % y = b * exp(c * time)
 
-    % corresponding integral equation is:
-    % y - (a + b * exp(c * time(1))) - c * integ(y, x1, x) = - a*c*(time-time(1))
-    % Hence the approx. linear equation to solve is:
-    % y - y(1) - c * S ?= -a*c*(time-time(1))
+  % corresponding integral equation is:
+  % y - b * exp(c * time(1)) = c * integ(y, x1, x)
+  % Hence the approx. linear equation to solve is:
+  % y - y(1) ?= c * S
+  % quadratic deviation to real solution:
+  % sum( (c*S - (y-y(1))).^2 )
 
-    % solve linear equation for (-a*c)
-    mac = (time-time(1)).' \ (data - data(1) + 1/tau*S).';
+  % solve linear equation for (c)
+  c = S.' \ (data - data(1)).';
+  % c = (S.*(data - data(1))).' \ ((data - data(1)).^2).';
+  % c = sum(S.*(data - data(1))) / sum(S.^2);
 
-    % determine b
-    T = exp(-time/tau);
-    l = [sum(T.^2), sum(T); sum(T), numel(time)] \ [sum(T.*data); sum(data)];
+  % determine b by simple division
+  b = sum(data) / sum(exp(c * time));
 
-    coeff = [-mac*tau, l(1), tau];  % a, b, -1/c
+  coeff = [b, -1/c];
 
-    % calculate fitted data
-    y = coeff(1) + coeff(2) * exp(-time/tau);
+  % calculate fitted data
+  y = b * exp(c*time);
 
-  else
-    % fit without offset and given c (-1/tau)
-    % y = b * exp(c * time)
-
-    % corresponding integral equation is:
-    % y - b * exp(c * time(1)) = c * integ(y, x1, x)
-    % Hence the approx. linear equation to solve is:
-    % y - y(1) - c * S ?= 0
-    % quadratic deviation to real solution:
-    % sum( (c*S - (y-y(1))).^2 )
-
-    % This case is not really solved via numerical integration but with a linear
-    % regression.
-
-    % determine b by linear regression
-    b = exp(-time/tau).' \ data.';
-
-    coeff = [b, tau];
-
-    % calculate fitted data
-    y = b * exp(-time/tau);
-
-  end
 end
 
-% squared deviation sum to (measured) data
+% squared deviation sum to data
 dev = sum((data - y).^2);
 
 end
@@ -1011,47 +817,6 @@ switch numel(A)
     if A(2) < time(1)/2 || A(2) > time(end)*2
       dev = dev * 1000;
     end
-
-end
-
-end
-
-function [dev, fitAmp] = lsqFitExpFixDecay(time, data, A, tau, hasOffset)
-%% function for least squares fit of a mono-exponential decay with fixed decay constant
-
-switch numel(A)
-  case 3
-    % bi-exponential with offset
-    % y(t) = A(1) + A(2)*exp(-t/A(3)) + A(4)*exp(-t/A(5))
-    fitAmp = A(1) + A(2)*exp(-time/tau(1)) + A(3)*exp(-time/tau(2));
-    dev = sum(abs(data - fitAmp).^2);
-    % penalty for exponential growth
-    if any(A(2:end) < 0), dev = dev * 1000; end
-
-  case 2
-    if hasOffset
-      % mono-exponential with offset
-      % y(t) = A(1) + A(2)*exp(-t/A(3))
-      fitAmp = A(1) + A(2)*exp(-time/tau);
-      dev = sum(abs( data - fitAmp ).^2);
-      % penalty for exponential growth
-      if any(A(2:end) < 0), dev = dev * 1000; end
-    else
-      % bi-exponential without offset
-      % y(t) = A(1)*exp(-t/A(2)) + A(3)*exp(-t/A(4))
-      fitAmp = A(1)*exp(-time/tau(1)) + A(2)*exp(-time/tau(1));
-      dev = sum(abs(data - fitAmp).^2);
-      % penalty for exponential growth
-      if any(A < 0), dev = dev * 1000; end
-    end
-
-  case 1
-    % mono-exponential without offset
-    % y(t) = A(1)*exp(-t/A(2))
-    fitAmp = A(1)*exp(-time/tau);
-    dev = sum(abs(data - fitAmp).^2);
-    % penalty for exponential growth
-    if any(A < 0), dev = dev * 1000; end
 
 end
 

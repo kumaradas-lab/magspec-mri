@@ -12,7 +12,7 @@ function varargout = GUI_NetworkAnalyzer(varargin)
 %   hf      handle to the figure of the Network Analyzer.
 %
 % ------------------------------------------------------------------------
-% (C) Copyright 2011-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------
 
@@ -387,7 +387,7 @@ while handles.Update || ...
         else
           handles.HW.TX(handles.iDevice).ChannelDef = 2;
         end
-        if ~isa(handles.HW, 'PD.HWClass')
+        if ~isa(handles.HW, 'PD.HW')
           HW = handles.HW;
           LoadCalcHW;
           handles.HW = HW;
@@ -396,14 +396,14 @@ while handles.Update || ...
         [handles.HW, handles.mySave] = Find_Frequency_Sweep(handles.HW, handles.mySave);
 
         handles.HW.TX(handles.iDevice).ChannelDef = ChannelDef;
-        if ~isa(handles.HW, 'PD.HWClass')
+        if ~isa(handles.HW, 'PD.HW')
           HW = handles.HW;
           LoadCalcHW;
           handles.HW = HW;
         end
 
         assignin('base', 'mySave', handles.mySave);
-        if ~isa(HW, 'PD.HWClass')
+        if ~isa(HW, 'PD.HW')
           assignin('base', 'HW', handles.HW);
         end
         figure(handles.figure_NetworkAnalyzer)
@@ -465,7 +465,7 @@ while handles.Update || ...
   guidata(hObject, handles);
   uipanel_cal_SelectionChangeFcn(hObject, eventdata, handles)
   if doCal && ~isempty(NetworkCal)
-    if evalin('base', 'exist(''HW'', ''var'')') && ~isa(handles.HW, 'PD.HWClass')
+    if evalin('base', 'exist(''HW'', ''var'')') && ~isa(handles.HW, 'PD.HW')
       HW = evalin('base', 'HW');
       HW.NetworkCal = NetworkCal;
       assignin('base', 'HW', HW);

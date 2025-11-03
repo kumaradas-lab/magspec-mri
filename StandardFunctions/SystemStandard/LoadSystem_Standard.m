@@ -7,10 +7,8 @@
 %#function LoadHWStruct_Standard
 %#function LoadLift_Standard
 %#function LoadMMRT_Standard
-%#function LoadMPI_Standard
 %#function LoadMagnet_Standard
 %#function LoadPiezo_Standard
-%#function LoadPowerSupply_Standard
 %#function LoadProbe_Standard
 %#function LoadRXTXCoil_Standard
 %#function LoadRXTX_Standard

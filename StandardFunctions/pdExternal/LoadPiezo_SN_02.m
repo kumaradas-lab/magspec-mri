@@ -1,5 +1,5 @@
 
-HW.Piezo.Channel=               4;                         % Grad output channel
+HW.Piezo.Channel=               3;                         % Grad output channel
 if HW.Piezo.Channel==3
   HW.Grad.x=2;
   HW.Grad.y=4;
@@ -27,7 +27,7 @@ HW.Piezo.OffsetCurrent=         0;                         % offset current  e.g
 HW.Piezo.DisplacementPerAmpere= 0;                         % Displacement in RAD/A
 HW.Piezo.DisplacementPerVolt=   0;                         % Displacement in m/V
 HW.Piezo.OffsetVoltage = [];
-switch 'PK2FVP2'
+switch 'PKP225D15B2'
     case 'PK44LA2P2' % rund mit Loch
         HW.Piezo.DisplacementPerVolt=   9e-6/150;                  % Displacement in m/V
         HW.Piezo.VoltageAmplitudeMax=   10;                        % Max Voltage at Piezo in V
@@ -111,7 +111,7 @@ HW.Piezo.OffsetOverdrivePercent=        -20;
 HW.Piezo.OffsetRampTime=                4.4e-3;
 HW.Piezo.OffsetSetTime=                 0.6e-3;
 HW.Piezo.OffsetBeforeAfterSeq=          1;
-HW.Piezo.PreEmphasisPeriods=            20;
+HW.Piezo.PreEmphasisPeriods=            10;
 HW.Piezo.PreEmphasisOverdrivePercent=   00;
 HW.Piezo.PreEmphasisRelativeAmplitude=  [ 0;  0;    (HW.Piezo.PreEmphasisOverdrivePercent+100)/100;  (HW.Piezo.PreEmphasisOverdrivePercent+100)/100;    1;1];
 HW.Piezo.PreEmphasisRelativeTime=       [-1;  0;    1/3;                                              2/3;                                                1;2];

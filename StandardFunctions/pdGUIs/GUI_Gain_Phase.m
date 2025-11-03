@@ -282,7 +282,7 @@ if ~isfield(handles,'refreshPlot'); handles.refreshPlot=0; end
 if evalin('base', 'exist(''HW'', ''var'')')
     HW = evalin('base', 'HW');
 end
-if exist('HW', 'var') && isa(HW, 'PD.HWClass')
+if exist('HW', 'var') && isa(HW, 'PD.HW')
     if evalin('base', 'exist(''mySave'', ''var'')')
         mySave = evalin('base', 'mySave');
     end

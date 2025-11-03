@@ -14,7 +14,7 @@ function SeqLoop = Image3D2VolView(SeqLoop, FileName, ZeroFillFactor, ZeroFillWi
 %   Image3D:            3D matrix with image data.
 %   FileName:           Optional. File name for the VolView binary data.
 %                       (Default: 'output/VolView3D_yyyymmdd_HHMMSSFFF')
-%   ZeroFillFactor:     Optional. Scalar or 1x3 zero fill factor for padding of the
+%   ZeroFillFactor:     Optional. Scalar zero fill factor for padding of the
 %                       k-space before the FFT. (Default: 1)
 %   ZeroFillWindowSize: Optional. To reduce the "jitter" in the image, k-space
 %                       frequencies further away from the center frequency can
@@ -30,7 +30,7 @@ function SeqLoop = Image3D2VolView(SeqLoop, FileName, ZeroFillFactor, ZeroFillWi
 %                       VolView files.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -61,19 +61,17 @@ if nargin < 3
   if isemptyfield(SeqLoop.AQSlice(1), 'ZeroFillFactor'), SeqLoop.AQSlice(1).ZeroFillFactor = 1; end
   ZeroFillFactor = SeqLoop.AQSlice(1).ZeroFillFactor;
 end
-ZeroFillFactor=reshape(ZeroFillFactor(1:min(end,3)),1,[]);
 if nargin < 4
   if isemptyfield(SeqLoop.AQSlice(1), 'ZeroFillWindowSize'), SeqLoop.AQSlice(1).ZeroFillWindowSize = 1.4; end
   ZeroFillWindowSize = SeqLoop.AQSlice(1).ZeroFillWindowSize;
 end
-ZeroFillWindowSize=reshape(ZeroFillWindowSize(1:min(end,3)),1,[]);
 
 %% collect data
 SeqLoop.AQSlice(1).resolutionRead = SeqLoop.AQSlice(1).sizeRead / SeqLoop.AQSlice(1).nRead;
 SeqLoop.AQSlice(1).resolutionPhase = SeqLoop.AQSlice(1).sizePhase ./ SeqLoop.AQSlice(1).nPhase;
 
 sImage = [SeqLoop.AQSlice(1).nRead, SeqLoop.AQSlice(1).nPhase(1), SeqLoop.AQSlice(1).nPhase(2)];
-sImageZ = sImage .* ZeroFillFactor;
+sImageZ = sImage * ZeroFillFactor;
 sImageZ(sImage==1) = 1;
 
 lengthScaling = 1e-3;
@@ -81,7 +79,7 @@ lengthScalingUnit = 'm';  % '', 'm', Greek character mu, 'n' (note: consider usi
 centerOfImage = SeqLoop.AQSlice(1).Center2OriginImage(1:3) / lengthScaling;
 
 resolutionImage = [SeqLoop.AQSlice(1).resolutionRead(1), ...
-  SeqLoop.AQSlice(1).resolutionPhase(1:2)] ./ lengthScaling ./ ZeroFillFactor;
+  SeqLoop.AQSlice(1).resolutionPhase(1:2)] / lengthScaling / ZeroFillFactor;
 resolutionImage(isinf(resolutionImage)) = 1;
 
 amplitudeScaling = SeqLoop.AQSlice(1).AmplitudeUnitScale;
@@ -92,7 +90,7 @@ if isfield(SeqLoop.data, 'ImageZ') && nargin <= 2
 elseif isfield(SeqLoop.data, 'ImageOs')
   % calculate ImageZ with new zero filling values
   szImageOs = arrayfun(@(n) size(SeqLoop.data.ImageOs, n), 1:4);
-  szImageOsZ = szImageOs .* ZeroFillFactor;
+  szImageOsZ = szImageOs * ZeroFillFactor;
   szImageOsZ(szImageOs==1) = 1;
 
   ImageOsZ = zeroFill_image(...
@@ -104,11 +102,11 @@ elseif isfield(SeqLoop.data, 'ImageOs')
   MySizeOS = [ ...
     SeqLoop.AQSlice(1).nRead*SeqLoop.AQSlice(1).ReadOS, ...
     SeqLoop.AQSlice(1).nPhase(1)*SeqLoop.AQSlice(1).PhaseOS(1), ...
-    SeqLoop.AQSlice(1).nPhase(2)*SeqLoop.AQSlice(1).PhaseOS(2) ] .* ZeroFillFactor;
+    SeqLoop.AQSlice(1).nPhase(2)*SeqLoop.AQSlice(1).PhaseOS(2) ] * ZeroFillFactor;
   MySize = [ ...
     SeqLoop.AQSlice(1).nRead, ...
     SeqLoop.AQSlice(1).nPhase(1), ...
-    SeqLoop.AQSlice(1).nPhase(2) ] .* ZeroFillFactor;
+    SeqLoop.AQSlice(1).nPhase(2) ] * ZeroFillFactor;
   ImageZ = ImageOsZ(floor(MySizeOS(1)/2)+  (1-floor(MySize(1)/2):ceil(MySize(1)/2)),...
                     floor(MySizeOS(2)/2)+  (1-floor(MySize(2)/2):ceil(MySize(2)/2)),...
                     floor(MySizeOS(3)/2)+  (1-floor(MySize(3)/2):ceil(MySize(3)/2)),:,:);

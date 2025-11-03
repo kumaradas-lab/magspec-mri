@@ -25,5 +25,3 @@ HW.TX.Max.PaUout(2)=min(HW.TX.Max.PaUout(2),100);
 % HW.TX.BlankOffsetAQ=1000e-9;        % Blank of receiver before TX pulse
 % HW.TX.BlankPostsetAQ=2000e-9;       % Blank of receiver after TX pulse
 % HW.TX.BlankAQ=1;                    % Switch TRx to 50 Ohm Resistor during TX pulse, to avoid saturation.
-% if ~HW.TX.ExtRFSN;if isfield(HW.TX.CalibrationRfAmp,'TriScatteredAmp');HW.TX.CalibrationRfAmp=rmfield(HW.TX.CalibrationRfAmp,'TriScatteredAmp');end;end
-if ~HW.TX.ExtRFSN;HW.TX.CalibrationRfAmp=[];end

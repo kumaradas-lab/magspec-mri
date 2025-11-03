@@ -4,7 +4,7 @@
 % LoadMySystem file of that system).
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2021-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %-------------------------------------------------------------------------------
 
@@ -31,38 +31,24 @@ HW.TX(1).Def.Amplitude(HW.TX(1).ChannelDef) = 0.99 * HW.TX(1).Max.Amplitude(HW.T
 % HW.TX(1).Def.Uout(HW.TX(1).ChannelDef) = HW.TX(1).Max.Uout(HW.TX(1).ChannelDef);  % send with maximum voltage by default
 HW.TX(1).Def.Uout(HW.TX(1).ChannelDef) = 3.99;  % send with 2 volts by default
 
-% HW.TX(1).BlankOffset = 200e-6;  % offset of un-blanking signal before rf pulse
-% HW.TX(1).BlankPostset = 100e-6;  % additional un-blanking time after rf pulse
-% HW.TX(1).BlankOffsetAQ = 5e-6;   % blank of receiver before TX pulse in s
-% HW.TX(1).BlankPostsetAQ = 10e-6;  % blank of receiver after TX pulse in s
-% HW.TX(1).BlankAQ = 1;               % switch TRx to 50 Ohm resistor during TX pulse, to avoid saturation.
-% HW.TX2RXdeadTime = 25e-3;  % antenne RMN EFNMR
-% HW.TX2RXdeadTime = 13e-3;
-% HW.TX2RXdeadTime = 15e-3;  % antenne RMN gradio rat
-HW.TX2RXdeadTime = 18e-3;  % antenne RMN gradio rat
-if numel(HW.TX) > 1
-  HW.TX(2).PaUout2Amplitude(2) = 1;  % DNP amplitudes in Volt; FIXME: Measure coil efficiency!
-  HW.TX(2).Max.Amplitude(2) = HW.TX(2).Max.PaUout(2) .* HW.TX(2).PaUout2Amplitude(2);
-
-  HW.TX(2).AmplitudeName = 'TX B2';
-  HW.TX(2).AmplitudeUnit = 'Veff';
-  HW.TX(2).AmplitudeUnitScale = 1/sqrt(2);
-end
+HW.TX2RXdeadTime = 20e-3;
+HW.TX(2).PaUout2Amplitude(2) = 1;  % DNP amplitudes in Volt; FIXME: Measure coil efficiency!
+HW.TX(2).Max.Amplitude(2) = HW.TX(2).Max.PaUout(2) .* HW.TX(2).PaUout2Amplitude(2);
+HW.TX(2).AmplitudeName = 'TX B2';
+HW.TX(2).AmplitudeUnit = 'Veff';
+HW.TX(2).AmplitudeUnitScale = 1/sqrt(2);
 
 
 %% RX settings
-% HW.RX(1).VGAGainDef = .1*HW.RX(1).VGAGainDef / HW.RX(1).GainDef * HW.RX(1).Amplitude2Uin / 20e-3;  % 20 mV maximum input voltage
-% HW.RX(1).VGAGainDef = HW.RX(1).VGAGainDef / HW.RX(1).GainDef * HW.RX(1).Amplitude2Uin / 20e-3;  % 20 mV maximum input voltage
 HW.RX(1).VGAGainDef = HW.RX(1).VGAGainDef / HW.RX(1).GainDef * HW.RX(1).Amplitude2Uin / 20e-3;  % 20 mV maximum input voltage
 HW.RX(1).LNAGain = 500*sqrt(2)/3;
 HW.RX(1).Rin = 200e3;
 
 %% DNP amplifier
-if numel(HW.TX) > 1
-  iDevice = 2;
-  % LoadTxPa_16022017; % PD amplifier
-  LoadRF1180_100_01;  % RFPA amplifier 100W (1MHz-180MHz)
-end
+iDevice = 2;
+% LoadTxPa_16022017; % PD amplifier
+LoadRF1180_100_01;  % RFPA amplifier 100W (1MHz-180MHz)
+
 
 %% pre-polarization settings
 HW.DefSeqValues.Prepol.use = false;
@@ -79,20 +65,11 @@ HW.DefSeqValues.Prepol.ResetDDS = true;  % reset the DDS at each tRep with prepo
 
 
 %% DNP settings
-if numel(HW.TX) > 1
-  HW.DefSeqValues.DNP.Device = 2;  % DNP pulse TX Device, e.g. 1
-  HW.DefSeqValues.DNP.digitalIO.Device = 2;  % Device that sets the digital output signal
-  dBmTX = 40;  % DNP pulse amlitude in dBm
-else
-  % for local tests only
-  warning('second console is not connected or switched off.');
-  HW.DefSeqValues.DNP.Device = 1;  % DNP pulse TX Device, e.g. 1
-  HW.DefSeqValues.DNP.digitalIO.Device = 1;  % Device that sets the digital output signal
-  dBmTX = -40;
-end
 HW.DefSeqValues.DNP.use = false;
 HW.DefSeqValues.DNP.Channel = 2;  % DNP pulse TX Channel, e.g. 2
+HW.DefSeqValues.DNP.Device = 2;  % DNP pulse TX Device, e.g. 1
 HW.DefSeqValues.DNP.Frequency = 69.5e6;  % DNP pulse frequency in Hz
+dBmTX = 40;  % DNP pulse amlitude in dBm
 HW.DefSeqValues.DNP.Amplitude = (0.001*10^(dBmTX/10) * ...
   HW.TX(HW.DefSeqValues.DNP.Device).Rout)^0.5 * sqrt(2) * ...
   HW.TX(HW.DefSeqValues.DNP.Device).PaUout2Amplitude(HW.DefSeqValues.DNP.Device)/1;  % amplitude in Volt
@@ -100,19 +77,6 @@ HW.DefSeqValues.DNP.tDNP = 2.0;  % duration of DNP pulse in seconds
 HW.DefSeqValues.DNP.tEnd = -20e-3;  % end of prepol before center of excitation pulse (at Seq.tEcho/2) in seconds
 HW.DefSeqValues.DNP.useExtDDS = true;  % use external DDS
 HW.DefSeqValues.DNP.ResetDDS = true;  % reset the DDS at each tRep with prepol pulse
-HW.DefSeqValues.DNP.digitalIO.use = false;  % Switch DDS with digital output signal
-HW.DefSeqValues.DNP.digitalIO.Channel = 1;  % Digital output channel for the DNP pulse signal
-HW.DefSeqValues.DNP.continuous = false;  % keep DNP pulse continuously running during experiment
-
-% For continuous DNP mode, interrupt the DNP pulse for the acquisition windows
-HW.RX(1).ClampCoil.Enable = false;  % use clamping signal around acquisitions
-HW.RX(1).ClampCoil.DigitalOutputSignal = 2^(HW.DefSeqValues.DNP.digitalIO.Channel-1);  % digital output signal added for clamping
-HW.RX(1).ClampCoil.DigitalOutputDevice = HW.DefSeqValues.DNP.digitalIO.Device;  % emit signal on specified MMRT device
-HW.RX(1).ClampCoil.SignalOff = true;  % set the signal to off for duration around acquisitions.
-HW.RX(1).ClampCoil.nSampleOffset = 3;  % additional samples with signal before the acquisition
-HW.RX(1).ClampCoil.nSamplePostset = 3;  % additional samples with signal after the acquisition
-HW.RX(1).ClampCoil.tOffset = 9e-3;  % interrupt signal before start of acquisition in seconds
-HW.RX(1).ClampCoil.tPostset = 9e-3;  % reset signal after end of acquisition in seconds
 
 
 %% Gradient system
@@ -208,11 +172,7 @@ if 1
   HW.Grad(1).xyzBDir = [-1, -1, 1, 1];  % x y z prepol - sign (for inversing direction)
 
   % resistance of gradient coils (including cabling)
-  % HW.Grad(1).LoadRin = [18.4, 13.5, 16.0, 18.4];  % no filters
-  % HW.Grad(1).LoadRin = [18.2, 13.1, 16.4, 18.0];
-  % HW.Grad(1).LoadRin = [18.2, 13.1, 16.14, 18.0];  % Low Z with 0.23ohm cable   ====> [18.0, 12.9, 16.0, 18.0]  FH cable
-  % HW.Grad(1).LoadRin = [15.05, 10.2, 15.9, 14.8];  % Low Z with 0.23ohm cable
-  HW.Grad(1).LoadRin = [14.50, 9.70, 14.76, 12.57];  % Low Z with new double cable 2022-03-17
+  HW.Grad(1).LoadRin = [18.4, 13.5, 16.0, 18.4];  % no filters
 
 end
 
@@ -285,14 +245,7 @@ if numel(HW.Grad) > 1
   % reduce number of windings in y-coil and z-coil from 400 to 200 respectively
   % HW.Grad(2).LoadIin2Amp = [7.312639051188890e-05*1.0108, 3.611585947860855e-04*1.0148/2, 4.094945768319414e-04*1.004/2, 1];  % x y z XXX? 10.03.2021 x? y200z200
   % re-calibration, 10/03/2021
-  % HW.Grad(2).LoadIin2Amp = [7.387719039280947e-05, 1.836016256569566e-04*1.004997501249375, (1.957216097287849e-04*1.050659630606860)/(8730/8718)/(8730/8768)/(8790/8781), 1];  % x y z XXX? 10.03.2021
-  % HW.Grad(2).LoadIin2Amp = [7.387719039280947e-05, 1.836016256569566e-04*1.004997501249375, (1.957216097287849e-04*1.050659630606860)/(8790/8810), 1];
-  %HW.Grad(2).LoadIin2Amp = [7.387719039280947e-05, 1.836016256569566e-04*1.004997501249375, (1.957216097287849e-04*1.050659630606860)/(8779/8758), 1];
-  % HW.Grad(2).LoadIin2Amp = [7.387719039280947e-05, 1.836016256569566e-04*1.004997501249375, (1.957216097287849e-04*1.050659630606860)/(8780/8772), 1];  % gradio rat
-  % HW.Grad(2).LoadIin2Amp = [7.387719039280947e-05, 1.836016256569566e-04*1.004997501249375, (1.957216097287849e-04*1.050659630606860)/(8780/8770), 1];  % gradio rat
-  HW.Grad(2).LoadIin2Amp = [7.387719039280947e-05, 1.836016256569566e-04*1.004997501249375, (1.957216097287849e-04*1.050659630606860), 1];  % gradio rat
-  % HW.Grad(2).LoadIin2Amp = [7.387719039280947e-05, 1.836016256569566e-04*1.004997501249375, (1.957216097287849e-04*1.050659630606860), 1];  % antenne RMN EFNMR
-  % HW.Grad(2).LoadIin2Amp = [7.387719039280947e-05, 1.836016256569566e-04*1.004997501249375, (1.957216097287849e-04*1.050659630606860)/(8800/8770), 1];   %salle 4.7T
+  HW.Grad(2).LoadIin2Amp = [7.387719039280947e-05, 1.836016256569566e-04*1.004997501249375, (1.957216097287849e-04*1.050659630606860)./(8730/8718), 1];  % x y z XXX? 10.03.2021
 
   %% resistance of coils in Ohm
   % HW.Grad(2).LoadRin = [55.2, 91.2, 79.9, 1];  % gemessen am 28.01.2021
@@ -321,8 +274,7 @@ if numel(HW.Grad) > 1
   % FIXME: Adapt to properties of used coils.
   % 4th channel is currently unused. Set some values anyway.
   HW.Grad(2).CoilThermalGroup = 1:4;
-  % HW.Grad(2).CoilPowerDissipation(1:4) = 30;  % Watt
-  HW.Grad(2).CoilPowerDissipation(1:4) = 45;  % Watt
+  HW.Grad(2).CoilPowerDissipation(1:4) = 30;  % Watt
   HW.Grad(2).CoilTemperatur(1:4) = 20;  % temperature of coil at start of measurement in degrees C
   HW.Grad(2).CoilMaxTemperature(1:4) = 60;  % maximum temperature (in model) before damage occurs in degrees C
   % thermal capacity in J/K;  FIXME: Adjust values?
@@ -338,21 +290,7 @@ if numel(HW.Grad) > 1
   fprintf('B0 field via cage in z-direction %3.1f %cT (in %s).\n', HW.B0*1e6, char(181), mfilename());
   HW.Grad(2).AmpOffsetExtra(3) = HW.B0;
   % HW.Grad(2).AmpOffsetExtra(2) = HW.B0;
-  % HW.Grad(2).AmpOffsetExtra(1) = HW.B0;
   % HW.Grad(2).AmpOffsetExtra(1:3) = -cross(HW.Grad(2).AmpOffset(1:3), [1,0,0]) / norm(HW.Grad(2).AmpOffset(1:3),2) * HW.B0;
-
-
-  %% DNP coil settings
-  % FIXME: Adjust those values
-  HW.TX(2).CoilPowerDissipation = 1e9;  % power dissipation in Watt
-  HW.TX(2).CoilTemperature = 20;  % temperature of coil at start of measurement in degrees C
-  HW.TX(2).CoilMaxTemperature = 60;  % maximum temperature (in model) before damage occurs in degrees C
-  % thermal capacity in J/K;  FIXME: Adjust values?
-  specificHeatCapacity = 385; % J/kg/K (copper wire)
-  % volumeCoil = ???;  % volume of copper in coil in m^3
-  % mass = volumeCoil*9e3;  % in kg (with density of copper wires)
-  mass = 2000e-3;  % mass of copper wires in kg
-  HW.TX(2).CoilThermalCapacity = specificHeatCapacity*mass;
 
 end
 
@@ -426,9 +364,10 @@ if 0
   HW.DefSeqValues.Prepol.SPI.ErrorInputChannel = 6;  % digital input channel for amplifier error signal
 end
 
-% %% external DDS settings
-% DDSConfigExePath = fullfile(winqueryreg('HKEY_LOCAL_MACHINE', 'SOFTWARE\Pure Devices\Settings', 'LibPath'), ...
-%   '..', 'PD-DDS', 'DDSConfig.exe');
-% DDS = PD.DDS.GetInstance(DDSConfigExePath);
-% % DDS.RDACRef = 10e3;  % reference resistance for DAC
-% DDS.IDAC2Uout = [DDS.IDACMin; DDS.IDACMax] \ [135e-3; 484e-3];
+
+%% external DDS settings
+DDSConfigExePath = fullfile(winqueryreg('HKEY_LOCAL_MACHINE', 'SOFTWARE\Pure Devices\Settings', 'LibPath'), ...
+  '..', 'PD-DDS', 'DDSConfig.exe');
+DDS = PD.DDS.GetInstance(DDSConfigExePath);
+% DDS.RDACRef = 10e3;  % reference resistance for DAC
+DDS.IDAC2Uout = [DDS.IDACMin; DDS.IDACMax] \ [135e-3; 484e-3];

@@ -8,7 +8,7 @@ function hax = plot_Smith(HW, Network, hax, type)
 % https://engineering.olemiss.edu/~eedarko/experience/rfqmeas2b.pdf
 %
 % INPUT:
-%   HW        HW structure or PD.HWClass object
+%   HW        HW structure or PD.HW object
 %   Network   Structure with at least the following fields:
 %     Frequency     Vector with frequencies in Hz
 %     Reflection    Complex reflection ratio
@@ -20,7 +20,7 @@ function hax = plot_Smith(HW, Network, hax, type)
 %   hax       Handle to the axes containing the Smith chart
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2019 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 

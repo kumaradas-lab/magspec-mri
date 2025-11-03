@@ -1,4 +1,0 @@
-%% Undocumented function
-
-%#function pdShimAmp
-

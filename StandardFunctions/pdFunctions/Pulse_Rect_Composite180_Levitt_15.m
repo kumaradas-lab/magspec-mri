@@ -3,7 +3,7 @@ function [pulseData] = Pulse_Rect_Composite180_Levitt_15(HW, Center, Pulse, vara
 %
 %   pulseData = Pulse_Rect_Composite180_Levitt_15(HW, Center, Pulse)
 % or:
-%   pulseData = Pulse_Rect_Composite180_Levitt_15(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments, MaxLength, Frequency, Phase)
+%   pulseData = Pulse_Rect_Composite180_Levitt_15(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments,  MaxLength, Frequency, Phase)
 % additionally:
 %   excitationAngleFactor = Pulse_Rect_Composite180_Levitt_15(HW, 'Amp')
 %   bandwidthFactor = Pulse_Rect_Composite180_Levitt_15(HW, 'Time')
@@ -62,8 +62,8 @@ function [pulseData] = Pulse_Rect_Composite180_Levitt_15(HW, Center, Pulse, vara
 % ------------------------------------------------------------------------------
 
 %% composite settings
-FlipAngleComposite = [180;     360;   180;     180];
-FlipPhaseComposite = [313.4/3; 313.4; 313.4/3; 0  ];
+FlipAngleComposite = [180;   360;   180;   180];
+FlipPhaseComposite = [104.5; 313.4; 104.5; 0  ];
 
 %% check input
 if nargin == 2

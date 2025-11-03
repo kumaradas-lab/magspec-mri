@@ -3,7 +3,7 @@ function pulseData = Pulse_Rect_Slice(HW, Center, Pulse, varargin)
 %
 %   pulseData = Pulse_Rect_Slice(HW, Center, Pulse)
 % or:
-%   pulseData = Pulse_Rect_Slice(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments, MaxLength, Frequency, Phase)
+%   pulseData = Pulse_Rect_Slice(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments,  MaxLength, Frequency, Phase)
 % additionally:
 %   excitationAngleFactor = Pulse_Rect_Slice(HW, 'Amp')
 %   bandwidthFactor = Pulse_Rect_Slice(HW, 'Time')
@@ -62,7 +62,7 @@ function pulseData = Pulse_Rect_Slice(HW, Center, Pulse, varargin)
 % the duration of the pulse to have the same bandwidth (FWHM) as a rect pulse.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2018-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2018-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -103,22 +103,14 @@ if nargin == 2
 end
 
 %% "real" path
-% Use gamma that better matches the frequency of the pulse
-% FIXME: Could this be an issue with (very) off-center slice pulses?
-if abs(Pulse.Frequency - HW.fLarmorX) < abs(Pulse.Frequency - HW.fLarmor)
-  tFlipPi = pi/HW.GammaX / HW.TX(Pulse.iDevice).AmpDef;
-else
-  tFlipPi = HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec / HW.TX(Pulse.iDevice).AmpDef;
-end
+tFlipPi = HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec / HW.TX(Pulse.iDevice).AmpDef;
 
-BlockLength = 1/Pulse.Bandwidth*bwFactor;
+BlockLength = 1/Pulse.Bandwidth*bwFactor*0.999;
 
-gain = HW.TX(Pulse.iDevice).AmpDef * 2*tFlipPi * (Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / BlockLength;
+gain = HW.TX(Pulse.iDevice).AmpDef * 2*tFlipPi * (Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / (BlockLength/0.998);
 
-if Pulse.MaxLength + 1/HW.TX(Pulse.iDevice).fSample < BlockLength;
-  error('PD:Pulse_Rect_Slice:MaxLengthTooShort', ...
-    'MaxLength of rf pulse is %.3f %cs too short.', ...
-    (BlockLength - Pulse.MaxLength)*1e6, char(181));
+if Pulse.MaxLength < BlockLength;
+  error('maxLength of HF Pulse to short')
 end
 
 if Pulse.MaxNumberOfSegments < 1

@@ -36,14 +36,10 @@ function [HW, mySave, SliceSelectOut, SeqOut] = Find_Shim(HW, mySave, minTime, d
 %                     recommended, default: HW.FindShim.T1)
 %     RepetitionTime  rate in seconds for each optimization step
 %                     (default: 3*Seq.T1)
-%     ShimStart       1xn vector or scalar that contains the initial shim values
-%                     where the search is started in T/m. If it is a scalar, the
-%                     same value applies to all gradient channels.
-%                     (Default: HW.FindShim.ShimStart)
-%     ShimStep        1xn vector or scalar with initial step sizes for
-%                     optimization per gradient channel in T/m. If it is a
-%                     scalar, the same value applies to all gradient channels.
-%                     (Default: HW.FindShim.ShimStep)
+%     ShimStart       1xn vector that contains the initial shim values where the
+%                     search is started (in T/m; default: HW.FindShim.ShimStart)
+%     ShimStep        1xn vector with initial step widths for optimization
+%                     (in T/m; default: HW.FindShim.ShimStep)
 %     AQEcho          relative part of the time tEcho to be acquired between the
 %                     inversion pulses [0...1[ (0 => only one sample)
 %                     (default: HW.FindShim.AQEcho)
@@ -66,11 +62,6 @@ function [HW, mySave, SliceSelectOut, SeqOut] = Find_Shim(HW, mySave, minTime, d
 %                     step (boolean). The frequency is determined by the maximum
 %                     amplitude in the frequency spectrum.
 %                     (default: HW.FindShim.use_nEchos_Frequency)
-%     store_fLarmor   Store new fLarmor in mySave after shimming if
-%                     Seq.use_nEchos_Frequency is true. This updates the
-%                     fallback value for functions like Find_Frequency_Sweep
-%                     if the frequency search interval is not yet exceeded.
-%                     (default: Seq.use_nEchos_Frequency)
 %     plotRaiseWindow
 %                     raise and focus figure window in plot_data_1D for every
 %                     iteration step (boolean, default: false)
@@ -87,10 +78,7 @@ function [HW, mySave, SliceSelectOut, SeqOut] = Find_Shim(HW, mySave, minTime, d
 %                     the acquired signal (default: @RectWin)
 %     tauMin          If the resulting T2* after shimming is lower than this
 %                     value in seconds, a warning is emitted and the new shim
-%                     values aren't used automatically.
-%                     (Default: HW.FindShim.tauMin or 1e-3)
-%     verbose         Show information about each shimming step in command
-%                     window (default: true).
+%                     values aren't used automatically (default: 1e-3).
 %
 %   SliceSelect
 %             structure with the following fields. See the documentation for
@@ -118,7 +106,7 @@ function [HW, mySave, SliceSelectOut, SeqOut] = Find_Shim(HW, mySave, minTime, d
 %   SeqOut    structure with sequence parameters and results
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -157,18 +145,6 @@ end
 if isemptyfield(Seq, 'use_nEchos_Frequency')
   Seq.use_nEchos_Frequency = HW.FindShim.use_nEchos_Frequency;
 end
-% store fLarmor in mySave after shimming
-if isemptyfield(Seq, 'store_fLarmor')
-  Seq.store_fLarmor = Seq.use_nEchos_Frequency;
-end
-if isa(HW, 'PD.HWClass') && Seq.use_nEchos_Frequency && ...
-    ~isemptyfield(Seq, 'ShimSequence') && isequal(Seq.ShimSequence, @sequence_Spectrum_Press)
-  warning('PD:Find_Shim:DoubleFrequencyCorrection', ...
-    ['The function "sequence_Spectrum_Press" always corrects the Larmor frequency offset using the phase drift of the signal.\n', ...
-    'De-activating "use_nEchos_Frequency" in "Find_Shim" so the frequency offset won''t be corrected twice.']);
-  Seq.use_nEchos_Frequency = 0;
-end
-
 if isemptyfield(Seq, 'plotRaiseWindow'), Seq.plotRaiseWindow = false; end  % raise and focus figure window in plot_data_1D
 if isemptyfield(Seq, 'plotProgress'), Seq.plotProgress = true; end  % plot shim and mean(abs(RX)) during optimization
 if isemptyfield(Seq, 'useFminsearch'), Seq.useFminsearch = true; end  % use fminsearch
@@ -177,14 +153,7 @@ if isemptyfield(Seq, 'ShimMatrixOff'), Seq.ShimMatrixOff = true; end  % set Shim
 if isemptyfield(Seq, 'useSliceSelect'), Seq.useSliceSelect = HW.FindShim.useSliceSelect; end  % use slice gradient
 % filter window @RaisedCosine, @LorentzToGauss or @SineBel
 if isemptyfield(Seq, 'FIDWindowFunction'), Seq.FIDWindowFunction = @RectWin; end
-if isemptyfield(Seq, 'tauMin')
-  if isemptyfield(HW.FindShim, 'tauMin')
-    Seq.tauMin = 1e-3;
-  else
-    Seq.tauMin = HW.FindShim.tauMin;
-  end
-end
-if isemptyfield(Seq, 'verbose'),  Seq.verbose = true;  end
+if isemptyfield(Seq, 'tauMin'),  Seq.tauMin = 1e-3;  end
 
 if ~Seq.nEchos
   if ~isempty(Seq.tFID) && isemptyfield(Seq, 'ShimSequence');
@@ -194,7 +163,7 @@ if ~Seq.nEchos
   end
 end
 
-if isemptyfield(Seq, 'LoadSystemAtEnd'), Seq.LoadSystemAtEnd = ~isa(HW, 'PD.HWClass'); end
+if isemptyfield(Seq, 'LoadSystemAtEnd'), Seq.LoadSystemAtEnd = ~isa(HW, 'PD.HW'); end
 
 if isemptyfield(SliceSelect, 'alfa'), SliceSelect.alfa = HW.FindShim.SliceSelect.alfa; end   % first rotation around x axis
 if isemptyfield(SliceSelect, 'phi'), SliceSelect.phi = HW.FindShim.SliceSelect.phi; end   % second rotation around (new) y axis
@@ -258,7 +227,7 @@ magnetShim = sequence_shim(HW, Seq);
 
 % B0 shift off
 if (isstruct(HW.Grad(SliceSelect.iDevice)) && ~isemptyfield(HW.Grad(SliceSelect.iDevice), 'ShimGradients')) || ...
-    (isa(HW.Grad(SliceSelect.iDevice), 'PD.GradClass') && ~isempty(HW.Grad(SliceSelect.iDevice).ShimGradients))
+    (isa(HW.Grad(SliceSelect.iDevice), 'PD.Grad') && ~isempty(HW.Grad(SliceSelect.iDevice).ShimGradients))
   magnetShim(HW.Grad(SliceSelect.iDevice).ShimGradients==0) = 0;
 else
   magnetShim([0, 0, 0, ones(1,length(magnetShim)-3)]) = 0;
@@ -275,7 +244,7 @@ end
 iAQ = find([SeqOut.AQ(:).Device] == SeqOut.SliceSelect.iDevice, 1, 'first');
 % FIXME: This always assesses the last acquisition window. Is that ok?
 iNaN = find(isnan(data_1D(iAQ).data));
-if isscalar(iNaN), iNaN = [0, iNaN]; end
+if numel(iNaN) == 1, iNaN = [0, iNaN]; end
 
 % get T2*
 % FIXME: This assumes that the center of excitation is at t=0. Is this always
@@ -299,14 +268,14 @@ shimElemStr = sprintf('%6.9f, ', magnetShim(HW.Grad(SliceSelect.iDevice).ShimGra
 if numel(HW.Grad) > 1
   % FIXME: Currently shimming with channels on one single device only is supported
   newCalLine = sprintf(['HW.Grad(%d).AmpOffset([%s]) = [%s]; ', ...
-    ' %% %s by FindShim%s (T2* = %.1f ms @ %.6f MHz), x y z in T/m\n'], ...
+    ' %% %s by FindShim%s (T2* = %.1f ms), x y z in T/m and B0 in T\n'], ...
     SliceSelect.iDevice, shimGradIdxStr(1:end-1), shimElemStr(1:end-2), ...
-    datestr(now, 'yyyy-mm-ddTHH:MM:SS'), ShimSequenceStr, SeqOut.tau*1e3, HW.fLarmor/1e6);
+    datestr(now, 'yyyy-mm-ddTHH:MM:SS'), ShimSequenceStr, SeqOut.tau*1e3);
 else
   newCalLine = sprintf(['HW.MagnetShim([%s]) = [%s]; ', ...
-    ' %% %s by FindShim%s (T2* = %.1f ms @ %.6f MHz), x y z in T/m\n'], ...
+    ' %% %s by FindShim%s (T2* = %.1f ms), x y z in T/m and B0 in T\n'], ...
     shimGradIdxStr(1:end-1), shimElemStr(1:end-2), ...
-    datestr(now, 'yyyy-mm-ddTHH:MM:SS'), ShimSequenceStr, SeqOut.tau*1e3, HW.fLarmor/1e6);
+    datestr(now, 'yyyy-mm-ddTHH:MM:SS'), ShimSequenceStr, SeqOut.tau*1e3);
 end
 
 useNewShim = true;
@@ -339,16 +308,11 @@ if ~useNewShim
 end
 
 
-HW.MagnetShim(HW.Grad(SliceSelect.iDevice).ShimGradients~=0) = magnetShim(HW.Grad(SliceSelect.iDevice).ShimGradients~=0);
+HW.MagnetShim = magnetShim;
 
 
 %% write new shim values to LoadMagnet file
-if ~isempty(HW.MagnetShimPath) ...
-    && (isemptyfield(mySave, 'DummySerial') ...
-        || mySave.DummySerial(min(SliceSelect.iDevice, numel(mySave.DummySerial))) <= 0)
-  if ~exist(fileparts(HW.MagnetShimPath), 'dir')
-    mkdir(fileparts(HW.MagnetShimPath));
-  end
+if ~isempty(HW.MagnetShimPath) && (isemptyfield(mySave, 'DummySerial') || mySave.DummySerial <= 0)
   fid = fopen(HW.MagnetShimPath, 'a+');
   fwrite(fid, newCalLine);
   fclose(fid);
@@ -357,21 +321,10 @@ if ~isempty(HW.MagnetShimPath) ...
   fprintf('\n');
   disp(newCalLine);
   fprintf('\n');
-  if Seq.use_nEchos_Frequency && Seq.store_fLarmor
-    % update current Larmor frequency of magnet for subsequent frequency
-    % searches
-    mySave.HW.fLarmor = HW.fLarmor;
-    mySave.HW.B0 = HW.B0;
-  end
 else
   if Seq.use_Find_Frequency_FID == 1
     mySave = [];
     [HW, mySave] = Find_Frequency_FID(HW, mySave, 0, 1, 0.2e-3);
-  elseif Seq.use_nEchos_Frequency && Seq.store_fLarmor
-    % update current Larmor frequency of magnet for subsequent frequency
-    % searches
-    mySave.HW.fLarmor = HW.fLarmor;
-    mySave.HW.B0 = HW.B0;
   end
   disp('Please add the following line to your MagnetShimCal.m file.' );
   disp(newCalLine);

@@ -94,7 +94,7 @@ function [SeqOut, mySave] = sequence_PulseDuration(HW, Seq, AQ, TX, Grad, mySave
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2021 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -108,60 +108,12 @@ if isemptyfield(Seq, 'PostProcessSequence'),Seq.PostProcessSequence = 1;  end
 if isemptyfield(Seq, 'PostProcessLocal'),   Seq.PostProcessLocal    = 1;  end
 
 
-%% parameters that are also needed when preparation is skipped
-iDevice = 1;  % FIXME: Actually support multiple devices
-if isemptyfield(Seq, 'useGammaX')
-  Seq.useGammaX = false;
-end
-
-if isa(HW, 'PD.HWClass')
-  if Seq.useGammaX
-    % imaging sequences currently only support measurements at the primary nucleus
-
-    % save current settings to restore them on exit
-    oldPaUout2Amplitude = HW.TX(iDevice).PaUout2Amplitude;
-    oldPaUout2AmplitudeX = HW.TX(iDevice).PaUout2AmplitudeX;
-    oldGammaDef = HW.GammaDef;
-
-    guardHW = onCleanup(@() ...
-      restoreHWsettings(HW, iDevice, oldPaUout2Amplitude, oldPaUout2AmplitudeX, oldGammaDef));
-
-    HW.TX(iDevice).PaUout2Amplitude = HW.TX(iDevice).PaUout2AmplitudeEstimatedX;
-    HW.TX(iDevice).PaUout2AmplitudeX = HW.TX(iDevice).PaUout2AmplitudeEstimatedX;
-
-    HW.GammaDef = HW.GammaX;
-
-  else
-    % save current settings to restore them on exit
-    oldPaUout2Amplitude = HW.TX(iDevice).PaUout2Amplitude;
-
-    guardHW = onCleanup(@() ...
-      restoreHWsettings(HW, iDevice, oldPaUout2Amplitude));
-
-    HW.TX(iDevice).PaUout2Amplitude = HW.TX(iDevice).PaUout2AmplitudeEstimated;
-  end
-
-  ampDef = get_TX_Amplitude(HW, ...
-    'Uout', HW.TX(iDevice).Def.UoutCalibrated(HW.TX(iDevice).ChannelDef), ...
-    'Device', iDevice);
-
-  currentTFlip90Def = 2*pi / HW.GammaDef / ampDef / 4;
-
-else
-  if Seq.useGammaX
-    warning('PD:sequence_PulseDuration:NoGammaX', ...
-      'Pulse duration determination at GammaX is only supported if HW is a PD.HWClass object.');
-  end
-  currentTFlip90Def = HW.tFlip90Def;
-end
-
-
 %% Preparation
 if Seq.PreProcessSequence
   Seq = set_EmptyField(Seq, 'doPlot',                   HW.FindPulseDuration.doPlot);
   Seq = set_EmptyField(Seq, 'T1Estimated',              HW.FindPulseDuration.T1Estimated); % estimated T1 time of the used sample (oil is recommened)
   Seq = set_EmptyField(Seq, 'tPulse90Estimated',        HW.FindPulseDuration.tPulse90Estimated);
-  if isempty(Seq.tPulse90Estimated), Seq.tPulse90Estimated = currentTFlip90Def; end
+  if isempty(Seq.tPulse90Estimated), Seq.tPulse90Estimated = HW.tFlip90Def; end
   Seq = set_EmptyField(Seq, 'excitationFlipAngleStart', HW.FindPulseDuration.excitationFlipAngleStart);
   Seq = set_EmptyField(Seq, 'excitationFlipAngleStop',  HW.FindPulseDuration.excitationFlipAngleStop);
   Seq = set_EmptyField(Seq, 'excitationFlipAngleSteps', HW.FindPulseDuration.excitationFlipAngleSteps);
@@ -253,15 +205,11 @@ if Seq.PreProcessSequence
   if ~isfield(Seq.AQSlice(1), 'SpoilFactor')
     Seq.AQSlice(1).SpoilFactor = [1, 1, 1];
   end
-  if ~isfield(Seq.AQSlice(1), 'phaseCycling')
-    Seq.AQSlice(1).phaseCycling = 0;
-  end
-  Seq.AQSlice(1).phaseCycling=double(any(Seq.AQSlice(1).phaseCycling)); % zero or one
 
 
   Seq.AQSlice(1).excitationFlipAngle = [repmat(Seq.excitationFlipAngleStart, 1, Seq.SteadyState_PreShots90), ... % pre-shots
-    reshape(repmat(linspace(Seq.excitationFlipAngleStart, Seq.excitationFlipAngleStop, Seq.excitationFlipAngleSteps),Seq.AQSlice(1).phaseCycling+1,1),1,[]), ...       % actual steps
-    repmat(Seq.excitationFlipAngleStop, 1, Seq.SteadyState_PostShots90)] * Seq.tPulse90Estimated/currentTFlip90Def;  % post-shots
+    linspace(Seq.excitationFlipAngleStart, Seq.excitationFlipAngleStop, Seq.excitationFlipAngleSteps), ...       % actual steps
+    repmat(Seq.excitationFlipAngleStop, 1, Seq.SteadyState_PostShots90)] * Seq.tPulse90Estimated/HW.tFlip90Def;  % post-shots
   Seq.AQSlice(1).inversionFlipAngle = Seq.AQSlice(1).excitationFlipAngle*2;
   % Seq.tReadoutOffset = -0.2e-3;
 
@@ -287,10 +235,6 @@ end
 %% actual measurement
 if Seq.StartSequence || Seq.PollPPGfast || Seq.GetRawData || Seq.PostProcessSequence
 
-  TXVoltage = HW.TX(Seq.AQSlice.iDevice).AmpDef / HW.TX(Seq.AQSlice.iDevice).PaUout2Amplitude(HW.TX(Seq.AQSlice.iDevice).ChannelDef);
-  fprintf('Searching pulse duration of 90%c pulse at default amplitude (%.3f V) around %.3f %cs.\n', ...
-    176, TXVoltage, Seq.tPulse90Estimated*1e6, 181);
-
   oldPreProcessSequence = Seq.PreProcessSequence;
   Seq.PreProcessSequence = 0;
   [SeqOut, mySave] = sequence_Spin_Echo(HW, Seq, AQ, TX, Grad, mySave);
@@ -303,58 +247,45 @@ end
 %% evaluate results
 iAQ = find([SeqOut.AQ(:).Device] == SeqOut.AQSlice(1).iDevice, 1, 'first');  % FIXME: Support multiple channels?
 if SeqOut.PostProcessLocal
-  data.Image = mean(SeqOut.data(iAQ).fft1_dataCut(floor(SeqOut.AQSlice(1).nRead*SeqOut.AQSlice(1).ReadOS/2) + (1-floor(SeqOut.AQSlice(1).nRead/2):ceil(SeqOut.AQSlice(1).nRead/2)),:,:,:,:,:),6);
-  data.tFlip = currentTFlip90Def/90*SeqOut.AQSlice(1).excitationFlipAngle(SeqOut.SteadyState_PreShots90+1:Seq.AQSlice(1).phaseCycling+1:end-SeqOut.SteadyState_PostShots90);
+  data.Image = SeqOut.data(iAQ).fft1_dataCut(floor(SeqOut.AQSlice(1).nRead*SeqOut.AQSlice(1).ReadOS/2) + (1-floor(SeqOut.AQSlice(1).nRead/2):ceil(SeqOut.AQSlice(1).nRead/2)),:);
+  data.tFlip = SeqOut.HW.tFlip90Def/90*SeqOut.AQSlice(1).excitationFlipAngle(SeqOut.SteadyState_PreShots90+1:end-SeqOut.SteadyState_PostShots90);
   data.AmplitudeAbs = mean(abs(data.Image(floor(end/2-end/20):ceil(end/2+end/20),:)), 1);
   [maxA, ~] = max(data.AmplitudeAbs);
-
-  % check range for search of first maximum
-  data.savePulseFile = true;
   data.index45 = find(data.AmplitudeAbs>maxA/2, 1, 'first');
+  data.index135 = data.index45-1 + find(data.AmplitudeAbs(data.index45:end)<maxA/2, 1, 'first');
+  data.index225 = data.index135-1 + find(data.AmplitudeAbs(data.index135:end)>maxA/2, 1, 'first');
+
+  data.savePulseFile = true;
   if isempty(data.index45) || data.index45==1
     warning('PD:sequence_PulseDuration', 'Decrease Seq.excitationFlipAngleStart')
     data.savePulseFile = false;
   end
-
-  nRange135 = min(max(2, floor(length(data.tFlip)/10)), 4);
-  data.index135 = data.index45 + find(data.AmplitudeAbs(data.index45+1:end)<maxA/2, 1, 'first');
   if isempty(data.index135)
     warning('PD:sequence_PulseDuration', 'Increase Seq.excitationFlipAngleStop')
-    data.index135 = min(data.index45+nRange135, length(data.tFlip));
+    data.index135 = min(data.index45+3, length(data.tFlip));
     data.savePulseFile = false;
-  elseif data.index135 < data.index45+nRange135
+  elseif data.index135 < data.index45+3
     warning('PD:sequence_PulseDuration', 'Increase Seq.excitationFlipAngleSteps')
-    data.index135 = min(data.index45+nRange135, length(data.tFlip));
+    data.index135 = min(data.index45+3, length(data.tFlip));
     data.savePulseFile = false;
   end
-
-  nRange225 = min(max(4, floor(length(data.tFlip)/6)), 8);
-  data.index225 = data.index135 + find(data.AmplitudeAbs(data.index135+1:end)>maxA/2, 1, 'first');
   if isempty(data.index225)
     warning('PD:sequence_PulseDuration', 'Increase Seq.excitationFlipAngleStop')
-    data.index225 = min(data.index135+nRange225, length(data.tFlip));
+    data.index225 = min(data.index135+6, length(data.tFlip));
     data.savePulseFile = false;
-  elseif data.index225 < data.index135+nRange225
+  elseif data.index225 < data.index135+6
     warning('PD:sequence_PulseDuration', 'Increase Seq.excitationFlipAngleSteps')
-    data.index225 = min(data.index135+nRange225, length(data.tFlip));
+    data.index225 = min(data.index135+6, length(data.tFlip));
     data.savePulseFile = false;
   end
 
   [maxA, maxI] = max(data.AmplitudeAbs(data.index45:data.index135));
   maxI = maxI+data.index45-1;
 
-  % FIXME: The following command "corrects" the phase for each pixel in read
-  % direction separately. Would it be better to correct all pixels with the
-  % average phase from the center? What about phase slope (e.g., due to
-  % incorrect gradient delay)?
   data.Image = bsxfun(@times, data.Image, exp(-1i*(0+angle(data.Image(:,maxI)))));
 
-  %   data.Amplitude = mean(data.Image(floor(end/2-end/4):ceil(end/2+end/4),:), 1);
-  AmplitudeI = (floor(size(data.Image,1)/2)+1)+(round(-size(data.Image,1)/4+0.5):round(size(data.Image,1)/4-0.5));
-  data.Amplitude = mean(data.Image(AmplitudeI,:), 1);
-  %   data.AmplitudeCenter = mean(data.Image(floor(end/2-end/20):ceil(end/2+end/20),:), 1);
-  AmplitudeCenterI = (floor(size(data.Image,1)/2)+1)+(round(-size(data.Image,1)/32):round(size(data.Image,1)/32));
-  data.AmplitudeCenter = mean(data.Image(AmplitudeCenterI,:), 1);
+  data.Amplitude = mean(data.Image(floor(end/2-end/4):ceil(end/2+end/4),:), 1);
+  data.AmplitudeCenter = mean(data.Image(floor(end/2-end/20):ceil(end/2+end/20),:), 1);
 
   data.tFlipInterp = interpn(data.tFlip, 8).';
   data.AmplitudeCenterInterp = interpn(data.AmplitudeCenter, 8, 'cubic').';
@@ -395,16 +326,9 @@ if SeqOut.doPlot
   data = SeqOut.dataPulseDuration;
   if isemptyfield(Seq, 'hParent'), Seq.hParent = 320; end
   if ishghandle(Seq.hParent, 'figure') || isnumeric(Seq.hParent)
-    newFigure = ~ishghandle(Seq.hParent, 'figure');
-    data.fh = figure(Seq.hParent);
+    data.fh = figure(320);
     clf(data.fh, 'reset');
     set(data.fh, 'Name', sprintf('Find 90%c pulse duration', 176), 'NumberTitle', 'off');
-    if newFigure
-      figPos = get(data.fh, 'Position');
-      figPos(1) = figPos(1) - (920-figPos(3))/2;
-      figPos(3) = 920;
-      set(data.fh, 'Position', figPos);
-    end
   elseif ishghandle(Seq.hParent, 'uipanel')
     data.fh = Seq.hParent;
     hKids = get(Seq.hParent, 'Children');
@@ -413,22 +337,9 @@ if SeqOut.doPlot
     error('Seq.hParent must be a handle to either a figure or a uipanel.');
   end
 
-  % The following too lines are exact copies from the above section. They are
-  % needed here, too, because this function can be called with
-  % Seq.PostProcessLocal=false (e.g., by the teach GUI).
-  AmplitudeI = (floor(size(data.Image,1)/2)+1)+(round(-size(data.Image,1)/4+0.5):round(size(data.Image,1)/4-0.5));
-  AmplitudeCenterI = (floor(size(data.Image,1)/2)+1)+(round(-size(data.Image,1)/32):round(size(data.Image,1)/32));
-
-  maxA = max(max(abs(data.Image(floor(end/2-end/4):ceil(end/2+end/4),:))));
+  maxA = max([abs(data.maxAmpCenter),max(data.AmplitudeAbs(data.index45:data.index135))])*1.1;
   hax = subplot(2,3,1, 'Parent', data.fh);
   imagesc(data.tFlip*1e6, SeqOut.data(iAQ).Ticks(1).Read*1e3, real(data.Image), 'Parent', hax);
-  hold(hax,'on')
-  dr=diff(SeqOut.data(iAQ).Ticks(1).Read(1:2))/2*1e3;
-  plot(hax, data.tFlip([1,end])*1e6,-dr+SeqOut.data(iAQ).Ticks(1).Read(AmplitudeI([1,1]))*1e3,'k:');
-  plot(hax, data.tFlip([1,end])*1e6,+dr+SeqOut.data(iAQ).Ticks(1).Read(AmplitudeI([end,end]))*1e3,'k:');
-  plot(hax, data.tFlip([1,end])*1e6,-dr+SeqOut.data(iAQ).Ticks(1).Read(AmplitudeCenterI([1,1]))*1e3,'b:');
-  plot(hax, data.tFlip([1,end])*1e6,+dr+SeqOut.data(iAQ).Ticks(1).Read(AmplitudeCenterI([end,end]))*1e3,'b:');
-  hold(hax,'off')
   set(hax, 'CLim', [-maxA, maxA]);
   title(hax, 'real');
   ylabel(hax, 'read in mm');
@@ -437,13 +348,6 @@ if SeqOut.doPlot
 
   hax = subplot(2,3,2, 'Parent', data.fh);
   imagesc(data.tFlip*1e6, SeqOut.data(iAQ).Ticks(1).Read*1e3, imag(data.Image), 'Parent', hax);
-  hold(hax,'on')
-  dr=diff(SeqOut.data(iAQ).Ticks(1).Read(1:2))/2*1e3;
-  plot(hax, data.tFlip([1,end])*1e6,-dr+SeqOut.data(iAQ).Ticks(1).Read(AmplitudeI([1,1]))*1e3,'k:');
-  plot(hax, data.tFlip([1,end])*1e6,+dr+SeqOut.data(iAQ).Ticks(1).Read(AmplitudeI([end,end]))*1e3,'k:');
-  plot(hax, data.tFlip([1,end])*1e6,-dr+SeqOut.data(iAQ).Ticks(1).Read(AmplitudeCenterI([1,1]))*1e3,'b:');
-  plot(hax, data.tFlip([1,end])*1e6,+dr+SeqOut.data(iAQ).Ticks(1).Read(AmplitudeCenterI([end,end]))*1e3,'b:');
-  hold(hax,'off')
   set(hax, 'CLim', [-maxA, maxA]);
   title(hax, 'imag');
   xlabel(hax, sprintf('pulse length in %cs', 181));
@@ -451,13 +355,6 @@ if SeqOut.doPlot
 
   hax = subplot(2,3,3, 'Parent', data.fh);
   imagesc(abs(data.Image), 'Parent', hax);
-  hold(hax,'on')
-  dr=1/2;
-  plot(hax, [1,numel(data.tFlip)],-dr+AmplitudeI([1,1]),'k:');
-  plot(hax, [1,numel(data.tFlip)],+dr+AmplitudeI([end,end]),'k:');
-  plot(hax, [1,numel(data.tFlip)],-dr+AmplitudeCenterI([1,1]),'b:');
-  plot(hax, [1,numel(data.tFlip)],+dr+AmplitudeCenterI([end,end]),'b:');
-  hold(hax,'off')
   set(hax, 'CLim', [-maxA, maxA]);
   title(hax, 'abs');
   ylabel(hax, 'read in samples');
@@ -495,19 +392,5 @@ if SeqOut.doPlot
   xlabel(hax, sprintf('pulse length in %cs', 181));
 end
 
-
-end
-
-
-function restoreHWsettings(HW, iDevice, paUout2Amplitude, paUout2AmplitudeX, gammaDef)
-%% function that restores the initial HW settings on exiting the main function
-
-HW.TX(iDevice).PaUout2Amplitude = paUout2Amplitude;
-
-if nargin > 3
-  % settings for secondary nucleus
-  HW.TX(iDevice).PaUout2AmplitudeX = paUout2AmplitudeX;
-  HW.GammaDef = gammaDef;
-end
 
 end

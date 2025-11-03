@@ -1,15 +1,14 @@
 classdef Talker < handle
 %% Wrapper for .NET class Communication.MTalker
 %
-%     talker = PD.Talker(mrtDevice, communicationType, tcpDevice)
+%     talker = PD.Talker(mrtDevice)
 %
 % This wrapper makes sure the .NET object is correctly disposed when it is
 % deleted.
-% Additionally, it is used as a wrapper for PD.DummyTalker to have a common
-% interface in both cases.
+% Alternatively, it might be used as a wrapper for PD.DummyTalker.
 %
 % ----------------------------------------------------------------------------
-% (C) Copyright 2019-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2019-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ----------------------------------------------------------------------------
 
@@ -17,6 +16,4 @@ end
 
 
 %#function PD.DummyTalker
-%#function PD.TCP.Talker
-%#function create_iPPG
 

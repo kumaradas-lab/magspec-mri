@@ -3,7 +3,7 @@ close all;
 
 file_name='test'; % don't forget to change the name before next experiment
 
-transmitter=enable_osensa("COM4"); % change COM port if needed
+transmitter=enable_osensa("COM3"); % change COM port if needed
 ts=1; %time step in seconds [s]
 n=30; % total recording time ~ 30 s
 data=zeros(n,2); % two columns: time, temperature

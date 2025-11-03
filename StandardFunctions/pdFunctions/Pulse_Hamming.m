@@ -61,7 +61,7 @@ function [pulseData] = Pulse_Hamming(HW, Center, Pulse, varargin)
 % the duration of the pulse to have the same bandwidth (FWHM) as a rect pulse.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2018-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2018-2020 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %-------------------------------------------------------------------------------
 
@@ -128,17 +128,9 @@ HamWin = Hamming(numberOfSegments*2+1);
 % normalized amplitude at tShape
 B1Shape = HamWin(2:2:end);
 % amplitude (in Tesla) of the B1+ field in the coil
-% Use gamma that better matches the frequency of the pulse
-% FIXME: Could this be an issue with (very) off-center slice pulses?
-if abs(Pulse.Frequency - HW.fLarmorX) < abs(Pulse.Frequency - HW.fLarmor)
-  pulseData.Amplitude = abs(B1Shape) * ...
-    (2*pi/HW.GammaX * Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / ...
-    sum(pulseData.Duration.*B1Shape, 1);
-else
-  pulseData.Amplitude = abs(B1Shape) * ...
-    (2*HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec * Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / ...
-    sum(pulseData.Duration.*B1Shape, 1);
-end
+pulseData.Amplitude = abs(B1Shape) * ...
+  (2*HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec * (Pulse.FlipAngle)/Pulse.FlipAngleFullTurn) / ...
+  sum(pulseData.Duration.*B1Shape, 1);
 % Phase of pulse segments (no negative Amplitude is allowed, so you have to add
 % 180 degrees to the phase to get an equivalent)
 pulseData.Phase = angle(B1Shape)/pi*180 + 0 + Pulse.Phase;

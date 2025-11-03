@@ -3,7 +3,7 @@ function pulseData = Pulse_RecoveryCMPG(HW, Center, Pulse, varargin)
 %
 %   pulseData = Pulse_RecoveryCMPG(HW, Center, Pulse)
 % or:
-%   pulseData = Pulse_RecoveryCMPG(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments, MaxLength, Frequency, Phase)
+%   pulseData = Pulse_RecoveryCMPG(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments,  MaxLength, Frequency, Phase)
 % additionally:
 %   excitationAngleFactor = Pulse_Rect_Slice(HW, 'Amp')
 %   bandwidthFactor = Pulse_RecoveryCMPG(HW, 'Time')
@@ -68,7 +68,7 @@ function pulseData = Pulse_RecoveryCMPG(HW, Center, Pulse, varargin)
 % the duration of the pulse to have the same bandwidth (FWHM) as a rect pulse.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2019-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2019-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -90,7 +90,7 @@ Pulse = set_EmptyField(Pulse, 'MaxNumberOfSegments', Inf);
 Pulse = set_EmptyField(Pulse, 'MaxLength', Inf);
 Pulse = set_EmptyField(Pulse, 'Frequency', HW.fLarmor);
 Pulse = set_EmptyField(Pulse, 'Phase', 0);
-Pulse = set_EmptyField(Pulse, 'Bandwidth', max(1/Pulse.MaxLength/bwFactor, 2e3));  % FIXME: Is this a sensible default?
+Pulse = set_EmptyField(Pulse, 'Bandwidth', max(1/Pulse.MaxLength/bwFactor, 2e3)); % FIXME: Is this a sensible default?
 Pulse = set_EmptyField(Pulse, 'iDevice', 1);
 
 %% short path
@@ -110,13 +110,7 @@ if nargin == 2
 end
 
 %% "real" path
-% Use gamma that better matches the frequency of the pulse
-% FIXME: Could this be an issue with (very) off-center slice pulses?
-if abs(Pulse.Frequency - HW.fLarmorX) < abs(Pulse.Frequency - HW.fLarmor)
-  tFlipPi = pi/HW.GammaX / HW.TX(Pulse.iDevice).AmpDef;
-else
-  tFlipPi = HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec / HW.TX(Pulse.iDevice).AmpDef;
-end
+tFlipPi = HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec/HW.TX(Pulse.iDevice).AmpDef;
 
 BlockLength = 1/Pulse.Bandwidth*bwFactor;
 

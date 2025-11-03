@@ -54,9 +54,6 @@ function [Seq, data_1D] = get_data_1D(Seq, data_S_AQs_TRs, Channel, iDevice, nuc
 %     AqFrequency
 %         Acquisition frequency at each sample.
 %
-%     Amplitude2Norm
-%         Amplification of the receiver chain in 1/T at each sample.
-%
 %     device
 %         Device number that was used to acquire the data.
 %
@@ -70,7 +67,7 @@ function [Seq, data_1D] = get_data_1D(Seq, data_S_AQs_TRs, Channel, iDevice, nuc
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2016-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 

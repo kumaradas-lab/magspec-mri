@@ -1,55 +1,23 @@
-function TXShape = correct_PulsePhase(TXShape, HW, iDevice, fDDS)
+function TXShape = correct_PulsePhase(TXShape, HW, iDevice)
 %% Correct phase of a slice selective rf pulses with offset frequency
 %
-%   TXShape = correct_PulsePhase(TXShape, HW, iDevice, fDDS)
+%   TXShape = correct_PulsePhase(TXShape, HW)
 %
 % The phase of the (shaped) rf pulses in the structure TXShape is corrected such
 % that the "effective phase offset" at the center of the pulse is as set in
 % TXShape.Phase.
-% Additionally, the "dummy pulses" that are added before and after the rf pulse
-% are used to shift the phase of the DDS such that the effective phase after the
-% pulse is as if no off-frequency pulse was emitted. It is assumed that the
-% reference frequency is HW.fLarmor (or HW.fLarmorX for the second frequency of
-% dual frequency pulses).
-%
-%
-% INPUT:
-%
-%   TXShape
-%         TX structure which contains only the pulse for which the phase should
-%         be corrected.
-%
-%   HW
-%         HW object (or structure)
-%
-%   iDevice
-%         Index of the used device in case multiple MRT devices are connected.
-%         (Default: 1)
-%
-%   fDDS
-%         Reference frequency of the DDS. (Default: HW.fLarmor)
-%
-%
-% OUTPUT:
-%
-%   TXShape
-%         TX structure which contains the pulse from the input structure TXShape
-%         potentially extended by "dummy pulses" before and after the actual rf
-%         pulse that are used to shift the phase of the DDS.
-%
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2014-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2014-2020 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
 if nargin < 3, iDevice = 1; end
-if nargin < 4, fDDS = HW.fLarmor; end
 
 for t = 1:numel(TXShape)
-  FrequencyGridTX = HW.TX(iDevice).fSample / 2^HW.TX(iDevice).DdsPicBits;
+  FrequencyGridTX = HW.TX(iDevice).fSample/2^HW.TX(iDevice).DdsPicBits;
   TXShape(t).Frequency = round(TXShape(t).Frequency./FrequencyGridTX) .* FrequencyGridTX;
-  fDDS = round(fDDS./FrequencyGridTX) .* FrequencyGridTX;
+  fLarmor = round(HW.fLarmor./FrequencyGridTX) .* FrequencyGridTX;
   % apply settings to all time steps
   if size(TXShape(t).Frequency, 1) == 1
     TXShape(t).Frequency = repmat(TXShape(t).Frequency, size(TXShape(t).Start,1), 1);
@@ -61,18 +29,13 @@ for t = 1:numel(TXShape)
     TXShape(t).Phase = repmat(TXShape(t).Phase, size(TXShape(t).Start,1), 1);
   end
 
-  if all(TXShape(t).Frequency(:) == fDDS)
+  if all(TXShape(t).Frequency(:) == fLarmor)
     % no correction necessary
-    if isemptyfield(TXShape(t), 'Start')
-      TXShape(t).Center = 0;
-      TXShape(t).CenterOffset = 0;
-    else
-      if isemptyfield(TXShape(t), 'Center')
-        TXShape(t).Center = TXShape(t).Start(1,:) + sum(TXShape(t).Duration,1)/2;
-      end
-      if isemptyfield(TXShape(t), 'CenterOffset')
-        TXShape(t).CenterOffset = TXShape(t).Center - (TXShape(t).Start(1,:) + sum(TXShape(t).Duration,1)/2);
-      end
+    if isemptyfield(TXShape(t), 'Center')
+      TXShape(t).Center = TXShape(t).Start(1,:) + sum(TXShape(t).Duration,1)/2;
+    end
+    if isemptyfield(TXShape(t), 'CenterOffset')
+      TXShape(t).CenterOffset = TXShape(t).Center - (TXShape(t).Start(1,:) + sum(TXShape(t).Duration,1)/2);
     end
     continue;
   end
@@ -145,7 +108,7 @@ for t = 1:numel(TXShape)
                                             sum(...
                                                 TXShape(t).Duration ...     % rounded duration of pulse segments
                                                 .*(TXShape(t).Frequency ... % rounded frequency of pulse segments
-                                                   -  fDDS )...             % get offset frequency
+                                                   -  fLarmor )...          % get offset frequency
                                                 , 1)...
                                             , ones(1, sz2))-0.5)...  % get +/- of a half turn (full turns are not subtracted)
                                        ./(tMinPulse);
@@ -153,7 +116,7 @@ for t = 1:numel(TXShape)
                                   sum(...
                                       tDur ...                        % rounded duration of pulse segments
                                       .*( TXShape(t).Frequency ...    % rounded frequncy of pulse segments
-                                         -  fDDS  ))...               % get rounded offset frequency
+                                         -  fLarmor  ))...            % get rounded offset frequency
                                   ...             % phase offset from start of pulse to center
                                   , ones(1, sz2))-0.5) ...  % get +/- of a half turn (full turns are not subtracted)
                              * 360;                   % get the phase in deg
@@ -177,10 +140,10 @@ for t = 1:numel(TXShape)
                        TXShape(t).Start(end,:)+TXShape(t).Duration(end,:); ...
                        TXShape(t).Start(end,:)+TXShape(t).Duration(end,:)+tMinPulse]+1.111e-12;  % round up a 0.5*tGrid
 
-  TXShape(t).Frequency = [ fDDS*ones(1, sz2); ...
+  TXShape(t).Frequency = [ HW.fLarmor*ones(1, sz2); ...
                            TXShape(t).Frequency; ...
-                           fDDS-FrequencyOffsetOfCorrectPhasePulse; ...
-                           fDDS*ones(1, sz2)];
+                           HW.fLarmor-FrequencyOffsetOfCorrectPhasePulse; ...
+                           HW.fLarmor*ones(1, sz2)];
 
   TXShape(t).Duration = [ tMinPulse*ones(1, sz2); ...
                           TXShape(t).Duration; ...

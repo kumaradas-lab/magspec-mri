@@ -1,7 +1,6 @@
 %% Settings for rf amplifier RF-100 with SN 8
 
 HW.TX.ExtRFSN = 8;
-HW.TX.ExtRFType = 'RF100';  % string with type identifier
 
 HW.TX.ChannelDef = 2;         % Default TX Channel set to Tx2
 
@@ -12,9 +11,9 @@ HW.TX.Max.PaUout(2) = 200;  % maximum peak output voltage in V
 % OP1dB=48 dBm
 % OP2dB=51.5 dBm
 % default peak output voltage in V  (might be reduced by other HW.TX.Def settings)
-HW.TX.Def.PaUout(2) = 10^( 47.0 /20)*(0.001*HW.RX.Rin)^0.5*sqrt(2);     % 50 W for linear gain up to 50 W
-HW.TX.Def.PaUout(2) = 10^( 50.0 /20)*(0.001*HW.RX.Rin)^0.5*sqrt(2);     % 100 W
-% HW.TX.Def.PaUout(2) = 10^( 53.0 /20)*(0.001*HW.RX.Rin)^0.5*sqrt(2);     % 200 W
+HW.TX.Def.PaUout(2) = 10^( 48.0 /20)*(0.001*HW.RX.Rin)^0.5;     % 50 W for linear gain up to 50 W
+HW.TX.Def.PaUout(2) = 10^( 53.0 /20)*(0.001*HW.RX.Rin)^0.5;     % 100 W
+HW.TX.Def.PaUout(2) = 10^( 59.0 /20)*(0.001*HW.RX.Rin)^0.5;     % 200 W
 
 HW.TX.Max.Amplitude = [20, 20]*1e-3;   % maximum B1+ in T
 HW.TX.Def.Amplitude = [20, 20]*1e-3;   % default B1+ in T
@@ -44,5 +43,5 @@ HW.RX.VGAGainDef = HW.RX.VGAGainMax/3; % reduce VGA gain to avoid saturation
 % HW.TX.BlankAQ = 1;              % Switch TRx to 50 Ohm resistor during TX pulse, to avoid saturation.
 
 %%
-UseExtRFAmpSwitch = 1;  % use switch of RF-100
-LoadExtRFAmp_Cal;
+UseRF100Switch = 1; % use switch of RF-100
+LoadRF100_Cal;

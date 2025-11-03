@@ -84,7 +84,7 @@ function [data, AQSlice] = get_kSpaceAndImageTicks(data, AQSlice)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2018-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2018-2021 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 %
@@ -115,14 +115,6 @@ if isemptyfield(data, 'ZeroFillFactorOS')
     AQSlice.nPhase(2)*AQSlice.PhaseOS(2), AQSlice.nPhase(3)*AQSlice.PhaseOS(3)];
   MySizeOSZ = ceil(MySizeOS .* data.ZeroFillFactor);
   data.ZeroFillFactorOS = MySizeOSZ ./ MySizeOS;
-end
-if isemptyfield(data, 'nucleusX')
-  data.nucleusX = false;
-end
-if data.nucleusX && ~isemptyfield(AQSlice, 'Gamma') && ~isemptyfield(AQSlice, 'GammaX')
-  XSizeRatio = AQSlice.Gamma/AQSlice.GammaX;
-else
-  XSizeRatio = 1;
 end
 
 %% find CartesianAxis names
@@ -167,7 +159,7 @@ if isinf(AQSlice.sizeRead)
   data.kTicks(1).ReadOsZ = ...
     get_FFTGrid(AQSlice.nRead*data.ZeroFillFactorOS(1)*AQSlice.ReadOS, ...
     AQSlice.nRead*data.ZeroFillFactorOS(1)*AQSlice.ReadOS).';
-  % data.kTicks(1).ReadHzZ = get_FFTGrid(AQSlice.nRead*ReadZ/(AQSlice.sizeRead*XSizeRatio), AQSlice.nRead*ReadZ).';
+  % data.kTicks(1).ReadHzZ = get_FFTGrid(AQSlice.nRead*ReadZ/AQSlice.sizeRead, AQSlice.nRead*ReadZ).';
   % Ticks of Image
   % data.Ticks(1).Read = AQSlice.CenterRot(1) + get_FFTGrid(AQSlice.nRead, AQSlice.nRead).';
   % data.Ticks(1).ReadZ = AQSlice.CenterRot(1) + ...
@@ -187,26 +179,26 @@ if isinf(AQSlice.sizeRead)
 else
   % k-Space label of axis x,y and z tick
   % Spatial frequency read for k-Space axis
-  data.kTicks(1).Read = get_FFTGrid(AQSlice.nRead/(AQSlice.sizeRead), AQSlice.nRead).' / XSizeRatio;
+  data.kTicks(1).Read = get_FFTGrid(AQSlice.nRead/AQSlice.sizeRead, AQSlice.nRead).';
   data.kTicks(1).ReadZ = ...
-    get_FFTGrid(AQSlice.nRead*data.ZeroFillFactor(1)/(AQSlice.sizeRead), ...
-    AQSlice.nRead*data.ZeroFillFactor(1)).' / XSizeRatio;
+    get_FFTGrid(AQSlice.nRead*data.ZeroFillFactor(1)/AQSlice.sizeRead, ...
+    AQSlice.nRead*data.ZeroFillFactor(1)).';
   % Spatial frequency read for kSpaceOs axis
-  data.kTicks(1).ReadOs = get_FFTGrid(AQSlice.nRead/(AQSlice.sizeRead), ...
-    AQSlice.nRead*AQSlice.ReadOS).' / XSizeRatio;
+  data.kTicks(1).ReadOs = get_FFTGrid(AQSlice.nRead/AQSlice.sizeRead, ...
+    AQSlice.nRead*AQSlice.ReadOS).';
   data.kTicks(1).ReadOsZ = ...
-    get_FFTGrid(AQSlice.nRead*data.ZeroFillFactorOS(1)/(AQSlice.sizeRead), ...
-    AQSlice.nRead*data.ZeroFillFactorOS(1)*AQSlice.ReadOS).' / XSizeRatio;
+    get_FFTGrid(AQSlice.nRead*data.ZeroFillFactorOS(1)/AQSlice.sizeRead, ...
+    AQSlice.nRead*data.ZeroFillFactorOS(1)*AQSlice.ReadOS).';
   % data.kTicks(1).ReadHzZ=get_FFTGrid(AQSlice.nRead*ReadZ/AQSlice.sizeRead,AQSlice.nRead*ReadZ).';
   % Ticks of Image
   data.Ticks(1).Read = AQSlice.CenterRot(1) + ...
-    get_FFTGrid(AQSlice.sizeRead, AQSlice.nRead).' * XSizeRatio;
+    get_FFTGrid(AQSlice.sizeRead, AQSlice.nRead).';
   data.Ticks(1).ReadZ = AQSlice.CenterRot(1) + ...
-    get_FFTGrid(AQSlice.sizeRead, AQSlice.nRead*data.ZeroFillFactor(1)).' * XSizeRatio;
+    get_FFTGrid(AQSlice.sizeRead, AQSlice.nRead*data.ZeroFillFactor(1)).';
   data.Ticks(1).ReadOs = AQSlice.CenterRot(1) + ...
-    get_FFTGrid(AQSlice.sizeRead*AQSlice.ReadOS, AQSlice.nRead*AQSlice.ReadOS).' * XSizeRatio;
+    get_FFTGrid(AQSlice.sizeRead*AQSlice.ReadOS, AQSlice.nRead*AQSlice.ReadOS).';
   data.Ticks(1).ReadOsZ = AQSlice.CenterRot(1) + ...
-    get_FFTGrid(AQSlice.sizeRead*AQSlice.ReadOS, AQSlice.nRead*AQSlice.ReadOS*data.ZeroFillFactor(1)).' * XSizeRatio;
+    get_FFTGrid(AQSlice.sizeRead*AQSlice.ReadOS, AQSlice.nRead*AQSlice.ReadOS*data.ZeroFillFactor(1)).';
 end
 for iPhase = 1:numel(AQSlice.nPhase)
   if isinf(AQSlice.sizePhase(iPhase))
@@ -237,29 +229,29 @@ for iPhase = 1:numel(AQSlice.nPhase)
   else
     % Spatial frequency phase for k-Space axis
     data.kTicks(iPhase).Phase = ...
-      get_FFTGrid(AQSlice.nPhase(iPhase)./(AQSlice.sizePhase(iPhase)), ...
-      AQSlice.nPhase(iPhase)).' / XSizeRatio;
+      get_FFTGrid(AQSlice.nPhase(iPhase)./AQSlice.sizePhase(iPhase), ...
+      AQSlice.nPhase(iPhase)).';
     data.kTicks(iPhase).PhaseZ = ...
-      get_FFTGrid(AQSlice.nPhase(iPhase).*data.ZeroFillFactor(iPhase+1)./(AQSlice.sizePhase(iPhase)), ...
-      AQSlice.nPhase(iPhase).*data.ZeroFillFactor(iPhase+1)).' / XSizeRatio;
+      get_FFTGrid(AQSlice.nPhase(iPhase).*data.ZeroFillFactor(iPhase+1)./AQSlice.sizePhase(iPhase), ...
+      AQSlice.nPhase(iPhase).*data.ZeroFillFactor(iPhase+1)).';
     % Spatial frequency phase for kSpaceOs axis
     data.kTicks(iPhase).PhaseOs = ...
-      get_FFTGrid(AQSlice.nPhase(iPhase)./(AQSlice.sizePhase(iPhase)), ...
-      AQSlice.nPhase(iPhase).*AQSlice.PhaseOS(iPhase)).' / XSizeRatio;
+      get_FFTGrid(AQSlice.nPhase(iPhase)./AQSlice.sizePhase(iPhase), ...
+      AQSlice.nPhase(iPhase).*AQSlice.PhaseOS(iPhase)).';
     data.kTicks(iPhase).PhaseOsZ = ...
-      get_FFTGrid(AQSlice.nPhase(iPhase).*data.ZeroFillFactorOS(iPhase+1)./(AQSlice.sizePhase(iPhase)), ...
-      AQSlice.nPhase(iPhase).*data.ZeroFillFactorOS(iPhase+1).*AQSlice.PhaseOS(iPhase)).' / XSizeRatio;
+      get_FFTGrid(AQSlice.nPhase(iPhase).*data.ZeroFillFactorOS(iPhase+1)./AQSlice.sizePhase(iPhase), ...
+      AQSlice.nPhase(iPhase).*data.ZeroFillFactorOS(iPhase+1).*AQSlice.PhaseOS(iPhase)).';
     data.Ticks(iPhase).Phase = AQSlice.CenterRot(iPhase) + ...
-      get_FFTGrid(AQSlice.sizePhase(iPhase), AQSlice.nPhase(iPhase)).' * XSizeRatio;
+      get_FFTGrid(AQSlice.sizePhase(iPhase), AQSlice.nPhase(iPhase)).';
     data.Ticks(iPhase).PhaseZ = AQSlice.CenterRot(iPhase) + ...
       get_FFTGrid(AQSlice.sizePhase(iPhase), ...
-      AQSlice.nPhase(iPhase).*data.ZeroFillFactor(iPhase+1)).' * XSizeRatio;
+      AQSlice.nPhase(iPhase).*data.ZeroFillFactor(iPhase+1)).';
     data.Ticks(iPhase).PhaseOs = AQSlice.CenterRot(iPhase) + ...
       get_FFTGrid(AQSlice.sizePhase(iPhase)*AQSlice.PhaseOS(iPhase), ...
-      AQSlice.nPhase(iPhase)*AQSlice.PhaseOS(iPhase)).' * XSizeRatio;
+      AQSlice.nPhase(iPhase)*AQSlice.PhaseOS(iPhase)).';
     data.Ticks(iPhase).PhaseOsZ = AQSlice.CenterRot(iPhase) + ...
       get_FFTGrid(AQSlice.sizePhase(iPhase)*AQSlice.PhaseOS(iPhase), ...
-      AQSlice.nPhase(iPhase)*AQSlice.PhaseOS(iPhase).*data.ZeroFillFactor(iPhase+1)).' * XSizeRatio;
+      AQSlice.nPhase(iPhase)*AQSlice.PhaseOS(iPhase).*data.ZeroFillFactor(iPhase+1)).';
   end
 end
 
@@ -269,11 +261,11 @@ data.PermuteOrder = [1, 2, 3, 4];
 
 if sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) >= 3
   % 3d image
-  if sum(AQSlice.nPhase(:) > 1) < 3
+  if AQSlice.nRead > 1
     % read encoding for first dimension
     data.PermuteOrder = [2, 1 ,3];
   else
-    % phase encoding for all 3 dimensions (CSI or ZTE)
+    % phase encoding for all 3 dimensions (CSI)
     data.PermuteOrder = [1, 3, 2];
   end
 end

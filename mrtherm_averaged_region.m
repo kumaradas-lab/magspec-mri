@@ -3,11 +3,28 @@ close all;
 
 fName = 'exp1';
 
+% --- Set up save directory in Google Drive ---
+baseFolder = 'G:\My Drive\MR_Thermometry\My runs';             % main directory on Google Drive, can change this to match the path in your Google Drive
+todayFolder = datestr(now, 'yyyy-mm-dd');           % folder named with today's date
+saveDir = fullfile(baseFolder, todayFolder);         % full path for today's run
+
+if ~exist(saveDir, 'dir')
+    mkdir(saveDir);                                 % create folder if it doesn't exist
+end
+
+timestamp = datestr(now, 'HHMMSS');
+fName = fullfile(saveDir, ['exp1_' timestamp]);
+
+
 % Initialize Osensa temperature sensor
-osensa_dev = enable_osensa("COM4");
+osensa_dev = enable_osensa("COM3");                  % Change when setting up
 
 % Initialize MRI system parameters
 LoadSystem; % Load system parameters (reset to default: HW Seq AQ TX Grad)
+HW.fLarmor = 23.42e6;                        % set correct Larmor frequency (0.55 T)
+HW.FindFrequencySweep.fCenter = HW.fLarmor;     % center sweep near expected resonance
+HW.FindFrequencySweep.fRange  = 1.0e6;       % widen sweep to ±500 kHz just in case, can increase the range depending on the medium
+HW.FindFrequencySweep.fOffsetFIDsStdMaxValue = 5000;  % allow more noise tolerance
 
 Seq.Loops = 1; % Number of loop averages
 
@@ -19,7 +36,7 @@ resolution = 32; % original 32x32
 thickness = 0.002; % original 0.002
 pausetime = 2;
 position = resolution / 2;
-measurement_time = 300; % Run time in seconds
+measurement_time = 60; % Run time in seconds
 
 % % Pixels and size %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Seq.AQSlice(1).nRead = resolution;
@@ -142,6 +159,8 @@ imagesc(Imagephases)
 colorbar 
 axis equal
 title('Image Phasemap')
+% Save full figure after both subplots are drawn
+saveas(figure5, fullfile(saveDir, 'Image_Magnitude_Phase.png'));
 
 % Save all data
 save([fName '.mat'], 'Timedata', 'TemperatureData', 'Phasedata', 'Deltaphase', 'Acquisitiondata');
@@ -152,18 +171,18 @@ saveas(phase_diff_figure, [fName '.png']);
 osensa_dev.close();
 disp("Osensa Transmitter OFF");
 
-% % plot deltaphase vs temperature
+% Plot delta phase vs temperature
 figure;
 plot(TemperatureData, Deltaphase, 'o-','LineWidth',1.5);
-xlabel('Temperature (�C)');
+xlabel('Temperature (°C)');
 ylabel('Phase Difference (rad)');
 title('Phase Difference vs Temperature');
 grid on;
-% Linear fit
 p = polyfit(TemperatureData, Deltaphase, 1);
 yfit = polyval(p, TemperatureData);
 hold on;
 plot(TemperatureData, yfit, '--r');
 legend('Data', sprintf('Fit: y = %.3fx + %.3f', p(1), p(2)));
+saveas(gcf, fullfile(saveDir, 'Phase_vs_Temperature.png'));
 
-save('Trial5_Res32_TR300_RoomTemp_oil_Apr9')
+save(fullfile(saveDir, 'Trial5_Res32_TR300_RoomTemp_oil_Apr9.mat'));

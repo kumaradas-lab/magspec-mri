@@ -1,97 +1,56 @@
 function [hAxes, config] = plot_data_1D(HW, data_1D, hAxes, raiseWindow, config)
 %% Plot RF signal (abs, real, imag), its phase and its frequency offset to AQ frequency
 %
-%     [hAxes, config] = plot_data_1D(HW, data_1D, hAxes, raiseWindow, config)
-%
-% This function plots the measured date in the time domain. The data can be
-% shown in up to three axes. The first axes show the absolute value of the data
-% optionally together with is real and imaginary part. The second axes show the
-% phase of the data (i.e., the phase of the complex measurement data). The third
-% axes show the frequency offset as calculated by the time derivative of the
-% measured phase.
+%       [hAxes, config] = plot_data_1D(HW, data_1D, hAxes, raiseWindow, config)
 %
 % INPUT:
-%
-%   HW
-%       HW structure or object.
-%
-%   data_1D
-%       Structure with measurement data (see get_data_1D).
-%
-%   hAxes
-%       Array with graphics handles for the three axes containing the RF signal
-%       (abs, real, imag), its phase and its frequency offset to AQ frequency
-%       (see corresponding output argument).
-%       Or: graphics handle to a valid parent for these three axes (uipanel or
-%       figure handle).
-%       If omitted, empty or 1, figure 100 is used.
-%
-%   raiseWindow
-%       Boolean value. If false and hAxes is not empty, the figure window does
-%       not steal the focus if it already exists.
-%       (Default: true)
-%
-%   config
-%       An optional structure with the following fields. If the these fields are
-%       omitted or empty, default values are used:
-%
-%     hParent
-%         Handle to a figure or uipanel that is used as a parent for the axes.
-%         (Default: 100)
-%
-%     figureTitle
-%         If "hParent" is a figure, this string is set as the figure name.
-%         (Default: 'Timeline continuous')
-%
-%     timeFieldname
-%         The fieldname in the structure "data_1D" that is used as the timeline.
-%         Valid values are "time_all" and "time_of_tRep".
-%         (Default: "time_all")
-%
-%     plotData
-%         Boolean value. If true, plot the absolute value (and its real and
-%         imaginary parts, see "plotDataRealImag" below).
-%         (Default: true)
-%
+%   HW            HW structure or object
+%   data_1D       structure with measurement data
+%   hAxes         array with graphics handles for the three axes containing the
+%                 RF signal (abs, real, imag), its phase and its frequency
+%                 offset to AQ frequency (see corresponding output argument).
+%                 Or: graphics handle to a valid parent for these three axes
+%                 (uipanel or figure handle).
+%                 If omitted, empty or 1, figure 100 is used.
+%   raiseWindow   Boolean value. If false and hAxes is not empty, the figure
+%                 window does not steal the focus if it already exists.
+%                 (Default: true)
+%   config        An optional structure with the following fields. If the these
+%                 fields are omitted or empty, default values are used:
+%     hParent       Handle to a figure or uipanel that is used as a parent for
+%                   the axes (default: 100).
+%     figureTitle   If "hParent" is a figure, this string is set as the figure
+%                   name (default: 'Timeline continuous').
+%     timeFieldname The fieldname in the structure "data_1D" that is used as the
+%                   timeline. Valid values are "time_all" and "time_of_tRep"
+%                   (default: "time_all").
+%     plotData      Boolean value. If true, plot the absolute value (and its
+%                   real and imaginary parts, see "plotDataRealImag" below).
+%                   (Default: true)
 %     plotDataRealImag
-%         Boolean value. If true, the real and imaginary parts of the signal is
-%         plotted additionally to its absolute value (see "plotData" above).
-%         (Default: true for complex valued data, false otherwise)
-%
-%     plotPhase
-%         Boolean value. If true, plot the phase of the data.
-%         (Default: true for complex valued data, false otherwise)
-%
-%     plotFreq
-%         Boolean value. If true, plot the frequency (offset) of the data.
-%         (Default: true for complex valued data, false otherwise)
-%
-%     plotDataYLim
-%         2-element vector with the y-limits in Tesla for the data plot. If this
-%         is empty ([]), the y-limits mode is set to "auto" instead.
-%         (Default: [])
-%
-%     omitnan
-%         Boolean value. If true, connect points in plot even if they are
-%         separated by NaN values.
-%         (Default: false)
-%
+%                   Boolean value. If true, the real and imaginary parts of the
+%                   signal is plotted additionally to its absolute value (see
+%                   "plotData" above). (Default: true)
+%     plotPhase     Boolean value. If true, plot the phase of the data (default:
+%                   true).
+%     plotFreq      Boolean value. If true, plot the frequency (offset) of the
+%                   data (default: true).
+%     plotDataYLim  2-element vector with the y-limits in Tesla for the data
+%                   plot. If this is "auto", the y-limits mode is set to "auto"
+%                   instead (default).
+%     omitnan       Boolean value. If true, connect points in plot even if they
+%                   are separated by NaN values (default: false).
 %
 % OUTPUT:
+%   hAxes         array with graphics handles for the three axes containing the
+%                 RF signal (abs, real, imag), its phase and its frequency
+%                 offset to AQ frequency (see corresponding input argument).
+%   config        Same as the input argument with the actually used settings.
 %
-%   hAxes
-%       Array with graphics handles for the three axes containing the RF signal
-%       (abs, real, imag), its phase and its frequency offset to AQ frequency
-%       (see corresponding input argument).
-%
-%   config
-%       Same as the input argument with the actually used settings.
-%
-%
-% ------------------------------------------------------------------------------
-% (C) Copyright 2011-2024 Pure Devices GmbH, Wuerzburg, Germany
+% ------------------------------------------------------------------------
+% (C) Copyright 2011-2020 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
-% ------------------------------------------------------------------------------
+% ------------------------------------------------------------------------
 
 %% Default input
 if nargin < 3, hAxes = []; end
@@ -102,9 +61,8 @@ config = set_EmptyField(config, 'hParent', 100);
 config = set_EmptyField(config, 'figureTitle', 'Timeline continuous');
 config = set_EmptyField(config, 'timeFieldname', 'time_all');
 config = set_EmptyField(config, 'plotData', true);
-is_complex = cellfun(@(x) any(imag(x)), {data_1D(:).data});
-config = set_EmptyField(config, 'plotPhase', is_complex);
-config = set_EmptyField(config, 'plotFreq', is_complex);
+config = set_EmptyField(config, 'plotPhase', true);
+config = set_EmptyField(config, 'plotFreq', true);
 config = set_EmptyField(config, 'plotDataRealImag', true);
 config = set_EmptyField(config, 'iData', 1:numel(data_1D));
 if ~isfield(config, 'plotDataYLim'), config.plotDataYLim = []; end
@@ -112,19 +70,6 @@ if ~isnumeric(config.plotDataYLim) || numel(config.plotDataYLim) ~= 2
   config.plotDataYLim = [];
 end
 config = set_EmptyField(config, 'omitnan', false);
-
-if numel(config.plotData) ~= numel(config.iData)
-  config.plotData = logical(true(size(config.iData)) .* config.plotData(1));
-end
-if numel(config.plotPhase) ~= numel(config.iData)
-  config.plotPhase = logical(true(size(config.iData)) .* config.plotPhase(1));
-end
-if numel(config.plotFreq) ~= numel(config.iData)
-  config.plotFreq = logical(true(size(config.iData)) .* config.plotFreq(1));
-end
-if numel(config.plotDataRealImag) ~= numel(config.iData)
-  config.plotDataRealImag = logical(true(size(config.iData)) .* config.plotDataRealImag(1));
-end
 
 %% handle multiple data channels
 if ~isscalar(data_1D)
@@ -143,10 +88,6 @@ if ~isscalar(data_1D)
     end
     config.figureTitle = sprintf('%s (data channel #%d)', configIn.figureTitle, iData);
     config.iData = iData;
-    config.plotData = configIn.plotData(config.iData);
-    config.plotPhase = configIn.plotPhase(config.iData);
-    config.plotFreq = configIn.plotFreq(config.iData);
-    config.plotDataRealImag = configIn.plotDataRealImag(config.iData);
     [hAxesOut{iData}, configOut(iData)] = plot_data_1D(HW, data_1D(iData), hAxes, raiseWindow, config);
   end
   hAxes =  hAxesOut;
@@ -175,7 +116,7 @@ end
 lastAxes = find(plotAxes, 1, 'last');
 
 % check type of hAxes and set graphic handles accordingly
-if isscalar(hAxes) && ...
+if numel(hAxes) == 1 && ...
     (ishghandle(hAxes, 'uipanel') || (ishghandle(hAxes, 'figure') || ...
      (isa(hAxes, 'double') && mod(hAxes, 1) == 0)) && hAxes ~= 1)
   hParent = hAxes;
@@ -213,7 +154,7 @@ axesTag = get(hAxesTmp, 'Tag');
 if numel(hAxesTmp) > 1
   idx = cellfun(@(str) str2double(str(end)), axesTag);
   hAxes(idx) = hAxesTmp;
-elseif isscalar(hAxesTmp)
+elseif numel(hAxesTmp) == 1
   hAxes(str2double(axesTag(end))) = hAxesTmp;
 end
 
@@ -221,7 +162,10 @@ end
 if isempty(hAxes)
   % assume that this is the first time we use this figure
   DataCursorUpdateFcns = getappdata(hFigure, 'DataCursorUpdateFcns');
-  DataCursorUpdateFcns.plotData1D = @plotData1D_DataCursorFcn;
+  % FIXME: The last argument to the data cursor function should be the device index
+  iDevice = data_1D.device;
+  DataCursorUpdateFcns.plotData1D = @(pointDataTip, eventData) ...
+    plotData1D_DataCursorFcn(pointDataTip, eventData, HW, iDevice);  
   setappdata(hFigure, 'DataCursorUpdateFcns', DataCursorUpdateFcns);
   hdcm = datacursormode(hFigure);
   set(hdcm, 'UpdateFcn', @DataCursorUpdateFcnHandler);
@@ -323,12 +267,12 @@ if raiseWindow
 end
 
 %% plot or update figure
-persistent hLabelY3 hMeanFreq
+persistent hLabelY hMeanFreq
 isNewAxes = false;
 %% data
 if config.plotData && ~isempty(data_1D.data)
   ylabelStr = {HW.RX(data_1D.device).AmplitudeName; ['in ', HW.RX(data_1D.device).AmplitudeUnit]};
-  singleLine = ~any(imag(data_1D.data)) || ~config.plotDataRealImag;
+  singleLine = all(imag(data_1D.data)==0) || ~config.plotDataRealImag;
 
   % search graphics objects
   hKids = get(hAxes(1), 'Children');
@@ -340,14 +284,6 @@ if config.plotData && ~isempty(data_1D.data)
       h_lines(i_line) = h_line;
       found_lines(i_line) = true;
     end
-  end
-  h_line = findobj(hKids, 'flat', 'Tag', 'plotData1D_Line_Saturation');
-  if ishghandle(h_line, 'line')
-    delete(h_line);
-  end
-  h_line = findobj(hKids, 'flat', 'Tag', 'plotData1D_Line_Saturation_Warn');
-  if ishghandle(h_line, 'line')
-    delete(h_line);
   end
 
   if config.omitnan
@@ -430,7 +366,6 @@ if config.plotData && ~isempty(data_1D.data)
       set(lh, 'AutoUpdate', 'off'); % Do not automatically add new entries to legend
     end
     grid(hAxes(1), 'on');
-    set(hAxes(1), 'XMinorGrid', 'on', 'YMinorGrid', 'on');
     isNewAxes = true;
     ylabel(hAxes(1), ylabelStr);
     if isempty(config.plotDataYLim)
@@ -466,38 +401,6 @@ if config.plotData && ~isempty(data_1D.data)
       ylabel(hAxes(1), ylabelStr);
     end
   end
-
-  % store properties in userdata of lines
-  ud.AmplitudeUnit = HW.RX(data_1D.device).AmplitudeUnit;
-  set(h_lines, 'UserData', ud);
-
-  if isemptyfield(data_1D, 'Amplitude2Norm')
-    amplitude2Norm = HW.RX(data_1D.device).Amplitude2Norm;
-  else
-    if isscalar(data_1D.Amplitude2Norm)
-      amplitude2Norm = data_1D.Amplitude2Norm;
-    else
-      amplitude2Norm = data_1D.Amplitude2Norm(plotIdx);
-    end
-  end
-
-  if any(abs(data_1D.data(plotIdx)) .* amplitude2Norm > HW.RX(data_1D.device).NormWarnSaturation)
-    % Add lines indicating receiver saturation
-    hold(hAxes(1), 'on');
-    saturationAmp = 1 ./ amplitude2Norm ./ HW.RX(data_1D.device).AmplitudeUnitScale;
-    plot(hAxes(1), ...
-      data_1D.(config.timeFieldname)(plotIdx), ...
-      saturationAmp, ...
-      'LineStyle', '-', 'LineWidth', 1, 'Marker', 'none', 'Color', 'r', ...
-      'Tag', 'plotData1D_Line_Saturation');
-    plot(hAxes(1), ...
-      data_1D.(config.timeFieldname)(plotIdx), ...
-      HW.RX(data_1D.device).NormWarnSaturation .* saturationAmp, ...
-      'LineStyle', '--', 'LineWidth', 1, 'Marker', 'none', 'Color', 'r', ...
-      'Tag', 'plotData1D_Line_Saturation_Warn');
-    clear saturationAmp
-  end
-
 end
 
 %% phase
@@ -507,11 +410,10 @@ if config.plotPhase && ~isempty(data_1D.data)
   if numel(h_lines) > 0
     h_lines(~strcmpi(get(h_lines, 'Type'), 'line')) = [];
   end
-  if ~isscalar(h_lines)
+  if numel(h_lines) ~= 1
     h_lines = plot(hAxes(2), data_1D.(config.timeFieldname), angle(data_1D.data), 'Tag', 'plotData1D_LinePhase');
     set(hAxes(2), 'Tag', 'plotData1D_Axes2');
     grid(hAxes(2), 'on');
-    set(hAxes(2), 'XMinorGrid', 'on', 'YMinorGrid', 'on');
     isNewAxes = true;
     ylabel(hAxes(2), {'Phase'; 'in rad'});
   else
@@ -536,45 +438,38 @@ if config.plotFreq && ~isempty(data_1D.data)
   offsetFrequency = gradient(unwrap(angle(data_1D.data)))./2./pi./grad_time;
   signalFrequency = data_1D.AqFrequency - offsetFrequency;
   iv = ~isnan(data_1D.data);
-  meanOffset = -mean(offsetFrequency(iv) ...
-                     .* (abs(data_1D.data(iv)) / sum(abs(data_1D.data(iv)))), 'omitnan') ...
-               * sum(iv);
+  meanOffset = -meanNAN(offsetFrequency(iv).*abs(data_1D.data(iv))/sum(abs(data_1D.data(iv))))*sum(iv);
   if any(data_1D.AqFrequency(~isnan(data_1D.AqFrequency)) ~= ...
       data_1D.AqFrequency(find(~isnan(data_1D.AqFrequency), 1, 'first')))
     meanFrequency = 0;
     meanFreqStr = sprintf('mean offset to AQ.Frequency = %.2f Hz', meanOffset);
     ylabelStr = {'Frequency', 'in Hz'};
   else
-    meanFrequency = mean(data_1D.AqFrequency, 'omitnan');
+    meanFrequency = meanNAN(data_1D.AqFrequency);
     meanFreqStr = sprintf('mean offset to %.6f MHz = %.2f Hz', data_1D.AqFrequency(1)/1e6, meanOffset);
     ylabelStr = {'f_{Offset}', 'in Hz'};
   end
-  if ~isscalar(h_lines) || ~ishghandle(h_lines, 'line') || ...
-      isempty(hMeanFreq) || ~isa(hMeanFreq, 'containers.Map') || ...
-      ~hMeanFreq.isKey(double(hParent)) || ~ishghandle(hMeanFreq(double(hParent)), 'textboxshape') || ...
-      isempty(hLabelY3) || ~isa(hLabelY3, 'containers.Map') || ...
-      ~hLabelY3.isKey(double(hParent)) || ~ishghandle(hLabelY3(double(hParent)), 'text')
+  if numel(h_lines) ~= 1 || ~ishghandle(h_lines, 'line') || ...
+      isempty(hMeanFreq) || ~ishghandle(hMeanFreq, 'textboxshape') || ...
+      length(hLabelY) < 3 || ~ishghandle(hLabelY(3), 'text')
     % A former annotation is hidden somewhere in the figure descendents
     delete(findall(hFigure, 'Tag', 'plotData1DFreqAnnotation'));
     h_lines = plot(hAxes(3), ...
       data_1D.(config.timeFieldname), signalFrequency-meanFrequency, ...
       'Tag', 'plotData1D_LineFreq');
     grid(hAxes(3), 'on');
-    set(hAxes(3), 'XMinorGrid', 'on', 'YMinorGrid', 'on');
     isNewAxes = true;
-    hLabelY3 = containers.Map('KeyType', 'double', 'ValueType', 'double');
-    hLabelY3(double(hParent)) = double(ylabel(hAxes(3), ylabelStr));
+    hLabelY(3) = ylabel(hAxes(3), ylabelStr);
     pos = get(hAxes(3), 'Position');
-    hMeanFreq = containers.Map('KeyType', 'double', 'ValueType', 'double');
-    hMeanFreq(double(hParent)) = double(annotation(hParent, 'textbox', ...
+    hMeanFreq = annotation(hParent, 'textbox', ...
       'Position', [pos(1), pos(2)+0.8*pos(4), pos(3), 0.2*pos(4)], ...
       'String', meanFreqStr, 'HorizontalAlignment', 'center', 'EdgeColor', 'none', ...
-      'VerticalAlignment', 'top', 'Margin', 2, 'Tag', 'plotData1DFreqAnnotation'));
+      'VerticalAlignment', 'top', 'Margin', 2, 'Tag', 'plotData1DFreqAnnotation');
     set(hAxes(3), 'Tag', 'plotData1D_Axes3', 'DeleteFcn', {@DeleteFreqAxes, hMeanFreq});
   else
     set(h_lines, 'XData', data_1D.(config.timeFieldname), 'YData', signalFrequency-meanFrequency)
-    set(hLabelY3(double(hParent)), 'String', ylabelStr)
-    set(hMeanFreq(double(hParent)), 'String', meanFreqStr);
+    set(hLabelY(3), 'String', ylabelStr)
+    set(hMeanFreq, 'String', meanFreqStr);
   end
   if length(data_1D.(config.timeFieldname))/sum(isnan(data_1D.(config.timeFieldname)))==2 && ~config.omitnan
     set(h_lines, 'LineStyle', 'none', 'Marker', '.');
@@ -609,7 +504,7 @@ if numAxesChanged || isNewAxes
   end
   if config.plotFreq
     pos = get(hAxes(3), 'Position');
-    set(hMeanFreq(double(hParent)), 'Position', [pos(1), pos(2)+0.8*pos(4), pos(3), 0.2*pos(4)]);
+    set(hMeanFreq, 'Position', [pos(1), pos(2)+0.8*pos(4), pos(3), 0.2*pos(4)]);
   end
 end
 % clear HW data_1D
@@ -629,35 +524,28 @@ end
 end
 
 
-function outputTxt = plotData1D_DataCursorFcn(pointDataTip, eventObj)
+function outputTxt = plotData1D_DataCursorFcn(pointDataTip, eventObj, HW, iDevice)
 % pointDataTip A PointDataTip object (undocumented Matlab and currently not used)
 % eventObj     Object containing event data structure
 % outputTxt    Data cursor text (string or cell array of strings)
-
 pos = get(eventObj, 'Position');
 target = get(eventObj, 'Target');
+disp('t')
 targetTag = get(target, 'Tag');
-
 switch targetTag
   case {'plotData1D_Line1', 'plotData1D_Line2', 'plotData1D_Line3'}
     % data axes
-    ud = get(target, 'UserData');
     outputTxt = {['time: ' num2str(pos(1), 3) ' s'], ...
-      ['amplitude: ' num2str(pos(2), 3) ' ' ud.AmplitudeUnit]};
-
+      ['amplitude: ' num2str(pos(2), 3) ' ' HW.RX(iDevice).AmplitudeUnit]};
   case 'plotData1D_LinePhase'
     % phase axes
     outputTxt = {['time: ' num2str(pos(1), 3) ' s'], ['phase: ' num2str(pos(2), 3) ' rad']};
-
   case 'plotData1D_LineFreq'
     % frequency (offset)
     ylab = get(get(get(target, 'Parent'), 'YLabel'), 'String');
-    outputTxt = {['time: ' num2str(pos(1), 3) ' s'],
-      sprintf('%s: %.0f Hz', lower(ylab{1}), pos(2))};
-
+    outputTxt = {['time: ' num2str(pos(1), 3) ' s'], [ylab{1} ': ' num2str(pos(2), 3) ' Hz']};
   otherwise
     outputTxt = [];
-
 end
 
 end

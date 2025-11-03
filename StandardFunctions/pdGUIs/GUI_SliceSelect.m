@@ -38,7 +38,7 @@ function varargout = GUI_SliceSelect(varargin)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2014-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2014-2018 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -87,7 +87,7 @@ elseif evalin('base', 'exist(''HW'', ''var'')')
     HW = evalin('base', 'HW');
 end
 
-if exist('HW', 'var') && isa(HW, 'PD.HWClass')
+if exist('HW', 'var') && isa(HW, 'PD.HW')
     if evalin('base', 'exist(''mySave'', ''var'')')
         mySave = evalin('base', 'mySave');
     end
@@ -572,7 +572,7 @@ if handles.MotionFcnBusy==0;
         Grad=handles.Grad;
         %talker=handles.talker;
       end
-      if exist('HW', 'var') && isa(HW, 'PD.HWClass')
+      if exist('HW', 'var') && isa(HW, 'PD.HW')
         if evalin('base', 'exist(''mySave'', ''var'')')
           mySave = evalin('base', 'mySave');
         end
@@ -1231,7 +1231,7 @@ if handles.MotionFcnBusy==0;
         Grad=handles.Grad;
         %talker=handles.talker;
       end
-      if exist('HW', 'var') && isa(HW, 'PD.HWClass')
+      if exist('HW', 'var') && isa(HW, 'PD.HW')
         if evalin('base', 'exist(''mySave'', ''var'')')
           mySave = evalin('base', 'mySave');
         end

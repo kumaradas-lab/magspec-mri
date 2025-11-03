@@ -23,6 +23,6 @@ end
 % FIXME: Do we need to take the SamplingFactor into account here?
 % This is probably good enough as long as the SamplingFactor is 1 or larger than
 % approximately 4.
-deadtime = max(TX2RXdeadTime, HW.TX(iDevice).BlankPostset) + 4 ./ fSample;
+deadtime = max(TX2RXdeadTime, HW.TX(iDevice).BlankPostset) + 4/fSample;
 
 end

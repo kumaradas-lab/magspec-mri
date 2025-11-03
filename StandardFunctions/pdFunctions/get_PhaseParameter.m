@@ -55,21 +55,16 @@ function Seq = get_PhaseParameter(Seq, HW)
 %   UseAtRepetitionTimeRephase / UseAtRepetitionTimeDephase
 %                   Repetition times where the rephase/dephase pulses should be
 %                   used (mandatory! default: UseAtRepetitionTime).
-%   StepIncrement   Number of steps before the increment is added for this
-%                   phase encoder (default: 1).
-%   kLineIncrement  Number of steps before the next k-line is encoded taking all
-%                   phase encoders into account. (Default: 1)
-%   numKLines       Number of k-lines for one complete image.
-%                   (Default: numel(Seq.Phase(t).UseAtRepetitionTime))
+%   StepIncrement   Number of elements in "UseAtRepetitionTime",
+%                   "UseAtRepetitionTimeRephase", or
+%                   "UseAtRepetitionTimeDephase" before the increment is added
+%                   (default: 1).
 %   StepOrder       Mapping of elements in "UseAtRepetitionTime",
 %                   "UseAtRepetitionTimeRephase", or
 %                   "UseAtRepetitionTimeDephase" to the phase encoding steps
 %                   (default:
 %                   repelem(1:Seq.Phase(t).nPhase*Seq.Phase(t).PhaseOS, 1, ...
 %                           Seq.Phase(t).StepIncrement(1)) )
-%   usedkLines      Subset and/or order of k-lines to acquire. These are indices
-%                   into the k-lines of one complete image in default ordering.
-%                   (Default: 1:Seq.Phase(t).numKLines)
 %
 % OUTPUT:
 % To each structure Seq.Phase the following fields are added:
@@ -82,7 +77,7 @@ function Seq = get_PhaseParameter(Seq, HW)
 %                   measurements.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -117,56 +112,12 @@ for t = 1:numel(Seq.Phase)
       Seq.Phase(t).Gamma = Seq.AQSlice(Seq.Phase(t).useAQSlice).Gamma;
     end
   end
-  if isemptyfield(Seq.Phase(t), 'sizePhase')
-    if isemptyfield(Seq, 'AQSlice') ...
-        || isemptyfield(Seq.AQSlice(Seq.Phase(t).useAQSlice), 'sizePhase')
-      error('PD:get_PhaseParameter:NoSizePhase', ...
-        'Seq.Phase.sizePhase must be set.');
-    else
-      Seq.Phase(t).sizePhase = Seq.AQSlice(Seq.Phase(t).useAQSlice).sizePhase(t);
-    end
-  end
-  if isemptyfield(Seq.Phase(t), 'nPhase')
-    if isemptyfield(Seq, 'AQSlice') ...
-        || isemptyfield(Seq.AQSlice(Seq.Phase(t).useAQSlice), 'nPhase')
-      error('PD:get_PhaseParameter:NoNPhase', ...
-        'Seq.Phase.nPhase must be set.');
-    else
-      Seq.Phase(t).nPhase = Seq.AQSlice(Seq.Phase(t).useAQSlice).nPhase(t);
-    end
-  end
-  if isemptyfield(Seq.Phase(t), 'PhaseOS')
-    if isemptyfield(Seq, 'AQSlice') ...
-        || isemptyfield(Seq.AQSlice(Seq.Phase(t).useAQSlice), 'PhaseOS')
-      Seq.Phase(t).PhaseOS = 1;
-    else
-      Seq.Phase(t).PhaseOS = Seq.AQSlice(Seq.Phase(t).useAQSlice).PhaseOS(t);
-    end
-  end
-  if isemptyfield(Seq.Phase(t), 'alfa')
-    if isemptyfield(Seq, 'AQSlice') ...
-        || isemptyfield(Seq.AQSlice(Seq.Phase(t).useAQSlice), 'alfa')
-      Seq.Phase(t).alfa = 0;
-    else
-      Seq.Phase(t).alfa = Seq.AQSlice(Seq.Phase(t).useAQSlice).alfa;
-    end
-  end
-  if isemptyfield(Seq.Phase(t), 'phi')
-    if isemptyfield(Seq, 'AQSlice') ...
-        || isemptyfield(Seq.AQSlice(Seq.Phase(t).useAQSlice), 'phi')
-      Seq.Phase(t).phi = 0;
-    else
-      Seq.Phase(t).phi = Seq.AQSlice(Seq.Phase(t).useAQSlice).phi;
-    end
-  end
-  if isemptyfield(Seq.Phase(t), 'theta')
-    if isemptyfield(Seq, 'AQSlice') ...
-        || isemptyfield(Seq.AQSlice(Seq.Phase(t).useAQSlice), 'theta')
-      Seq.Phase(t).theta = 0;
-    else
-      Seq.Phase(t).theta = Seq.AQSlice(Seq.Phase(t).useAQSlice).theta;
-    end
-  end
+  if isemptyfield(Seq.Phase(t), 'sizePhase'), Seq.Phase(t).sizePhase = Seq.AQSlice(Seq.Phase(t).useAQSlice).sizePhase(t); end
+  if isemptyfield(Seq.Phase(t), 'nPhase'), Seq.Phase(t).nPhase = Seq.AQSlice(Seq.Phase(t).useAQSlice).nPhase(t); end
+  if isemptyfield(Seq.Phase(t), 'PhaseOS'), Seq.Phase(t).PhaseOS = Seq.AQSlice(Seq.Phase(t).useAQSlice).PhaseOS(t); end
+  if isemptyfield(Seq.Phase(t), 'alfa'), Seq.Phase(t).alfa = Seq.AQSlice(Seq.Phase(t).useAQSlice).alfa; end
+  if isemptyfield(Seq.Phase(t), 'phi'), Seq.Phase(t).phi = Seq.AQSlice(Seq.Phase(t).useAQSlice).phi; end
+  if isemptyfield(Seq.Phase(t), 'theta'), Seq.Phase(t).theta = Seq.AQSlice(Seq.Phase(t).useAQSlice).theta; end
   if isemptyfield(Seq.Phase(t), 'angle2Turns')  % conversion factor of the input angles to full turns  e.g.: 1/(2*pi)
     if isemptyfield(Seq, 'AQSlice') || ...
         isemptyfield(Seq.AQSlice(Seq.Phase(t).useAQSlice), 'angle2Turns')
@@ -180,40 +131,31 @@ for t = 1:numel(Seq.Phase)
   if isemptyfield(Seq.Phase(t), 'UseAtRepetitionTimeRephase'), Seq.Phase(t).UseAtRepetitionTimeRephase = Seq.Phase(t).UseAtRepetitionTime; end
   if isemptyfield(Seq.Phase(t), 'UseAtRepetitionTimeDephase'), Seq.Phase(t).UseAtRepetitionTimeDephase = Seq.Phase(t).UseAtRepetitionTime; end
   if isemptyfield(Seq.Phase(t), 'StepIncrement'), Seq.Phase(t).StepIncrement = 1; end
-  if isemptyfield(Seq.Phase(t), 'kLineIncrement'), Seq.Phase(t).kLineIncrement = 1; end
-  if isemptyfield(Seq.Phase(t), 'StepOrder')
-    % encoding order (for one cycle) in this encoding direction
-    Seq.Phase(t).StepOrder = reshape(repmat(1:Seq.Phase(t).nPhase*Seq.Phase(t).PhaseOS, Seq.Phase(t).StepIncrement(1)/Seq.Phase(t).kLineIncrement(1), 1), 1, []);
-  end
-  if isemptyfield(Seq.Phase(t), 'numKLines')
-    % number of k-lines per one (complete) image
-    Seq.Phase(t).numKLines = numel(Seq.Phase(t).UseAtRepetitionTime);
-  end
-  if isemptyfield(Seq.Phase(t), 'usedkLines')
-    % subset and/or order of k-lines to acquire
-    Seq.Phase(t).usedkLines = 1:Seq.Phase(t).numKLines;
-  end
+  if isemptyfield(Seq.Phase(t), 'StepOrder'), Seq.Phase(t).StepOrder = reshape(repmat(1:Seq.Phase(t).nPhase*Seq.Phase(t).PhaseOS, Seq.Phase(t).StepIncrement(1), 1), 1, []); end
+  if isemptyfield(Seq.Phase(t), 'usedkLines'), Seq.Phase(t).usedkLines = 1:numel(Seq.Phase(t).UseAtRepetitionTime); end
   if isemptyfield(Seq.Phase(t), 'Overdrive'), Seq.Phase(t).Overdrive = 0; end
 
+  % tempsize=ones(1,size(Seq.tRep,2));
+  % tempsize(~Seq.Phase(t).UseAtRepetitionTime)=nan;
+  % tempNSteps=sum(~isnan(tempsize(:)));
+  tempsize = ones(1, numel(Seq.Phase(t).UseAtRepetitionTime));
+  tempNSteps = numel(tempsize);
+  Seq.Phase(t).StepOrder = Seq.Phase(t).StepOrder.'*ones(1,ceil(tempNSteps/(Seq.Phase(t).nPhase*Seq.Phase(t).PhaseOS*Seq.Phase(t).StepIncrement(1))));
+  Seq.Phase(t).StepOrder = reshape(Seq.Phase(t).StepOrder(1:tempNSteps),1,tempNSteps);
+  Seq.Phase(t).usedkLines = repmat(Seq.Phase(t).usedkLines(:).', 1, tempNSteps/numel(Seq.Phase(t).usedkLines));
 
   Seq.Phase(t).Resolution = Seq.Phase(t).sizePhase/Seq.Phase(t).nPhase;
   Seq.Phase(t).GradTimeIntegral = pi/Seq.Phase(t).Gamma/Seq.Phase(t).Resolution;
 
-  if round((Seq.Phase(t).GradDephaseLength-Seq.Phase(t).tRamp*2)*HW.MMRT(Seq.Phase(t).iDevice).fSystem) < 2
-    error('PD:get_PhaseParameter:GradDephaseLengthTooShort', ...
-      'Seq.Phase(%d).GradDephaseLength too short', t);
+  if Seq.Phase(t).GradDephaseLength-Seq.Phase(t).tRamp*2 < 2/HW.MMRT(Seq.Phase(t).iDevice).fSystem
+    error(['Seq.Phase(' num2str(t) ').GradDephaseLength too short'])
   end
-  if round((Seq.Phase(t).GradRephaseLength-Seq.Phase(t).tRamp*2)*HW.MMRT(Seq.Phase(t).iDevice).fSystem) < 2
-    error('PD:get_PhaseParameter:GradRephaseLengthTooShort', ...
-      'Seq.Phase(%d).GradRephaseLength too short', t);
+  if Seq.Phase(t).GradRephaseLength-Seq.Phase(t).tRamp*2 < 2/HW.MMRT(Seq.Phase(t).iDevice).fSystem
+    error(['Seq.Phase(' num2str(t) ').GradRephaseLength too short'])
   end
 
-  Seq.Phase(t).GradAmpDephase = ...
-    (Seq.Phase(t).GradTimeIntegral + Seq.Phase(t).GradTimeIntegralDephaseOffset) / ...
-    (Seq.Phase(t).GradDephaseLength - Seq.Phase(t).tRamp);
-  Seq.Phase(t).GradAmpRephase = ...
-    (Seq.Phase(t).GradTimeIntegral + Seq.Phase(t).GradTimeIntegralRephaseOffset) / ...
-    (Seq.Phase(t).GradRephaseLength - Seq.Phase(t).tRamp);
+  Seq.Phase(t).GradAmpDephase=(Seq.Phase(t).GradTimeIntegral+Seq.Phase(t).GradTimeIntegralDephaseOffset)/(Seq.Phase(t).GradDephaseLength-Seq.Phase(t).tRamp);
+  Seq.Phase(t).GradAmpRephase=(Seq.Phase(t).GradTimeIntegral+Seq.Phase(t).GradTimeIntegralRephaseOffset)/(Seq.Phase(t).GradRephaseLength-Seq.Phase(t).tRamp);
 
 
   temp = zeros(3, 1);
@@ -224,25 +166,16 @@ for t = 1:numel(Seq.Phase)
   Seq.Phase(t).GradAmpRephase = temp;
 
   if Seq.Phase(t).UseCoordinate < 4
-    Angle2Deg = Seq.Phase(t).angle2Turns * 360;
+    Angle2Deg = Seq.Phase(t).angle2Turns*360;
     [Rx, Ry, Rz] = get_aptDegRotationMatrix(Seq.Phase(t).alfa*Angle2Deg, Seq.Phase(t).phi*Angle2Deg, Seq.Phase(t).theta*Angle2Deg);
     Seq.Phase(t).GradAmpRephase = Rz*(Ry*(Rx*Seq.Phase(t).GradAmpRephase));
     Seq.Phase(t).GradAmpDephase = Rz*(Ry*(Rx*Seq.Phase(t).GradAmpDephase));
   else
-    keyboard();
+    keyboard
   end
 
-  % encoding steps for all images in default ordering (chronologically)
-  usedkLinesImages = reshape(repmat(Seq.Phase(t).usedkLines, Seq.Phase(t).kLineIncrement, 1), 1, []);
-  usedkLinesImages = repmat(usedkLinesImages, 1, ceil(numel(Seq.Phase(t).UseAtRepetitionTime)/numel(usedkLinesImages)));
-  Seq.Phase(t).StepOrder = repmat(Seq.Phase(t).StepOrder, 1, ceil(Seq.Phase(t).numKLines/numel(Seq.Phase(t).StepOrder)));
-  kLineOrder = Seq.Phase(t).StepOrder(usedkLinesImages);
-  % kLineOrder = Seq.Phase(t).usedkLines(Seq.Phase(t).StepOrder);  % original
-
   if mod(Seq.Phase(t).nPhase*Seq.Phase(t).PhaseOS,2)
-    phaseSteps = linspace(-1+1/(Seq.Phase(t).nPhase*Seq.Phase(t).PhaseOS), ...
-      1-1/(Seq.Phase(t).nPhase*Seq.Phase(t).PhaseOS), ...
-      Seq.Phase(t).nPhase*Seq.Phase(t).PhaseOS);
+    phaseSteps = linspace(-1+1/(Seq.Phase(t).nPhase*Seq.Phase(t).PhaseOS), 1-1/(Seq.Phase(t).nPhase*Seq.Phase(t).PhaseOS), Seq.Phase(t).nPhase*Seq.Phase(t).PhaseOS);
     Seq.Phase(t).GradAmpDephase=Seq.Phase(t).GradAmpDephase * phaseSteps;
     Seq.Phase(t).GradAmpRephase=Seq.Phase(t).GradAmpRephase * phaseSteps;
     Seq.Phase(t).AQPhaseShift=Seq.Phase(t).distance/Seq.Phase(t).sizePhase*pi*Seq.Phase(t).nPhase * phaseSteps;
@@ -252,9 +185,7 @@ for t = 1:numel(Seq.Phase)
     Seq.Phase(t).GradAmpRephase=Seq.Phase(t).GradAmpRephase * phaseSteps;
     Seq.Phase(t).AQPhaseShift = Seq.Phase(t).distance/Seq.Phase(t).sizePhase*pi*Seq.Phase(t).nPhase * phaseSteps;
   end
-  Seq.Phase(t).AQPhaseShift = Seq.Phase(t).AQPhaseShift(kLineOrder);
-
-  tempsize = ones(1, numel(Seq.Phase(t).UseAtRepetitionTime));
+  Seq.Phase(t).AQPhaseShift = Seq.Phase(t).AQPhaseShift(Seq.Phase(t).StepOrder);
 
   for n = unique([1:3, Seq.Phase(t).UseCoordinate])
   % if Seq.Phase(t).Overdrive==0;
@@ -272,14 +203,14 @@ for t = 1:numel(Seq.Phase)
 
     Seq.Phase(t).GradRephase(n).Amp(1,Seq.Phase(t).UseAtRepetitionTimeRephase) = 0;
     Seq.Phase(t).GradRephase(n).Amp(2:3,Seq.Phase(t).UseAtRepetitionTimeRephase) = ...
-      [Seq.Phase(t).GradAmpRephase(n,kLineOrder).*Seq.Phase(t).GradRephaseSign; ...
-       Seq.Phase(t).GradAmpRephase(n,kLineOrder).*Seq.Phase(t).GradRephaseSign];
+      [Seq.Phase(t).GradAmpRephase(n,min(size(Seq.Phase(t).GradAmpRephase,2),Seq.Phase(t).usedkLines(Seq.Phase(t).StepOrder))).*Seq.Phase(t).GradRephaseSign; ...
+       Seq.Phase(t).GradAmpRephase(n,min(size(Seq.Phase(t).GradAmpRephase,2),Seq.Phase(t).usedkLines(Seq.Phase(t).StepOrder))).*Seq.Phase(t).GradRephaseSign];
     Seq.Phase(t).GradRephase(n).Amp(4,Seq.Phase(t).UseAtRepetitionTimeRephase) = 0;
 
     Seq.Phase(t).GradDephase(n).Amp(1,Seq.Phase(t).UseAtRepetitionTimeDephase) = 0;
     Seq.Phase(t).GradDephase(n).Amp(2:3,Seq.Phase(t).UseAtRepetitionTimeDephase) = ...
-      [Seq.Phase(t).GradAmpDephase(n,kLineOrder).*Seq.Phase(t).GradDephaseSign; ...
-       Seq.Phase(t).GradAmpDephase(n,kLineOrder).*Seq.Phase(t).GradDephaseSign];
+      [Seq.Phase(t).GradAmpDephase(n,min(size(Seq.Phase(t).GradAmpDephase,2),Seq.Phase(t).usedkLines(Seq.Phase(t).StepOrder))).*Seq.Phase(t).GradDephaseSign; ...
+       Seq.Phase(t).GradAmpDephase(n,min(size(Seq.Phase(t).GradAmpDephase,2),Seq.Phase(t).usedkLines(Seq.Phase(t).StepOrder))).*Seq.Phase(t).GradDephaseSign];
     Seq.Phase(t).GradDephase(n).Amp(4,Seq.Phase(t).UseAtRepetitionTimeDephase) = 0;
 
     Seq.Phase(t).GradRephase(n).Time = NaN(4, size(Seq.tRep, 2));
@@ -297,10 +228,6 @@ for t = 1:numel(Seq.Phase)
                      -Seq.Phase(t).GradDephaseLength/2+Seq.Phase(t).tRamp; ...
                      +Seq.Phase(t).GradDephaseLength/2-Seq.Phase(t).tRamp; ...
                      +Seq.Phase(t).GradDephaseLength/2]) - Seq.Phase(t).GradTimeDelay(n);
-
-    % replace Inf by NaN
-    Seq.Phase(t).GradRephase(n).Time(isinf(Seq.Phase(t).GradRephase(n).Time)) = NaN;
-    Seq.Phase(t).GradDephase(n).Time(isinf(Seq.Phase(t).GradDephase(n).Time)) = NaN;
   % else
   %   Seq.Phase(t).GradRephase(n).Amp=nan+zeros(8,size(tempsize,2));
   %   Seq.Phase(t).GradDephase(n).Amp=nan+zeros(8,size(tempsize,2));

@@ -3,7 +3,7 @@ function [pulseData] = Pulse_Rect_Composite180_Levitt_34(HW, Center, Pulse, vara
 %
 %   pulseData = Pulse_Rect_Composite180_Levitt_34(HW, Center, Pulse)
 % or:
-%   pulseData = Pulse_Rect_Composite180_Levitt_34(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments, MaxLength, Frequency, Phase)
+%   pulseData = Pulse_Rect_Composite180_Levitt_34(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments,  MaxLength, Frequency, Phase)
 % additionally:
 %   excitationAngleFactor = Pulse_Rect_Composite180_Levitt_34(HW, 'Amp')
 %   bandwidthFactor = Pulse_Rect_Composite180_Levitt_34(HW, 'Time')
