@@ -160,7 +160,7 @@ colorbar
 axis equal
 title('Image Phasemap')
 % Save full figure after both subplots are drawn
-saveas(figure5, fullfile(saveDir, 'Image_Magnitude_Phase.png'));
+saveas(figure5, fullfile(saveDir, ['Image_Magnitude_Phase_' timestamp '.png']));
 
 % Save all data
 save([fName '.mat'], 'Timedata', 'TemperatureData', 'Phasedata', 'Deltaphase', 'Acquisitiondata');
@@ -183,6 +183,6 @@ yfit = polyval(p, TemperatureData);
 hold on;
 plot(TemperatureData, yfit, '--r');
 legend('Data', sprintf('Fit: y = %.3fx + %.3f', p(1), p(2)));
-saveas(gcf, fullfile(saveDir, 'Phase_vs_Temperature.png'));
+saveas(gcf, fullfile(saveDir, ['Phase_vs_Temperature' timestamp '.png']));
 
-save(fullfile(saveDir, 'Trial5_Res32_TR300_RoomTemp_oil_Apr9.mat'));
+save(fullfile(saveDir, ['Trial5_Res32_TR300_RoomTemp_oil_Apr9' timestamp '.mat']));
