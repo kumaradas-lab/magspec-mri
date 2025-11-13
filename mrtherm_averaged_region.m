@@ -21,10 +21,10 @@ osensa_dev = enable_osensa("COM3");                  % Change when setting up
 
 % Initialize MRI system parameters
 LoadSystem; % Load system parameters (reset to default: HW Seq AQ TX Grad)
-HW.fLarmor = 23.42e6;                        % set correct Larmor frequency (0.55 T)
-HW.FindFrequencySweep.fCenter = HW.fLarmor;     % center sweep near expected resonance
-HW.FindFrequencySweep.fRange  = 1.0e6;       % widen sweep to ±500 kHz just in case, can increase the range depending on the medium
-HW.FindFrequencySweep.fOffsetFIDsStdMaxValue = 5000;  % allow more noise tolerance
+% HW.fLarmor = 23.42e6;                        % set correct Larmor frequency (0.55 T)
+% HW.FindFrequencySweep.fCenter = HW.fLarmor;     % center sweep near expected resonance
+% HW.FindFrequencySweep.fRange  = 500e3;       % widen sweep to ±250 kHz just in case, can increase the range depending on the medium
+% HW.FindFrequencySweep.fOffsetFIDsStdMaxValue = 5000;  % allow more noise tolerance
 
 Seq.Loops = 1; % Number of loop averages
 
