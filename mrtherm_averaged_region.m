@@ -30,8 +30,8 @@ Seq.Loops = 1; % Number of loop averages
 
 % Define parameters
 Seq.T1 = 100e-3;
-Seq.tEcho = 3e-3; % try for 3, 5, 20
-Seq.tRep = 8e-3;
+Seq.tEcho = 15e-3; % try for 3, 5, 20 increase TE for better  temp sensitivity
+Seq.tRep = 200e-3;   % try increasign TR 200 ms to stabilize phase
 resolution = 32; % original 32x32
 thickness = 0.002; % original 0.002
 pausetime = 2;
@@ -82,8 +82,8 @@ Seq.AQSlice(1).ZeroFillWindowSize = 1.4;
 Seq.AQSlice(1).ZeroFillFactor = 4;
 Seq.AQSlice(1).ThicknessPos = [0 0 -0.01]; % position of the slice
 
-Seq.CorrectSliceRephase = 0;                        % Correct SliceGradTimeIntegralOffset
-Seq.CorrectReadRephase = 0;                         % Correct ReadGradTimeIntegralOffset
+Seq.CorrectSliceRephase = 1;        % Correct SliceGradTimeIntegralOffset
+Seq.CorrectReadRephase = 1;         % Correct ReadGradTimeIntegralOffset
 Seq.CorrectPhase = 1;
 
 % Initialize data storage
@@ -106,20 +106,41 @@ while true
   [SeqLoop, mySave] = sequence_Flash(HW, Seq, AQ, TX, Grad, mySave);
   Acquisitiondata(i) = SeqLoop;
   
-  % Extract phase data from acquired image
-  Imagephase = unwrap(angle(SeqLoop.data.Image(position, 1, position)));
-  Phasedata(i) = Imagephase;
-  
-  % Compute phase difference
+  % % Extract phase data from acquired image
+  % Imagephase = unwrap(angle(SeqLoop.data.Image(position, 1, position)));
+  % Phasedata(i) = Imagephase;
+  % 
+  % % Compute phase difference
+  % if i < 4
+  %   deltaphase = 0;
+  % elseif i == 5
+  %   Referencephase = Phasedata(5);
+  %   deltaphase = 0;
+  % else
+  %   deltaphase = Imagephase - Referencephase;
+  % end
+
+  %% Trying using 3x3 ROI innstead of single pixel for phase
+  roiSize = 3;
+  x1 = position - floor(roiSize/2);
+  x2 = position + floor(roiSize/2);
+  roi = SeqLoop.data.Image (x1:x2, 1, x1:x2);
+  roi_mean_phase = angle(mean(roi(:)));
+
+  Phasedata(i)=roi_mean_phase;
+  %%
+  %Compute phase difference
   if i < 4
     deltaphase = 0;
   elseif i == 5
-    Referencephase = Phasedata(5);
+    Referencephase = roi_mean_phase;
     deltaphase = 0;
   else
-    deltaphase = Imagephase - Referencephase;
+      raw= [Reference roi_mean_phase];
+      unwrapped = unwrap(raw);
+    deltaphase = unwrapped(end)-unwrapped(1);
   end
-  
+
   Deltaphase(i) = deltaphase;
   
   % Plot phase difference over time
