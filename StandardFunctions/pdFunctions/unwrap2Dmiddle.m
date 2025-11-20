@@ -8,14 +8,16 @@ function unwrapped = unwrap2Dmiddle(tounwrap)
 % center row is unwrapped. All other rows are unwrapped identically to the
 % center row.
 %
+% See also: unwrap3Dmiddle
+%
 % ------------------------------------------------------------------------------
-% (C) Copyright 2014-2020 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2014-2021 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
 u1 = unwrap(tounwrap, [], 1);
-u1m = unwrap(u1(round(end/2),:)) - u1(round(end/2),:);
+u1m = unwrap(u1(floor(end/2)+1,:)) - u1(floor(end/2)+1,:);
 u2 = u1 + ones(size(u1,1),1)*u1m;
-unwrapped = u2 - (u2(round(end/2),round(end/2)) - tounwrap(round(end/2),round(end/2)));
+unwrapped = u2 - (u2(floor(end/2)+1,floor(end/2)+1) - tounwrap(floor(end/2)+1,floor(end/2)+1));
 
 end

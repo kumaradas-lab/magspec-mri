@@ -1,6 +1,7 @@
 %% Settings for rf amplifier RF-100 with SN 7
 
 HW.TX.ExtRFSN = 7;
+HW.TX.ExtRFType = 'RF100';  % string with type identifier
 
 HW.TX.ChannelDef = 2;         % Default TX Channel set to Tx2
 
@@ -38,36 +39,36 @@ HW.RX.VGAGainDef = HW.RX.VGAGainMax/1; % default VGA gain
 % HW.TX.BlankAQ = 1;              % Switch TRx to 50 Ohm resistor during TX pulse, to avoid saturation.
 
 %%
-UseRF100Switch = 1; % use switch of RF-100
-LoadRF100_Cal;
+UseExtRFAmpSwitch = 1;  % use switch of RF-100
+LoadExtRFAmp_Cal;
 
 %%
-% if exist('CalibrationPaUout2Amplitude.mat','file');
-%     load('CalibrationPaUout2Amplitude.mat');
-%     HW.TX.CalibrationPaUout2Amplitude=CalibrationTX;
-%     clear CalibrationPaUout2Amplitude
-% end;
-% if exist('CalibrationUout.mat','file');
-%     load('CalibrationUout.mat');
-%     HW.TX.CalibrationUout=CalibrationUout;
-%     clear CalibrationUout
-% end;
-% if exist('CalibrationNorm2MmrtUout.mat','file');
-%     load('CalibrationNorm2MmrtUout.mat');
-%     HW.TX.CalibrationNorm2MmrtUout=CalibrationTX;
-%     clear CalibrationNorm2MmrtUout
-% end;
-%
-% if any(HW.TX.Uout2PaUout~=1)
-%     if exist('CalibrationRfAmp.mat','file');
-%         load('CalibrationRfAmp.mat');
-%         HW.TX.CalibrationRfAmp=CalibrationRfAmp;
-%         clear CalibrationRfAmp
-%     end;
+% if exist('CalibrationPaUout2Amplitude.mat', 'file')
+%   load('CalibrationPaUout2Amplitude.mat');
+%   HW.TX.CalibrationPaUout2Amplitude = CalibrationTX;
+%   clear CalibrationPaUout2Amplitude
+% end
+% if exist('CalibrationUout.mat', 'file')
+%   load('CalibrationUout.mat');
+%   HW.TX.CalibrationUout = CalibrationUout;
+%   clear CalibrationUout
+% end
+% if exist('CalibrationNorm2MmrtUout.mat', 'file')
+%   load('CalibrationNorm2MmrtUout.mat');
+%   HW.TX.CalibrationNorm2MmrtUout = CalibrationTX;
+%   clear CalibrationNorm2MmrtUout
 % end
 %
-% if exist('CalibrationRx.mat','file');
-%     load('CalibrationRx.mat');
-%     HW.RX.Calibration=CalibrationRx;
-%     clear CalibrationRx
-% end;
+% if any(HW.TX.Uout2PaUout~=1)
+%   if exist('CalibrationRfAmp.mat', 'file')
+%     load('CalibrationRfAmp.mat');
+%     HW.TX.CalibrationRfAmp = CalibrationRfAmp;
+%     clear CalibrationRfAmp
+%   end
+% end
+%
+% if exist('CalibrationRx.mat', 'file')
+%   load('CalibrationRx.mat');
+%   HW.RX.Calibration = CalibrationRx;
+%   clear CalibrationRx
+% end

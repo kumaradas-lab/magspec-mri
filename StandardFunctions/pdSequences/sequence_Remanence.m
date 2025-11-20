@@ -50,7 +50,7 @@ function SeqOut = sequence_Remanence(HW, Seq, AQ, TX, Grad)
 %         Index for the used MMRT device. (Default: 1)
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2021-2023 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -153,8 +153,40 @@ for iRem = 1:numel(useGrad)
 end
 
 
+TX(1).Start = NaN;
+AQ(1).Start = NaN;
+
+
 %% run pulse program
+
+% de-activate eddy current compensation for this "measurement"
+if ~isemptyfield(HW.Grad(Seq.iDevice).EddyCurrent, 'relExaggeration') && ...
+    any(HW.Grad(Seq.iDevice).EddyCurrent.relExaggeration ~= 0)
+  % FIXME: This doesn't have any effect if this is only called to prepare the
+  % pulse program.
+  oldRelExaggeration = HW.Grad(Seq.iDevice).EddyCurrent.relExaggeration;
+  if isa(HW, 'PD.HWClass')
+    iDevice = Seq.iDevice;
+    protectRelExaggeration = onCleanup(@() resetRelExaggeration(HW, iDevice, oldRelExaggeration));
+  end
+
+  HW.Grad(Seq.iDevice).EddyCurrent.relExaggeration(:) = 0;
+end
+
 [~, SeqOut] = set_sequence(HW, Seq, AQ, TX, Grad);
 
+if isa(HW, 'PD.HWClass') && ...
+    ~isemptyfield(HW.Grad(Seq.iDevice).EddyCurrent, 'relExaggeration') && ...
+    any(HW.Grad(Seq.iDevice).EddyCurrent.relExaggeration ~= 0)
+  % FIXME: Might not be executed if user interrupts "measurement"
+  HW.Grad(Seq.iDevice).EddyCurrent.relExaggeration = oldRelExaggeration;
+end
+
+end
+
+function resetRelExaggeration(HW, iDevice, oldRelExaggeration)
+%% Reset value of HW.Grad.EddyCurrent.relExaggeration to oldRelExaggeration
+
+HW.Grad(iDevice).EddyCurrent.relExaggeration = oldRelExaggeration;
 
 end

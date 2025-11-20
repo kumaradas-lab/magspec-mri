@@ -1,5 +1,11 @@
 function [pulseData] = Pulse_Rect_xAmplitude(HW, Center, BW, FlipAngle, maxpulseCount,  maxLength, Frequency, Phase)
-% create a rectangular RF pulse
+%% create a rectangular RF pulse
+%
+% ------------------------------------------------------------------------------
+% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
+% www.pure-devices.com
+% ------------------------------------------------------------------------------
+
 % x=2 * 6/5/0.86;
 % x=2 * 12/9/0.86;
 x=2 * 12/9/0.86;
@@ -19,10 +25,10 @@ if nargin==2
         elseif strcmp(Center,'Time')
             pulseData=x;
         else
-            pulseData=nan;       
-		end
+            pulseData=nan;
+    end
     else
-      	Pulse.MaxLength
+        Pulse.MaxLength
         Pulse.Bandwidth
         Pulse.Center
         Pulse.FlipAngle
@@ -31,23 +37,25 @@ if nargin==2
         Pulse.MaxNumberOfSegments
 
     end
-    
+
 else
-    
+
     tFlipPi=HW.TX.Amp2FlipPiIn1Sec/HW.TX.AmpDef;
 
-    BlockLength=x/BW*0.999;
+    BlockLength=x/BW;
 
-    gain=HW.TX.AmpDef*tFlipPi*(FlipAngle/pi)/(BlockLength/0.998);
+    gain=HW.TX.AmpDef*tFlipPi*(FlipAngle/pi)/BlockLength;
 
-    if maxLength<BlockLength;
-        error('maxLength of HF Pulse to short')
+    if maxLength + 1/HW.TX(Pulse.iDevice).fSample < BlockLength
+      error('PD:Pulse_Rect_xAmplitude:MaxLengthTooShort', ...
+        'MaxLength of rf pulse is %.3f %cs too short.', ...
+        (BlockLength - maxLength)*1e6, char(181));
     end
-    
+
     if maxpulseCount<1
         error('maxpulseCount >= 1');
     end
-    
+
     pulseData.Start=-BlockLength/2+Center;
     pulseData.Amplitude=gain;
     pulseData.Duration=BlockLength;
@@ -55,9 +63,5 @@ else
     pulseData.Phase=Phase;
 
 end
-    
-    
-%% ------------------------------------------------------------------------    
-% (C) Copyright 2012 Pure Devices GmbH, Wuerzburg, Germany
-% www.pure-devices.com
-%------------------------------------------------------------------------    
+
+end

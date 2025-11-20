@@ -1,6 +1,7 @@
 %% Settings for rf amplifier RF-100 with SN 23
 
 HW.TX.ExtRFSN = 23;
+HW.TX.ExtRFType = 'RF100';  % string with type identifier
 
 HW.TX.ChannelDef = 2;         % Default TX Channel set to Tx2
 
@@ -22,7 +23,7 @@ HW.TX.BlankPostset = 400e-9;     % Blank of RF-100 after TX pulse
 HW.TX.BlankOffsetAQ = 1000e-9;   % Blank of receiver before TX pulse
 if HW.TX.DampCoil.Enable
     HW.TX.BlankPostsetAQ = 1400e-9;  % Blank of receiver after TX pulse
-else 
+else
     HW.TX.BlankPostsetAQ = 2400e-9;
 end
 HW.TX.BlankAQ = 1;               % Switch TRx to 50 Ohm resistor during TX pulse, to avoid saturation.
@@ -34,6 +35,5 @@ HW.RX.VGAGainDef = HW.RX.VGAGainMax/1; % reduce VGA gain to avoid saturation
 
 
 %%
-UseRF100Switch = 1; % use switch of RF-100
-LoadRF100_Cal; % new cal Uout and 6 A FET
-
+UseExtRFAmpSwitch = 1;  % use switch of RF-100
+LoadExtRFAmp_Cal;  % new cal Uout and 6 A FET

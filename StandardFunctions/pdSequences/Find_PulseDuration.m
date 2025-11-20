@@ -72,7 +72,7 @@ function [HW, mySave] = Find_PulseDuration(HW, mySave, minTime, doPlot, iteratio
 %       mySave structure
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2024 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -88,6 +88,9 @@ if nargin < 8,                        Seq        = struct(); end
 
 if isemptyfield(Seq, 'skipFrequencySweep')
   Seq.skipFrequencySweep = false;
+end
+if isemptyfield(Seq, 'useGammaX')
+  Seq.useGammaX = false;
 end
 
 %% initialization
@@ -158,54 +161,70 @@ else
 end
 
 % Store calculated values or display them
-newPaUout2Amplitude = HW.TX(SeqLoop.AQSlice.iDevice).PaUout2Amplitude;
+if Seq.useGammaX
+  PaUout2AmplitudeFieldname = 'PaUout2AmplitudeX';
+  fLarmorPulseDuration = HW.fLarmorX;
+else
+  PaUout2AmplitudeFieldname = 'PaUout2Amplitude';
+  fLarmorPulseDuration = HW.fLarmor;
+end
+
+newPaUout2Amplitude = HW.TX(SeqLoop.AQSlice.iDevice).(PaUout2AmplitudeFieldname);
 TXVoltage = HW.TX(SeqLoop.AQSlice.iDevice).AmpDef / HW.TX(SeqLoop.AQSlice.iDevice).PaUout2Amplitude(HW.TX(SeqLoop.AQSlice.iDevice).ChannelDef);
 newPaUout2Amplitude(HW.TX(SeqLoop.AQSlice.iDevice).ChannelDef) = data.B1 / TXVoltage;
-comment = sprintf('%s (tFlip90 = %.3f %ss @ %.3f V) from 1d Spin Echo by %s', ...
-  datestr(now, 'yyyy-mm-ddTHH:MM:SS'), data.tFlip90*1e6, char(181), ...
-  TXVoltage, mfilename());
+comment = sprintf('%s (tFlip90 = %.3f us @ %.3f V @ %.6f MHz) from 1d Spin Echo by %s', ...
+  datestr(now, 'yyyy-mm-ddTHH:MM:SS'), data.tFlip90*1e6, TXVoltage, fLarmorPulseDuration/1e6, mfilename());
 
-newCalLine = sprintf('HW.TX(%d).PaUout2Amplitude = [%.6f, %.6f]*1e-6', ...
-  SeqLoop.AQSlice.iDevice, newPaUout2Amplitude*1e6);
+newCalLine = sprintf('HW.TX(%d).%s = [%.6f, %.6f]*1e-6;', ...
+  SeqLoop.AQSlice.iDevice, PaUout2AmplitudeFieldname, newPaUout2Amplitude*1e6);
 
 if ~isempty(HW.TX(SeqLoop.AQSlice.iDevice).CoilName)
-  newCalLine = sprintf('if strcmp(HW.TX(%d).CoilName, ''%s''),  %s;  end', ...
+  newCalLine = sprintf('if strcmp(HW.TX(%d).CoilName, ''%s''),  %s  end', ...
     SeqLoop.AQSlice.iDevice, HW.TX(SeqLoop.AQSlice.iDevice).CoilName, newCalLine);
 end
 
 if SeqLoop.AQSlice.iDevice > 1
-  newCalLine = sprintf('if numel(HW.TX) >= %d,  %s;  end', ...
+  newCalLine = sprintf('if numel(HW.TX) >= %d,  %s  end', ...
     SeqLoop.AQSlice.iDevice, newCalLine);
 end
 
-newCalLine = sprintf('%s;  %% %s\n', newCalLine, comment);
+newCalLine = sprintf('%s  %% %s\n', newCalLine, comment);
 
-if data.savePulseFile
-  if ~isempty(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath) && (isemptyfield(mySave, 'DummySerial') || mySave.DummySerial <= 0)
-    if ~exist(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath, 'file')
-      newCalLine = ['% factor from voltage amplitude at the coil input to B1+ field strength in T/V', sprintf('\n'), newCalLine];
-    end
-    fid = fopen(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath, 'a+');
+if ~isempty(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath) ...
+    && (isemptyfield(mySave, 'DummySerial') ...
+        || mySave.DummySerial(min(SeqLoop.AQSlice.iDevice, numel(mySave.DummySerial))) <= 0)
+  addFirstLine = ~exist(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath, 'file');
+  if ~exist(fileparts(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath), 'dir')
+    mkdir(fileparts(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath));
+  end
+  fid = fopen(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath, 'a+');
+  fid_protect = onCleanup(@() fclose(fid));
+  if addFirstLine
+    fwrite(fid, ['% factor from voltage amplitude at the coil input to B1+ field strength in T/V', sprintf('\n')]);
+  end
+  if data.savePulseFile
     fwrite(fid, newCalLine);
-    [~, name, ~] = fileparts(fopen(fid));
-    fclose(fid);
-    clear(name);clear('name')
     fprintf('\nA new line was added to the following file:\n%s\n%s\n', ...
       HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath, newCalLine);
   else
-    fprintf('\n');
-    fprintf('\nPlease add the following line to your LoadMySystem.m file:\n%s\n', ...
-      newCalLine);
+    fwrite(fid, ['% ', newCalLine]);  % add line as comment
   end
+  delete(fid_protect);
+  [~, name, ~] = fileparts(fopen(fid));
+  clear(name);clear('name')
 
   % save the time of the last RF pulse duration search
   mySave.lastTime_PulseDuration = now*24*3600;
-
-else
+elseif data.savePulseFile
+  fprintf('\n');
+  fprintf('\nPlease add the following line to your LoadMySystem.m file:\n%s\n', ...
+    newCalLine);
+end
+if ~data.savePulseFile
   fprintf('\n');
   warnStr = ['Determination of pulse length unsuccessful!\n', ...
     'If you want to use the uncertain best guess value anyway, ', ...
-    'please manually add the following line to your LoadMySystem.m file:\n%s\n'];
+    'please manually append or un-comment the following line in your PaUout2AmplitudeCal.m file:\n%s\n'];
   warning('PD:sequence_PulseDuration', warnStr, newCalLine);
 end
 

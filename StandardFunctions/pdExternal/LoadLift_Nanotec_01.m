@@ -5,10 +5,10 @@ end
 
 HW.Lift.SN = 1;
 
-if (~isa(HW, 'PD.HW') && isemptyfield(HW, 'Lift')) || ~isa(HW.Lift, 'PD.SampleLift') || ...
+if (~isa(HW, 'PD.HWClass') && isemptyfield(HW, 'Lift')) || ~isa(HW.Lift, 'PD.SampleLift') || ...
     isempty(HW.Lift) || (isa(HW.Lift, 'PD.SampleLift') && ~isvalid(HW.Lift))
   % only re-create object if it was explicitly deleted before
-  if isa(HW, 'PD.HW') || (~isemptyfield(HW, 'Lift') && ~isemptyfield(HW.Lift, 'SN'))
+  if isa(HW, 'PD.HWClass') || (~isemptyfield(HW, 'Lift') && ~isemptyfield(HW.Lift, 'SN'))
     lift = HW.Lift;
   else
     lift = struct();
@@ -19,8 +19,10 @@ end
 % define any settings that differ from the default values here
 % HW.Lift.SetMicroStepsDivisor(5);
 % HW.Lift.SetInputPolarityInverse([5 6]);
-% HW.Lift.directionChannel = 5;
-% HW.Lift.clockChannel = 6;
+% HW.Lift.startSetChannel = 6;  % channel of stepper controller; connected to DigitalIO output 3 on MMRT
+% HW.Lift.setBit0Channel = 5;  % channel of stepper controller; connected to DigitalIO output 4 on MMRT
+% HW.Lift.clockChannel = 6;  % channel of stepper controller; connected to DigitalIO output 3 on MMRT
+% HW.Lift.directionChannel = 5;  % channel of stepper controller; connected to DigitalIO output 4 on MMRT
 
 % return;
 

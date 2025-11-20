@@ -25,6 +25,8 @@ function plot_data_store(hf, plotData, hgProps)
 %                       respective axes.
 %       hgProps.axes{i}.title
 %                       String with the title of the respective subplot.
+%       hgProps.axes{i}.xlabel
+%                       String with the xlabel of the respective subplot.
 %       hgProps.axes{i}.ylabel
 %                       String with the ylabel of the respective subplot.
 %       hgProps.axes{i}.legend.labels
@@ -40,10 +42,10 @@ function plot_data_store(hf, plotData, hgProps)
 % To clear the stored data and to re-start with empty axes, call:
 %       plot_data_store('clear')
 %
-% -----------------------------------------------------------------------
-% (C) Copyright 2016-2019 Pure Devices GmbH, Wuerzburg, Germany
+% ------------------------------------------------------------------------------
+% (C) Copyright 2016-2024 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
-%------------------------------------------------------------------------
+% ------------------------------------------------------------------------------
 
 %%
 persistent handles plotDataStore
@@ -121,6 +123,12 @@ if ~isfield(handles, 'axesPlot') || ...
     end
     if ~isemptyfield(hgProps, 'axes') && iscell(hgProps.axes) && ...
         numel(hgProps.axes)>=iAxes && ...
+        ~isemptyfield(hgProps.axes{iAxes}, 'xlabel')
+      xlabel(handles.axesPlot(iAxes), hgProps.axes{iAxes}.xlabel, ...
+        'HandleVisibility', 'off');
+    end
+    if ~isemptyfield(hgProps, 'axes') && iscell(hgProps.axes) && ...
+        numel(hgProps.axes)>=iAxes && ...
         ~isemptyfield(hgProps.axes{iAxes}, 'ylabel')
       ylabel(handles.axesPlot(iAxes), hgProps.axes{iAxes}.ylabel, ...
         'HandleVisibility', 'off');
@@ -151,8 +159,8 @@ for iAxes = 1:numAxes
   end
   % plot in axes or update lines
   if isvector(plotDataStore{iAxes})
-    if numel(handles.lines{iAxes}) ~= 1
-      handles.lines{iAxes} = plot(handles.axesPlot(iAxes), plotDataStore{iAxes});
+    if ~isscalar(handles.lines{iAxes})
+      handles.lines{iAxes} = plot(handles.axesPlot(iAxes), plotDataStore{iAxes}');
     else
       set(handles.lines{iAxes}, 'YData', plotDataStore{iAxes})
     end

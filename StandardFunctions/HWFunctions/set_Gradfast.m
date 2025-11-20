@@ -4,8 +4,14 @@ function grad = set_Gradfast(GradDAC, TimeGradOffset, tActEnd, tOffset)
 %   grad = set_Gradfast(GradDAC, TimeGradOffset, tActEnd, tOffset)
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
 end
+
+
+%#function PD.Gradient
+%#function PD.SystemConstants
+%#function isemptyfield
+

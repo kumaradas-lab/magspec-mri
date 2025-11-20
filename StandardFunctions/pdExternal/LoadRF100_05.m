@@ -1,6 +1,7 @@
 %% Settings for rf amplifier RF-100 with SN 5
 
 HW.TX.ExtRFSN = 5;
+HW.TX.ExtRFType = 'RF100';  % string with type identifier
 
 HW.TX.ChannelDef = 2;         % Default TX Channel set to Tx2
 
@@ -37,5 +38,5 @@ HW.RX.VGAGainDef = HW.RX.VGAGainMax/3; % reduce VGA gain to avoid saturation
 % HW.TX.BlankAQ = 1;              % Switch TRx to 50 Ohm resistor during TX pulse, to avoid saturation.
 
 %%
-UseRF100Switch = 1; % use switch of RF-100
-LoadRF100_Cal;
+UseExtRFAmpSwitch = 1;  % use switch of RF-100
+LoadExtRFAmp_Cal;

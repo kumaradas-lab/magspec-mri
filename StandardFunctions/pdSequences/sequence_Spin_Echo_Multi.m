@@ -3,7 +3,7 @@
 % Spin Echo 1 2 and 3 dimension
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2014-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2014-2023 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %-------------------------------------------------------------------------------
 
@@ -12,7 +12,7 @@ warning('PD:sequence_Spin_Echo_Multi:deprecated', ...
    'of OpenMatlab. Consider using the function "sequence_Spin_Echo" with ' ...
    'Seq.AQSlice(1).TurboFactor>1 instead.']);
 
-if exist('HW', 'var') && isa(HW, 'PD.HW')
+if exist('HW', 'var') && isa(HW, 'PD.HWClass')
     ResetStructs;  % reset variables: Seq AQ TX Grad
 else
     % mySave.DummySerial = 0;  % for Dummy measurements without an MRI device (0 or [] for real measurements or 1 for dummy measurements)
@@ -79,6 +79,13 @@ Seq.AQSlice(1).SliceCoordinate=3;                          % direction of Slice:
 
 % Generate tRep times
 Seq.tRep=Seq.tEcho*ones(1,1+prod(Seq.AQSlice(1).nPhase)*prod(Seq.AQSlice(1).PhaseOS)+Seq.SteadyState_PreShots+Seq.SteadyState_PostShots);
+if HW.RX(iDevice).ClampCoil.Enable
+  % extent last tRep with acquisition for coil blank signal if necessary
+  % FIXME: Probably disrupts timing for post-shots
+  Seq.tRep(end-Seq.SteadyState_PostShots) = ...
+    max(Seq.tRep(end-Seq.SteadyState_PostShots), ...
+    Seq.tEcho/2 + 1/Seq.AQSlice(1).HzPerPixMin/2 + HW.RX(iDevice).ClampCoil.tPostset + 0.2e-3);
+end
 
 % 90 degrees slice excitation
 Seq.Slice(1).Pulse.Function=@Pulse_Sinc_2;

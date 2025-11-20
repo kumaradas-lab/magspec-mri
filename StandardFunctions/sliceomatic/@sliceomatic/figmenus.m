@@ -6,7 +6,7 @@ function d = figmenus(this, d)
 % Copyright 2000, 2001, 2002, 2003, 2004, 2005 The MathWorks Inc
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2016-2020 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -38,6 +38,14 @@ if isempty(currentUiMenues) || ...
   d.fprint  = uimenu(this.fileMenu, ...
     'Label',    'Print...', ...
     'Callback', @(hObject, eventData) this.callbacks('print'));
+  d.faviexport  = uimenu(this.fileMenu, ...
+    'Label',    'Export as Video...', ...
+    'Callback', @(hObject, eventData) this.ExportAvi());
+  if exist('Image3D2VolView', 'file') == 2
+    d.fvolviewexport  = uimenu(this.fileMenu, ...
+      'Label',    'Export to VolView...', ...
+      'Callback', @(hObject, eventData) this.ExportVolView());
+  end
   d.fsaveprefs = uimenu(this.fileMenu, ...
     'Label',    'Save Preferences', ...
     'Callback', {@SavePrefs, this});
@@ -200,17 +208,26 @@ d.defcontoursmooth = 'off';
 
 % investigate hardware opengl.
 inc = 0;
-try %#ok<TRYNC>
-  od = opengl('data');
-  if isfield(od, 'Software')
-    % R14 version of MATLAB
-    if ~od.Software
-      inc = 10;
+try  %#ok<TRYNC>
+  if verLessThan('Matlab', '9.6')
+    % The function "opengl" is deprecated in Matlab R2019a and later.
+    od = opengl('data');
+    if isfield(od, 'Software')
+      % R14 version of MATLAB
+      if ~od.Software
+        inc = 10;
+      end
+    else
+      % Older version of MATLAB
+      if ~(strcmp(od.Renderer, 'Mesa X11') || ...
+          strcmp(od.Renderer, 'GDI Generic'))
+        inc = 10;
+      end
     end
   else
-    % Older version of MATLAB
-    if ~(strcmp(od.Renderer, 'Mesa X11') || ...
-        strcmp(od.Renderer, 'GDI Generic'))
+    % Use "rendererinfo" in Matlab R2019a and later.
+    od = rendererinfo(this.hAxes);
+    if ~isfield(od, 'GraphicsRenderer') || ~strcmp(od.GraphicsRenderer, 'OpenGL Hardware')
       inc = 10;
     end
   end

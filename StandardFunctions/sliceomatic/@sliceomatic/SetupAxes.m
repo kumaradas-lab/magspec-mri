@@ -11,7 +11,7 @@ function d = SetupAxes(this, d, xmesh, ymesh, zmesh)
 % Copyright 2000, 2001, 2002, 2003, 2004, 2005 The MathWorks Inc
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2016-2020 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -29,9 +29,14 @@ end
 if isempty(this.hParent), this.hParent = this.hFigure; end
 
 if this.hParent == this.hFigure
+  if ishghandle(this.hFigure, 'figure')
+    oldVisibility = get(this.hFigure, 'Visible');
+  else
+    oldVisibility = 'on';
+  end
   this.hFigure = figure(this.hFigure);
   clf(this.hFigure, 'reset')
-  set(this.hFigure, 'Name', 'Sliceomatic');
+  set(this.hFigure, 'Name', 'Sliceomatic', 'Visible', oldVisibility);
 end
 
 %% trigger delete function of previous sliceomatic in parent
@@ -42,12 +47,17 @@ end
 
 %% Set up main axes
 lim = [min(d.data(isfinite(d.data))), max(d.data(isfinite(d.data)))];
-if isempty(lim)
+if isempty(lim) || all(lim == 0) || all(isnan(lim))
   lim = [-1, 1];
 end
 if lim(1) == lim(2)
-  lim(1) = 0.9*lim(1);
-  lim(2) = 1.1*lim(2);
+  if lim(1) > 0
+    lim(1) = 0.9*lim(1);
+    lim(2) = 1.1*lim(2);
+  else
+    lim(1) = 1.1*lim(1);
+    lim(2) = 0.9*lim(2);
+  end
 end
 
 if ~isnan(xmesh)
@@ -110,7 +120,7 @@ else
   axis(this.hAxes, 'vis3d');
 end
 
-hold(this.hAxes, 'all');
+hold(this.hAxes, 'on');
 grid(this.hAxes, 'on');
 
 %% Set up the four controller axes
@@ -190,10 +200,10 @@ else
   slicecontrols(this.hParent, 1);
 end
 
-isocontrols(this.hParent, 1);
+this.SetupSliderIso(true);
 
 %% parent size changed function
-if verLessThan('matlab', '8.4') % before R2014b
+if verLessThan('matlab', '8.4')  % before R2014b
   d.oldResizeFcn = get(this.hParent, 'ResizeFcn');
   set(this.hParent, 'ResizeFcn', @(hObject,evtdata) this.SizeChangedFcn());
 else

@@ -36,7 +36,7 @@ function [SeqOut, mySave] = sequence_shim_B0map(HW, Seq, varargin)
 %               (Default: 3e-3)
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2020 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2020-2024 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -130,13 +130,27 @@ fprintf('Shim Y:    %8.2f %cT/m\n', opt(3)*1e6, 181);
 fprintf('Shim Z:    %8.2f %cT/m\n', opt(4)*1e6, 181);
 
 % new magnet shim values
-magnetShim = HW.MagnetShim;
+magnetShim = HW.Grad(SeqOut.AQSlice(1).iDevice).AmpOffset;
 magnetShim(1:3) = magnetShim(1:3) - opt(2:4).';
-newCalLine = sprintf(['HW.MagnetShim = [%6.9f, %6.9f, %6.9f, %6.9f]; ', ...
-  ' %% %s by B0 map using sequence_Flash, x y z in T/m and B0 in T\n'], ...
-  magnetShim, datestr(now, 'yyyy-mm-ddTHH:MM:SS'));
+
+shimElemStr = sprintf('%6.9f, ', magnetShim(1:3));
+if numel(HW.Grad) > 1
+  % FIXME: Currently shimming with channels on one single device only is supported
+  newCalLine = sprintf(['HW.Grad(%d).AmpOffset([1,2,3]) = [%s]; ', ...
+    ' %% %s by B0 map using sequence_Flash, x y z in T/m and B0 in T\n'], ...
+    SeqOut.AQSlice(1).iDevice, shimElemStr(1:end-2), ...
+    datestr(now, 'yyyy-mm-ddTHH:MM:SS'));
+else
+  newCalLine = sprintf(['HW.MagnetShim([1,2,3]) = [%s]; ', ...
+    ' %% %s by B0 map using sequence_Flash, x y z in T/m and B0 in T\n'], ...
+    shimElemStr(1:end-2), ...
+    datestr(now, 'yyyy-mm-ddTHH:MM:SS'));
+end
 
 % FIXME: Add consistency checks.
+if ~exist(fileparts(HW.MagnetShimPath), 'dir')
+  mkdir(fileparts(HW.MagnetShimPath));
+end
 fid = fopen(HW.MagnetShimPath, 'a+');
 if fid < 0
   warning('PD:sequence_shim_B0map:InvalidFile', ...

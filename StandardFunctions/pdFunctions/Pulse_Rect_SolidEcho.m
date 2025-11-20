@@ -3,7 +3,7 @@ function pulseData = Pulse_Rect_SolidEcho(HW, Center, Pulse, varargin)
 %
 %   pulseData = Pulse_Rect_SolidEcho(HW, Center, Pulse)
 % or:
-%   pulseData = Pulse_Rect_SolidEcho(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments,  maxLength, Frequency, Phase)
+%   pulseData = Pulse_Rect_SolidEcho(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments, MaxLength, Frequency, Phase)
 % additionally:
 %   excitationAngleFactor = Pulse_Rect_SolidEcho(HW, 'Amp')
 %   bandwidthFactor = Pulse_Rect_SolidEcho(HW, 'Time')
@@ -19,7 +19,9 @@ function pulseData = Pulse_Rect_SolidEcho(HW, Center, Pulse, varargin)
 % INPUT:
 %
 %   HW      HW structure
-%   Center  The center of the pulse in seconds (tRep).
+%   Center  The center of the refocussed spin system in seconds (tRep). This
+%           definition allows it to replace a "normal" excitation pulse with
+%           this solid echo pulse.
 %   Pulse   A structure with the following fields (if omitted or empty, default
 %           values are used):
 %     FlipAngle
@@ -68,6 +70,9 @@ function pulseData = Pulse_Rect_SolidEcho(HW, Center, Pulse, varargin)
 %     Phase
 %             Column vector with the phases in degrees of each component/block
 %             with respect to the overall sequence.
+%     tCenterOffset
+%             Offset between the center of the 90 degrees pulses and "Center"
+%             (i.e., the time of the expected solid echo maximum).
 %
 %
 % The additional syntax is used to return the amplitude and bandwidth factors.
@@ -77,9 +82,9 @@ function pulseData = Pulse_Rect_SolidEcho(HW, Center, Pulse, varargin)
 % the duration of the pulse to have the same bandwidth (FWHM) as a rect pulse.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2020 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2020-2024 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
-%-------------------------------------------------------------------------------
+% ------------------------------------------------------------------------------
 
 %% check input
 if nargin == 2
@@ -103,6 +108,7 @@ if nargin > 5, Pulse.MaxLength = varargin{3}; end
 if nargin > 6, Pulse.Frequency = varargin{4}; end
 if nargin > 7, Pulse.Phase = varargin{5}; end
 
+
 %% default values
 Pulse = set_EmptyField(Pulse, 'FlipAngle', pi/2);
 Pulse = set_EmptyField(Pulse, 'FlipAngleFullTurn', 2*pi);
@@ -116,22 +122,33 @@ Pulse = set_EmptyField(Pulse, 'iDevice', 1);
 if isemptyfield(Pulse, 'tauSolid'), Pulse.tauSolid = 2*HW.tFlip90Def; end
 if isemptyfield(Pulse, 'PhaseSolidInversionOffset'), Pulse.PhaseSolidInversionOffset = 90; end
 
-%% rect pulses for a solid echo
-tFlipPi = HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec / HW.TX(Pulse.iDevice).AmpDef;
 
-BlockLength = 1/Pulse.Bandwidth*0.999;
+%% rect pulses for a solid echo
+% Use gamma that better matches the frequency of the pulse
+% FIXME: Could this be an issue with (very) off-center slice pulses?
+if abs(Pulse.Frequency - HW.fLarmorX) < abs(Pulse.Frequency - HW.fLarmor)
+  tFlipPi = pi/HW.GammaX / HW.TX(Pulse.iDevice).AmpDef;
+else
+  tFlipPi = HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec / HW.TX(Pulse.iDevice).AmpDef;
+end
+
+BlockLength = 1/Pulse.Bandwidth;
 
 gain = HW.TX(Pulse.iDevice).AmpDef * 2*tFlipPi * ...
-  (Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / (BlockLength/0.998);
+  (Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / BlockLength;
 
-if Pulse.MaxLength < BlockLength
-  error('MaxLength of rf pulse is too short.');
+if Pulse.MaxLength + 1/HW.TX(Pulse.iDevice).fSample < BlockLength
+  error('PD:Pulse_Rect_SolidEcho:MaxLengthTooShort', ...
+    'MaxLength of rf pulse is %.3f %cs too short.', ...
+    (BlockLength - Pulse.MaxLength)*1e6, char(181));
 end
 
 if Pulse.MaxNumberOfSegments < 3
   error('MaxNumberOfSegments must be at least 3.');
 end
 
+% pulseData.Start = [-2*Pulse.tauSolid; -Pulse.tauSolid] + Center - BlockLength/2;
+% pulseData.Duration = [BlockLength; BlockLength];
 pulseData.Start = [-2*Pulse.tauSolid; -2*Pulse.tauSolid+BlockLength; -Pulse.tauSolid] + ...
   Center - BlockLength/2;
 pulseData.Duration = [diff(pulseData.Start); BlockLength];
@@ -140,5 +157,7 @@ pulseData.Duration(2) = [];
 pulseData.Amplitude = [gain; gain];
 pulseData.Frequency = zeros(size(pulseData.Start)) + Pulse.Frequency;
 pulseData.Phase = [0; Pulse.PhaseSolidInversionOffset] + Pulse.Phase;
+
+pulseData.tCenterOffset = Center - 3/2*Pulse.tauSolid;  % center of the RF pulses
 
 end

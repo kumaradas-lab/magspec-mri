@@ -7,7 +7,7 @@ function callbacks(this, varargin)
 %           The MathWorks Inc
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2016-2019 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2024 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -254,16 +254,7 @@ try
         set(s,'visible','on');
       end
     case 'isodelete'
-      [a, s] = getarrowslice();
-      hArrows = getappdata(gco, 'Arrows');
-      hArrows(hArrows == a) = [];
-      setappdata(gco, 'Arrows', hArrows);
-      cap = getappdata(s, 'sliceomaticisocap');
-      if ~isempty(cap)
-        delete(cap);
-      end
-      delete(s);
-      delete(a);
+      this.DeleteIso(gco());
     case 'isoflatlight'
       [a, s] = getarrowslice();
       set(s,'facelighting','flat');
@@ -394,12 +385,7 @@ try
       setappdata(s, 'contourlevels', levels);
       this.DrawLocalContour(s, getappdata(s, 'contour'), levels);
     case 'deleteslice'
-      [a, s] = getarrowslice();
-      if ~isempty(getappdata(s,'contour'))
-        delete(getappdata(s,'contour'));
-      end
-      delete(s);
-      delete(a);
+      this.DeleteSlice(gco());
     case 'deleteslicecontour'
       [a, s] = getarrowslice();
       if ~isempty(getappdata(s,'contour'))
@@ -617,8 +603,9 @@ try
     case 'colormap'
       str = get(gcbo(), 'String');
       val = str{get(gcbo(), 'Value')};
-      if strcmp(val, 'custom')
-        colormapeditor;
+      if ~isdeployed() && strcmp(val, 'custom')
+        % "colormapeditor" tool doesn't work if deployed
+        colormapeditor();
         % FIXME: Execution should wait until colormapeditor was closed.
         val = colormap(this.hAxes);
       else

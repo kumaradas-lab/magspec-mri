@@ -12,7 +12,7 @@ function varargout = GUI_NetworkAnalyzer(varargin)
 %   hf      handle to the figure of the Network Analyzer.
 %
 % ------------------------------------------------------------------------
-% (C) Copyright 2011-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2023 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------
 
@@ -387,7 +387,7 @@ while handles.Update || ...
         else
           handles.HW.TX(handles.iDevice).ChannelDef = 2;
         end
-        if ~isa(handles.HW, 'PD.HW')
+        if ~isa(handles.HW, 'PD.HWClass')
           HW = handles.HW;
           LoadCalcHW;
           handles.HW = HW;
@@ -396,14 +396,14 @@ while handles.Update || ...
         [handles.HW, handles.mySave] = Find_Frequency_Sweep(handles.HW, handles.mySave);
 
         handles.HW.TX(handles.iDevice).ChannelDef = ChannelDef;
-        if ~isa(handles.HW, 'PD.HW')
+        if ~isa(handles.HW, 'PD.HWClass')
           HW = handles.HW;
           LoadCalcHW;
           handles.HW = HW;
         end
 
         assignin('base', 'mySave', handles.mySave);
-        if ~isa(HW, 'PD.HW')
+        if ~isa(HW, 'PD.HWClass')
           assignin('base', 'HW', handles.HW);
         end
         figure(handles.figure_NetworkAnalyzer)
@@ -417,7 +417,7 @@ while handles.Update || ...
       end
     end
     handles.Seq.fSpan=str2double(get(handles.edit_fSpan, 'String'))*1e6;
-    if isnan(handles.Seq.fSpan);
+    if isnan(handles.Seq.fSpan)
       if isempty(handles.HW.Network.fSpan)
         handles.Seq.fSpan=1e6;
       else
@@ -426,7 +426,7 @@ while handles.Update || ...
       set(handles.edit_fSpan, 'String', num2str(handles.Seq.fSpan/1e6))
     end
     handles.Seq.fSteps=str2double(get(handles.edit_steps, 'String'));
-    if isnan(handles.Seq.fSteps);
+    if isnan(handles.Seq.fSteps)
       if isempty(handles.HW.Network.fSteps)
         handles.Seq.fSteps=101;
       else
@@ -435,7 +435,7 @@ while handles.Update || ...
       set(handles.edit_steps, 'String', num2str(handles.Seq.fSteps))
     end
     handles.Seq.TXPowerdBm=str2double(get(handles.edit_power, 'String'));
-    if isnan(handles.Seq.TXPowerdBm);
+    if isnan(handles.Seq.TXPowerdBm)
       if isempty(handles.HW.Network.TXPowerdBm)
         handles.Seq.TXPowerdBm=0;
       else
@@ -465,7 +465,7 @@ while handles.Update || ...
   guidata(hObject, handles);
   uipanel_cal_SelectionChangeFcn(hObject, eventdata, handles)
   if doCal && ~isempty(NetworkCal)
-    if evalin('base', 'exist(''HW'', ''var'')') && ~isa(handles.HW, 'PD.HW')
+    if evalin('base', 'exist(''HW'', ''var'')') && ~isa(handles.HW, 'PD.HWClass')
       HW = evalin('base', 'HW');
       HW.NetworkCal = NetworkCal;
       assignin('base', 'HW', HW);

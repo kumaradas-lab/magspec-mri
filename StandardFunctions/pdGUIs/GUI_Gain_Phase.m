@@ -282,7 +282,7 @@ if ~isfield(handles,'refreshPlot'); handles.refreshPlot=0; end
 if evalin('base', 'exist(''HW'', ''var'')')
     HW = evalin('base', 'HW');
 end
-if exist('HW', 'var') && isa(HW, 'PD.HW')
+if exist('HW', 'var') && isa(HW, 'PD.HWClass')
     if evalin('base', 'exist(''mySave'', ''var'')')
         mySave = evalin('base', 'mySave');
     end
@@ -323,7 +323,7 @@ while or(and(get(handles.checkbox2, 'Value'),get(handles.radiobutton2,'Value')),
         handles.HW.TX.BlankAQ=BlankAQtemp;
 
         handles.HW.tRepInit=0.05;
-        
+
 
     set(handles.radiobutton2,'Value',1)
     drawnow
@@ -348,10 +348,10 @@ function checkbox1_Callback(hObject, eventdata, handles)
         else
             set(handles.text10, 'String', 'kHz')
         end
-        if isfield(handles,'Seq') 
-            if isfield(handles.Seq,'TXAmp') 
-                if isfield(handles.Seq,'B1Amp2Str') 
-                    if isnan(str2double(get(handles.edit5, 'String'))); 
+        if isfield(handles,'Seq')
+            if isfield(handles.Seq,'TXAmp')
+                if isfield(handles.Seq,'B1Amp2Str')
+                    if isnan(str2double(get(handles.edit5, 'String')))
                         set(handles.edit5, 'String', ['def ', num2str(handles.Seq.TXAmp*handles.Seq.B1Amp2Str,'%3.6f')])
                     else
                         set(handles.edit5, 'String', num2str(handles.Seq.TXAmp*handles.Seq.B1Amp2Str,'%3.6f'))
@@ -398,11 +398,11 @@ end
 
 % --- Executes when selected object is changed in uipanel1.
 function uipanel1_SelectionChangeFcn(hObject, eventdata, handles)
-% hObject    handle to the selected object in uipanel1 
+% hObject    handle to the selected object in uipanel1
 % eventdata  structure with the following fields (see UIBUTTONGROUP)
-%	EventName: string 'SelectionChanged' (read only)
-%	OldValue: handle of the previously selected object or empty if none was selected
-%	NewValue: handle of the currently selected object
+%  EventName: string 'SelectionChanged' (read only)
+%  OldValue: handle of the previously selected object or empty if none was selected
+%  NewValue: handle of the currently selected object
 % handles    structure with handles and user data (see GUIDATA)
 
 % handles.Cal.Cal=~get(handles.radiobutton2,'Value');

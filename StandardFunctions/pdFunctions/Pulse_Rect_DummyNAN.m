@@ -3,7 +3,7 @@ function [pulseData] = Pulse_Rect_DummyNAN(HW, Center, Pulse, varargin)
 %
 %   pulseData = Pulse_Rect_DummyNAN(HW, Center, Pulse)
 % or:
-%   pulseData = Pulse_Rect_DummyNAN(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments,  MaxLength, Frequency, Phase)
+%   pulseData = Pulse_Rect_DummyNAN(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments, MaxLength, Frequency, Phase)
 % additionally:
 %   excitationAngleFactor = Pulse_Rect_DummyNAN(HW, 'Amp')
 %   bandwidthFactor = Pulse_Rect_DummyNAN(HW, 'Time')
@@ -57,7 +57,7 @@ function [pulseData] = Pulse_Rect_DummyNAN(HW, Center, Pulse, varargin)
 % the duration of the pulse to have the same bandwidth (FWHM) as a rect pulse.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2020 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2022 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -95,7 +95,13 @@ Pulse = set_EmptyField(Pulse, 'iDevice', 1);
 
 %% dummy rect pulse
 
-tFlipPi = HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec / HW.TX(Pulse.iDevice).AmpDef;
+% Use gamma that better matches the frequency of the pulse
+% FIXME: Could this be an issue with (very) off-center slice pulses?
+if abs(Pulse.Frequency - HW.fLarmorX) < abs(Pulse.Frequency - HW.fLarmor)
+  tFlipPi = pi/HW.GammaX / HW.TX(Pulse.iDevice).AmpDef;
+else
+  tFlipPi = HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec / HW.TX(Pulse.iDevice).AmpDef;
+end
 
 BlockLength = 1/Pulse.Bandwidth*0.999;
 

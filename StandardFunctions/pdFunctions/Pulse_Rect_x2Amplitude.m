@@ -1,5 +1,11 @@
 function [pulseData] = Pulse_Rect_x2Amplitude(HW, Center, BW, FlipAngle, maxpulseCount,  maxLength, Frequency, Phase)
-% create a rectangular RF pulse
+%% create a rectangular RF pulse
+%
+% ------------------------------------------------------------------------------
+% (C) Copyright 2019-2024 Pure Devices GmbH, Wuerzburg, Germany
+% www.pure-devices.com
+% ------------------------------------------------------------------------------
+
 % x=2 * 6/5/0.86;
 % x=2 * 12/9/0.86;
 x=2 * 12/9/0.86;
@@ -31,12 +37,14 @@ else
 
     tFlipPi=HW.TX.Amp2FlipPiIn1Sec/HW.TX.AmpDef;
 
-    BlockLength=x/BW*0.999;
+    BlockLength=x/BW;
 
-    gain=HW.TX.AmpDef*tFlipPi*(FlipAngle/pi)/(BlockLength/0.998);
+    gain=HW.TX.AmpDef*tFlipPi*(FlipAngle/pi)/BlockLength;
 
-    if maxLength<BlockLength;
-        error('maxLength of HF Pulse to short')
+    if maxLength + 1/HW.TX(Pulse.iDevice).fSample < BlockLength
+      error('PD:Pulse_Rect_x2Amplitude:MaxLengthTooShort', ...
+        'MaxLength of rf pulse is %.3f %cs too short.', ...
+        (BlockLength - maxLength)*1e6, char(181));
     end
 
     if maxpulseCount<1
@@ -51,8 +59,4 @@ else
 
 end
 
-
-%% ------------------------------------------------------------------------
-% (C) Copyright 2019-2020 Pure Devices GmbH, Wuerzburg, Germany
-% www.pure-devices.com
-%------------------------------------------------------------------------
+end

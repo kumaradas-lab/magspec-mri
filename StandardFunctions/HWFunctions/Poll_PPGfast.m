@@ -4,7 +4,7 @@ function Seq = Poll_PPGfast(Seq)
 %   Seq = Poll_PPGfast(Seq)
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2016-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -15,6 +15,7 @@ end
 %#function PD.Talker
 %#function PD.UnwindProtectGuard
 %#function check_GradientAmplifier
+%#function get_PowerMon
 %#function get_RuntimeFPGA
 %#function set_FanDutyCycle
 %#function sleep

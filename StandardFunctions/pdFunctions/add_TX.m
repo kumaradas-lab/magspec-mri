@@ -46,6 +46,23 @@ function TX = add_TX(TX1, TX2)
 %       doesn't match, a warning is issued and the device number from TX2 takes
 %       precedence.
 %
+%   BlankOffset
+%       Row vector (1 x tReps) with the offset time before rf pulses for the
+%       blanking signal on the Blk port. If the specified times in TX1 and TX2
+%       don't match, a warning is issued and the times from TX2 take precedence.
+%
+%   BlankPostset
+%       Row vector (1 x tReps) with the postset time after rf pulses for the
+%       blanking signal on the Blk port. If the specified times in TX1 and TX2
+%       don't match, a warning is issued and the times from TX2 take precedence.
+%
+%   Repeat
+%       Row vector (1 x tReps) specifying whether the actions from the previous
+%       tRep are repeated. This can be useful to reduce the number of commands
+%       in the pulse program. If the field is present in TX1 and TX2, the values
+%       are combined using an AND operation, i.e., both must be true or the
+%       combined value is false.
+%
 % All other input fields are ignored and discarded.
 %
 %
@@ -55,7 +72,7 @@ function TX = add_TX(TX1, TX2)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2013-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2013-2023 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -70,40 +87,124 @@ for t = 1:min(numel(TX1), numel(TX2))
   TX(t).Phase = TX(t).Start;
 
   % FIXME: Support "mixed" output channels.
-  if isfield(TX1(t), 'Channel')  TX(t).Channel = TX1(t).Channel;  end
-  if isfield(TX2(t), 'Channel')
-    if isfield(TX(t), 'Channel') && TX(t).Channel ~= TX2(t).Channel
+  TX(t).Channel = [];
+  if ~isemptyfield(TX1(t), 'Channel')
+    TX(t).Channel = TX1(t).Channel;
+  end
+  if ~isemptyfield(TX2(t), 'Channel')
+    if ~isemptyfield(TX(t), 'Channel') && TX(t).Channel ~= TX2(t).Channel
+      % FIXME: Should this better be an error?
       warning('PD:add_TX:ChannelDisagree', ...
         'The channel of merged TX structures must agree.');
     end
     TX(t).Channel = TX2(t).Channel;
   end
-  if isfield(TX1(t), 'Device'),  TX(t).Device = TX1(t).Device;  end
-  if isfield(TX2(t), 'Device')
-    if isfield(TX(t), 'Device') && TX(t).Device ~= TX2(t).Device
+
+  TX(t).Device = [];
+  if ~isemptyfield(TX1(t), 'Device')
+    TX(t).Device = TX1(t).Device;
+  end
+  if ~isemptyfield(TX2(t), 'Device')
+    if ~isemptyfield(TX(t), 'Device') && TX(t).Device ~= TX2(t).Device
+      % FIXME: Should this better be an error?
       warning('PD:add_TX:DeviceDisagree', ...
         'The device of merged TX structures must agree.');
     end
     TX(t).Device = TX2(t).Device;
   end
 
-  % FIXME: What about the fields "BlankOffset", "BlankPostset", "Repeat"?
 
   % expand to all tReps
   if size(TX1(t).Start, 2) == 1
     TX1(t).Start = TX1(t).Start * ones(1, max(size(TX2(t).Start,2),1));
+  end
+  if size(TX1(t).Duration, 2) == 1
     TX1(t).Duration = TX1(t).Duration * ones(1, max(size(TX2(t).Start,2),1));
+  end
+  if size(TX1(t).Amplitude, 2) == 1
     TX1(t).Amplitude = TX1(t).Amplitude * ones(1, max(size(TX2(t).Start,2),1));
+  end
+  if size(TX1(t).Frequency, 2) == 1
     TX1(t).Frequency = TX1(t).Frequency * ones(1, max(size(TX2(t).Start,2),1));
+  end
+  if size(TX1(t).Phase, 2) == 1
     TX1(t).Phase = TX1(t).Phase * ones(1, max(size(TX2(t).Start,2),1));
   end
+  if ~isemptyfield(TX1(t), 'BlankOffset') && size(TX1(t).BlankOffset, 2) == 1
+    TX1(t).BlankOffset = TX1(t).BlankOffset * ones(1, max(size(TX2(t).Start,2),1));
+  end
+  if ~isemptyfield(TX1(t), 'BlankPostset') && size(TX1(t).BlankPostset, 2) == 1
+    TX1(t).BlankPostset = TX1(t).BlankPostset * ones(1, max(size(TX2(t).Start,2),1));
+  end
+  if ~isemptyfield(TX1(t), 'Repeat') && size(TX1(t).Repeat, 2) == 1
+    TX1(t).Repeat = TX1(t).Repeat * ones(1, max(size(TX2(t).Start,2),1));
+  end
+
   if size(TX2(t).Start, 2) == 1
     TX2(t).Start = TX2(t).Start * ones(1, max(size(TX1(t).Start,2),1));
+  end
+  if size(TX2(t).Duration, 2) == 1
     TX2(t).Duration = TX2(t).Duration * ones(1, max(size(TX1(t).Start,2),1));
+  end
+  if size(TX2(t).Amplitude, 2) == 1
     TX2(t).Amplitude = TX2(t).Amplitude * ones(1, max(size(TX1(t).Start,2),1));
+  end
+  if size(TX2(t).Frequency, 2) == 1
     TX2(t).Frequency = TX2(t).Frequency * ones(1, max(size(TX1(t).Start,2),1));
+  end
+  if size(TX2(t).Phase, 2) == 1
     TX2(t).Phase = TX2(t).Phase * ones(1, max(size(TX1(t).Start,2),1));
   end
+  if ~isemptyfield(TX2(t), 'BlankOffset') && size(TX2(t).BlankOffset, 2) == 1
+    TX2(t).BlankOffset = TX2(t).BlankOffset * ones(1, max(size(TX1(t).Start,2),1));
+  end
+  if ~isemptyfield(TX2(t), 'BlankPostset') && size(TX2(t).BlankPostset, 2) == 1
+    TX2(t).BlankPostset = TX2(t).BlankPostset * ones(1, max(size(TX1(t).Start,2),1));
+  end
+  if ~isemptyfield(TX2(t), 'Repeat') && size(TX2(t).Repeat, 2) == 1
+    TX2(t).Repeat = TX2(t).Repeat * ones(1, max(size(TX1(t).Start,2),1));
+  end
+
+
+  % "combine" input that are specified per tRep
+  TX(t).BlankOffset = [];
+  if ~isemptyfield(TX1(t), 'BlankOffset')
+    TX(t).BlankOffset = TX1(t).BlankOffset;
+  end
+  if ~isemptyfield(TX2(t), 'BlankOffset')
+    if ~isemptyfield(TX(t), 'BlankOffset') ...
+        && any(TX(t).BlankOffset ~= TX2(t).BlankOffset)
+      % FIXME: Should this better be an error?
+      warning('PD:add_TX:BlankOffsetDisagree', ...
+        'The BlankOffset of merged TX structures must agree.');
+    end
+    TX(t).BlankOffset = TX2(t).BlankOffset;
+  end
+  TX(t).BlankPostset = [];
+  if ~isemptyfield(TX1(t), 'BlankPostset')
+    TX(t).BlankPostset = TX1(t).BlankPostset;
+  end
+  if ~isemptyfield(TX2(t), 'BlankPostset')
+    if ~isemptyfield(TX(t), 'BlankPostset') ...
+        && any(TX(t).BlankPostset ~= TX2(t).BlankPostset)
+      % FIXME: Should this better be an error?
+      warning('PD:add_TX:BlankPostsetDisagree', ...
+        'The BlankPostset of merged TX structures must agree.');
+    end
+    TX(t).BlankPostset = TX2(t).BlankPostset;
+  end
+  TX(t).Repeat = [];
+  if ~isemptyfield(TX1(t), 'Repeat')
+    TX(t).Repeat = TX1(t).Repeat;
+  end
+  if ~isemptyfield(TX2(t), 'Repeat')
+    if ~isemptyfield(TX(t), 'Repeat')
+      TX(t).Repeat = TX(t).Repeat & TX2(t).Repeat;
+    else
+      TX(t).Repeat = TX2(t).Repeat;
+    end
+  end
+
 
   % expand all fields to the number of rows of TX.Start
   if size(TX1(t).Duration, 1) == 1

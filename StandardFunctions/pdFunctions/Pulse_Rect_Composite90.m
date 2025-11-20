@@ -3,7 +3,7 @@ function [pulseData] = Pulse_Rect_Composite90(HW, Center, Pulse, varargin)
 %
 %   pulseData = Pulse_Rect_Composite90(HW, Center, Pulse)
 % or:
-%   pulseData = Pulse_Rect_Composite90(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments,  MaxLength, Frequency, Phase)
+%   pulseData = Pulse_Rect_Composite90(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments, MaxLength, Frequency, Phase)
 % additionally:
 %   excitationAngleFactor = Pulse_Rect_Composite90(HW, 'Amp')
 %   bandwidthFactor = Pulse_Rect_Composite90(HW, 'Time')
@@ -69,10 +69,10 @@ function [pulseData] = Pulse_Rect_Composite90(HW, Center, Pulse, varargin)
 % the same length. The "bandwidthFactor" is the factor that must be applied to
 % the duration of the pulse to have the same bandwidth (FWHM) as a rect pulse.
 %
-% ------------------------------------------------------------------------
-% (C) Copyright 2012-2021 Pure Devices GmbH, Wuerzburg, Germany
+% ------------------------------------------------------------------------------
+% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
-% ------------------------------------------------------------------------
+% ------------------------------------------------------------------------------
 
 %% Convert from syntax (2) to syntax (1)
 if nargin < 3, Pulse = []; end
@@ -110,15 +110,23 @@ if nargin == 2
 end
 
 %% "real" path
-tFlipPi = HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec/HW.TX(Pulse.iDevice).AmpDef;
+% Use gamma that better matches the frequency of the pulse
+% FIXME: Could this be an issue with (very) off-center slice pulses?
+if abs(Pulse.Frequency - HW.fLarmorX) < abs(Pulse.Frequency - HW.fLarmor)
+  tFlipPi = pi/HW.GammaX / HW.TX(Pulse.iDevice).AmpDef;
+else
+  tFlipPi = HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec / HW.TX(Pulse.iDevice).AmpDef;
+end
 
-BlockLength = 1/Pulse.Bandwidth*0.999;
+BlockLength = 1/Pulse.Bandwidth;
 
 gain = HW.TX(Pulse.iDevice).AmpDef * 2*tFlipPi * ...
-  (Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / (BlockLength/0.998);
+  (Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / BlockLength;
 
-if Pulse.MaxLength < BlockLength*sum(Pulse.FlipAngleComposite)/90
-  error('Pulse_Rect_Composite90: MaxLength of rf pulse is too short.');
+if Pulse.MaxLength + 1/HW.TX(Pulse.iDevice).fSample < BlockLength*sum(Pulse.FlipAngleComposite)/90
+  error('PD:Pulse_Rect_Composite90:MaxLengthTooShort', ...
+    'MaxLength of rf pulse is %.3f %cs too short.', ...
+    (BlockLength*sum(Pulse.FlipAngleComposite)/90 - Pulse.MaxLength)*1e6, char(181));
 end
 
 if Pulse.MaxNumberOfSegments < numel(Pulse.FlipAngleComposite)

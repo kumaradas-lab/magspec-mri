@@ -37,14 +37,23 @@ function sPPG = create_PPGfast(HW, hfpuls, hfacq, IOs, grad, tRep, CLTime, MixMo
 %         reset (phase reference)
 %
 %   settingsPPG
-%         structure with addtional settings for the PPG:
+%         structure with additional settings for the PPG:
 %     init
-%           logical to indicate if the initialization commands should be prepended
+%           logical to indicate if the initialization commands should be
+%           prepended to the pulse program
 %     iDevice
 %           index of the MMRT device the PPG applies to
 %     syncDevices
-%           logical to indicate that slave devices should start synchronized
-%           with the master device.
+%           logical to indicate that secondary devices should start synchronized
+%           with the primary device.
+%     tRepIsTriggered
+%           logical row vector to mark tReps which wait for an external trigger
+%           to start
+%     tRepTriggerDebounceTime
+%           row vector with debounce time of trigger in seconds
+%     auxCommands
+%           FPGA commands (64-bit unsigned integers) that are prepended to the
+%           commands for each respective tRep
 %
 %
 % OUTPUT:
@@ -53,12 +62,15 @@ function sPPG = create_PPGfast(HW, hfpuls, hfacq, IOs, grad, tRep, CLTime, MixMo
 %         .NET object with the compiled sequence (inside a Matlab wrapper)
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
 end
 
 
+%#function PD.MRISequence
 %#function PD.PPGWrapper
+%#function PD.SequenceCommands
+%#function hex2uint64
 

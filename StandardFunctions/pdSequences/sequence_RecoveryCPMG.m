@@ -29,7 +29,20 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %             (default: 90)
 %     refocusingAngle
 %             excitation angle of the (180 degrees) refocusing pulses in degrees
-%             (default: 180)
+%             (Default: HW.RecoveryCPMG.refocusingAngle or 180)
+%     refocusingPhase
+%             Phase of the refocusing pulse (relative to the excitation pulse)
+%             in degrees.
+%             (Default: HW.RecoveryCPMG.refocusingPhase or 90)
+%     refocusingPhaseOffset
+%             Additional phase offset of the refocusing pulses in degrees. This
+%             can be:
+%               * A scalar that applies to all refocusing pulses in the echo
+%                 train.
+%               * A vector of size 1xSeq.nEcho.
+%               * A string "alternateIncrement" in which case the refosing
+%                 direction alternates after each second pulse.
+%             (Default: 0)
 %     tExcitation
 %             duration of the excitation pulse in s. If this is set, the
 %             amplitude of the excitation pulse is set such that the pulse flips
@@ -72,7 +85,8 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %             estimated maximum value of the range of T2 times of the sample
 %             in s (default: Seq.T2Estimated*2)
 %     tEcho
-%             Echo time of the CPMG Echo train in s
+%             Echo time of the CPMG Echo train in s. The set value is increased
+%             to HW.RecoveryCPMG.tEchoMin if necessary.
 %             (default: Seq.T2EstimatedMin/2 but at least 8 times the refocusing
 %             pulse length)
 %     tEchoTrain
@@ -87,7 +101,7 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %             pulses and the acquisition windows is adapted such that the Echo
 %             time is an integer multiple of its period. This should only be
 %             used in conjunction with slice selection. (Default: false)
-%             The acutally used frequency is returned in SeqOut.fLarmor.
+%             The actually used frequency is returned in SeqOut.fLarmor.
 %             See also "get_fLarmorFitTotEcho".
 %     SteadyState_PreShots180
 %             Number of Echoes without acquisition window at beginning of each
@@ -103,7 +117,7 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %             (default: HW.RX.RiseTime or the value in
 %             HW.RecoveryCPMG.tAQEchoDelay)
 %     fSample
-%             sample rate of acquisition windows at Echoes in Hertz
+%             Sample rate of acquisition windows at Hahn echoes in Hertz
 %             (default: 500e3 or the value in HW.RecoveryCPMG.fSample)
 %     tAQFID
 %             Duration of the acquisition window after the excitation pulse in
@@ -117,6 +131,9 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %             acquisition window of the FID should start. If this time is too
 %             short, it is automatically extended to the lowest possible value.
 %             (default: 0)
+%     fSampleFID
+%             Sample rate of acquisition windows at FID (or solid echo) in Hertz
+%             (default: Seq.fSample or the value in HW.RecoveryCPMG.fSampleFID)
 %     AQFIDMean
 %             Boolean value. If true, the average of the acquired FID is used
 %             for the T2 fit. Otherwise, each sample of the FID is used
@@ -129,8 +146,9 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %     T1 SETTINGS:
 %     Recovery
 %             The type of the recovery experiment. Either 'Inversion' (180
-%             degree preparation pulse) or 'Saturation' (90 degree preparation
-%             pulse). (default: 'Inversion')
+%             degree preparation pulse), 'Saturation' (90 degree preparation
+%             pulse) or 'Decay' (e.g. Spin-Lock preparation).
+%             (default: 'Inversion')
 %     tRelax
 %             relaxation time after the CPMG Echo train in s
 %             (default: Seq.T1EstimatedMax*5)
@@ -178,10 +196,23 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %             if Seq.Tau1Log is false or
 %             logspace(log10(Seq.Tau1Start), log10(Seq.Tau1End), Seq.nTau1)
 %             if Seq.Tau1Log is true.
+%     tShiftPreparation
+%             Additional time between center of preparation pulse and center of
+%             excitation pulse in seconds. This time is *not* included in the
+%             evaluation of T1 which uses Tau1. This time can be used to account
+%             for durations during the preparation time during which the
+%             relevant magnetization doesn't change (e.g., while the spin-system
+%             is *not* aligned with B0 during the preparation time).
+%             (Default: 0)
 %     PulsePreparation
 %             Structure with settings for the pulse shape function of the
 %             preparation pulses. (See Seq.saturationPulse or Seq.inversionPulse
 %             above)
+%     tSaturation
+%             Duration of the saturation pulse in seconds. By default, the
+%             duration is such that its bandwidth matches the excitation pulse.
+%             This value is only used if Seq.Recovery is 'Saturation' or
+%             'Decay'.
 %     SpoilSaturation
 %             In case Seq.Recovery is set to 'Saturation', a spoiler gradient
 %             pulse can be used to reduce the influence of the excitation effect
@@ -199,6 +230,18 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %             If true, the data is supplied by the MRT early (packet end), i.e.
 %             at the end of the last acquisition window (of each average).
 %             (Default: Seq.tRelax > 1)
+%     Function_Prepare_Measurement
+%             A function handle to a prepare function with the following
+%             signature:
+%                   [HW, Seq, AQ, TX, Grad] = @(HW, Seq, AQ, TX, Grad)
+%             The function is called after the basic pulse program (without
+%             averages or phase cycling) is created. All elements have the
+%             sorting nActions x tReps x nTau1.
+%             It can be used to add more sophisticated preparations.
+%             Set Seq.T2Prepare.tRepsPrepare accordingly if the number of tReps
+%             used in the preparation is other than 1. Adjust Seq.tRep,
+%             Seq.tOffset, Seq.CLTime, Seq.DigitalIO, TX, AQ, and Grad
+%             accordingly.
 %
 %     EVALUATION SETTINGS:
 %     Plot
@@ -211,7 +254,8 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %             Boolean: fit T1 time to values of 1st Echo in each recovery
 %             (default: Seq.nTau1>2)
 %     PlotT1
-%             figure number for the T1 plot (default: 101)
+%             Figure number for the T1 plot. If set to 0, no figure is shown.
+%             (Default: 101)
 %     FitT2
 %             Boolean: fit T2 time of CPMG with FitT2AtTau1 (see below)
 %             (default: Seq.nEcho>3)
@@ -219,7 +263,11 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %             indices for the recovery times that are selected for T2 time fit
 %             (default: max(1,Seq.nTau1))
 %     PlotT2
-%             figure number for the T2 plot (default: 102)
+%             Figure number for the (first) T2 plot. If set to 0, no figure is
+%             shown. (Default: 90)
+%     PlotT1T2
+%             Figure number for the (first) plot with T1-T2-map data. If set to
+%             0, no figure is shown. (Default: 80)
 %     SubtractEmptyMeasurement
 %             Boolean: If true, the Echo amplitudes of an empty measurement are
 %             subtracted from the actual measurement. (default: false)
@@ -261,6 +309,53 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %             long enough, the slice gradient is turned off. (default: false)
 %     Slice.nRamp
 %             Number of steps in ramp. (default: 1)
+%
+%     AVERAGING SETTINGS:
+%     SeqAverage
+%             Structure with the following (optional) fields:
+%       average
+%               Number of times that the measurement for each preparation time
+%               is repeated. (default: 1)
+%       averageBreak
+%               Additional time in seconds after the block with a given
+%               preparation time was measured. (default: 0)
+%       SaveSeqAverageData
+%               Boolean value to indicate whether to sace data of all averages.
+%               (default: true)
+%       TXPhasePrepareIncrement
+%               Phase increment in degrees of preparation pulses (inversion or
+%               saturation). (default: [0, 0, 180, 0] if Seq.SeqAverage.average
+%               is a multiple of 4, 0 otherwise)
+%       TXPhaseExcitationIncrement
+%               Phase increment of excitation pulses (of CPMG) from one average
+%               to the next. (default: 180 for phase cycling)
+%       TXPhaseRefocusIncrement
+%               Phase increment of refocusing pulses (of CPMG) from one average
+%               to the next. (default: 0)
+%       AQPhaseIncrement
+%               Phase increment of acquisitions (at echoes of CPMG) from one
+%               average to the next.
+%               (default: Seq.SeqAverage.TXPhaseExcitationIncrement)
+%       RandomTXRXPhaseOffset
+%               Boolean value to indicate whether a random phase should be added
+%               to all rf pulses and acquisitions from one average to the next.
+%               (default: false)
+%       TXPhasePrepareOffset
+%               Additional phase offset of preparation pulses in degrees.
+%               (default: 0)
+%       TXPhaseExcitationOffset
+%               Additional phase offset of excitation pulses (of CPMG) in
+%               degrees. (default: 0)
+%       TXPhaseRefocusOffset
+%               Additional phase offset of refocusing pulses (of CPMG) in
+%               degrees. (default: 0)
+%       AQPhaseOffset
+%               Additional phase offset of acquisitions (at echoes of CPMG) in
+%               degrees. (default: 0)
+%       GetDataAfterAverages
+%               Collect the data that has been acquired so far immediately after
+%               the averages for a given preparation time are done.
+%
 %
 %     SAMPLE LIFT SETTINGS:
 %     Lift
@@ -315,6 +410,29 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %               Duration of damping signal after 90 degree excitation pulses
 %               in s (default: 9e-6)
 %
+%
+%     EXTERNAL POWER SUPPLY SETTINGS:
+%     PowerSupply
+%             Structure with settings for an external power supply that is used
+%             to power the slice gradient. The following fields can be used:
+%       EnableAnalogChannel
+%               Number of the digital output channel that is used to set the
+%               external power supply to analog remote control. If set to 0, no
+%               signal is emitted.
+%               (Default: HW.PowerSupply.EnableAnalogChannel if available, 0
+%               otherwise)
+%       EnableAnalogTOffset
+%               Offset time in seconds before ramping up the slice gradient when
+%               the enable analog control signal is switched on.
+%               (Default: HW.PowerSupply.EnableAnalogTOffset if available, 0
+%               otherwise)
+%       EnableAnalogTPostset
+%               Postset time in seconds after ramping down the slice gradient
+%               when the enable analog control signal is switched off.
+%               (Default: HW.PowerSupply.EnableAnalogTPostset if available, 0
+%               otherwise)
+%
+%
 %     FULL SCALE REFERENCE SETTINGS:
 %     MeasureFullScaleReference
 %             Use measurement as a reference for full scale
@@ -351,7 +469,7 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %           structure with updated fields
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012,2015-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012,2015-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -406,24 +524,10 @@ if Seq.PreProcessSequence
   if isemptyfield(Seq, 'excitationPulse'), Seq.excitationPulse = @Pulse_Rect_Slice; end % pulse shape function of 90 degree excitation pulse of CPMG
   if isemptyfield(Seq, 'inversionPulse'),  Seq.inversionPulse  = @Pulse_Rect_Slice; end % pulse shape function of inversion pulse before CPMG
   if isemptyfield(Seq, 'saturationPulse'), Seq.saturationPulse = @Pulse_Rect_Slice; end % pulse shape function of saturation pulse before
-  if isemptyfield(Seq, 'refocusingPulse'), Seq.refocusingPulse = @Pulse_Rect_Slice; end % pulse shape function of 180 degree refocusing pulse of CPMG
   if isemptyfield(Seq, 'excitationAngle'), Seq.excitationAngle = 90;              end % excitation angle of the excitation pulses in degrees
-  if isemptyfield(Seq, 'refocusingAngle'), Seq.refocusingAngle = 180;             end % excitation angle of the refocusing pulses in degrees
-  if ~isfield(Seq, 'tExcitation'),        Seq.tExcitation = [];                   end % duration of the excitation pulses in seconds
-  if isemptyfield(Seq, 'tRefocus'),       Seq.tRefocus = Seq.tExcitation;         end % duration of the refocusing pulses in seconds
-  if isempty(Seq.tRefocus)
-    if ~isempty(HW.RecoveryCPMG.tFlip180Def)
-      tFlip180Def = HW.RecoveryCPMG.tFlip180Def;
-    else
-      tFlip180Def = HW.tFlip180Def;
-    end
-
-    Seq.tRefocus = tFlip180Def * (Seq.refocusingAngle/180) * Seq.refocusingPulse(HW, 'Amp');
-
-    if ~isinf(Seq.thicknessSlice)
-      Seq.tRefocus = max(Seq.tRefocus, ...
-        1/Seq.MaxGradAmpSlice * Seq.refocusingPulse(HW, 'Time') / (HW.GammaDef/(2*pi) * Seq.thicknessSlice));
-    end
+  if ~isfield(Seq, 'tExcitation')
+    % duration of the excitation pulses in seconds
+    Seq.tExcitation = [];
   end
   if isemptyfield(Seq, 'tPreheatRfAmp'),  Seq.tPreheatRfAmp = 0;                  end % turn on the rf amplifier before the sequence for this time in s
 
@@ -438,22 +542,92 @@ if Seq.PreProcessSequence
   if isemptyfield(Seq, 'T2Estimated'),    Seq.T2Estimated   = 150e-3;             end % estimated T2 time of sample in s
   if isemptyfield(Seq, 'T2EstimatedMin'), Seq.T2EstimatedMin = Seq.T2Estimated/2; end % estimated minimum value of T2 values of sample in s
   if isemptyfield(Seq, 'T2EstimatedMax'), Seq.T2EstimatedMax = Seq.T2Estimated*2; end % estimated maximum value of T2 values of sample in s
-  if isemptyfield(Seq, 'tEcho'),  Seq.tEcho = min(8*Seq.tRefocus, Seq.T2EstimatedMin/3); end  % Echo time in s
+  if isemptyfield(Seq, 'refocusingPulse')
+    % pulse shape function of 180 degree refocusing pulse of CPMG
+    Seq.refocusingPulse = @Pulse_Rect_Slice;
+  end
+  if isemptyfield(Seq, 'refocusingAngle')
+    % excitation angle of the refocusing pulses in degrees
+    if isemptyfield(HW, {'RecoveryCPMG', 'refocusingAngle'})
+      Seq.refocusingAngle = 180;
+    else
+      Seq.refocusingAngle = HW.RecoveryCPMG.refocusingAngle;
+    end
+  end
+  if isemptyfield(Seq, 'tRefocus')
+    % duration of the refocusing pulses in seconds
+    Seq.tRefocus = Seq.tExcitation;
+  end
+  if isempty(Seq.tExcitation) && ~isemptyfield(HW, {'RecoveryCPMG', 'tFlip90Def'})
+    Seq.tExcitation = HW.RecoveryCPMG.tFlip90Def;
+  end
+  if isempty(Seq.tRefocus)
+    if ~isempty(HW.RecoveryCPMG.tFlip180Def)
+      tFlip180Def = HW.RecoveryCPMG.tFlip180Def;
+    else
+      tFlip180Def = HW.tFlip180Def;
+    end
+
+    Seq.tRefocus = tFlip180Def * (Seq.refocusingAngle/180) * Seq.refocusingPulse(HW, 'Amp');
+
+    if ~isinf(Seq.thicknessSlice)
+      Seq.tRefocus = max(Seq.tRefocus, ...
+        1/Seq.MaxGradAmpSlice * Seq.refocusingPulse(HW, 'Time') / (HW.GammaDef/(2*pi) * Seq.thicknessSlice));
+    end
+  end
+
+  if isemptyfield(Seq, 'tEcho'),  Seq.tEcho = max(8*Seq.tRefocus, Seq.T2EstimatedMin/3); end  % Echo time in s
+  if ~isemptyfield(HW, {'RecoveryCPMG', 'tEchoMin'}) && Seq.tEcho < HW.RecoveryCPMG.tEchoMin
+    warning('PD:sequence_RecoveryCPMG:tEchoShortened', ...
+      'Seq.tEcho (%.3f ms) has been increased to HW.RecoveryCPMG.tEchoMin (%.3f ms).', ...
+      Seq.tEcho*1e3, HW.RecoveryCPMG.tEchoMin*1e3);
+  end
   if isemptyfield(Seq, 'tEchoTrain'),     Seq.tEchoTrain    = Seq.T2EstimatedMax*3; end % total time of Echo train in s
   if isemptyfield(Seq, 'nEcho'),          Seq.nEcho         = round(Seq.tEchoTrain/Seq.tEcho);end % number of Echoes in CPMG
+
+  if isemptyfield(Seq, 'refocusingPhase')
+    if isemptyfield(HW, {'RecoveryCPMG', 'refocusingPhase'})
+      Seq.refocusingPhase = 90;
+    else
+      Seq.refocusingPhase = HW.RecoveryCPMG.refocusingPhase;
+    end
+  end
+  if isemptyfield(Seq, 'refocusingPhaseOffset')
+    Seq.refocusingPhaseOffset = 0;
+  end
+  if ischar(Seq.refocusingPhaseOffset)
+    switch Seq.refocusingPhaseOffset
+      case 'alternateIncrement'
+        Seq.refocusingPhaseOffset = mod(cumsum(90-90*(-1).^(1:Seq.nEcho)), 360);
+      otherwise
+        error('PD:sequence_RecoveryCPMG', ...
+          'Setting Seq.refocusingPhaseOffset to "%s" is not supported.', ...
+          Seq.refocusingPhaseOffset);
+    end
+  end
   if isemptyfield(Seq, 'FixfLarmorTotEcho'), Seq.FixfLarmorTotEcho = false;       end % adjust the Larmor frequency to the Echo time
   if Seq.thicknessSlice > 0.1 && Seq.FixfLarmorTotEcho
     warning('PD:sequence_RecoveryCPMG:NoSliceWithFixfLarmor', ...
       '"Seq.FixfLarmorTotEcho" should only be true if used in conjunction with a slice selection.');
   end
   if isemptyfield(Seq, 'SteadyState_PreShots180'), Seq.SteadyState_PreShots180 = 0; end % number of Echoes without AQ window at beginning of CPMG train
-  if isemptyfield(Seq, 'fSample') % sample rate of acquisition windows at Echoes
+  if isemptyfield(Seq, 'fSample') % sample rate of acquisition windows at echoes
     if ~isemptyfield(HW.RecoveryCPMG, 'fSample')
       Seq.fSample = HW.RecoveryCPMG.fSample;
     else
       Seq.fSample = 500e3; % min(1000e3, max(20e3, 20/Seq.tAQEcho));
     end
   end
+  Seq.fSample = 1/(round(HW.RX(iDevice).fSample/Seq.fSample)/HW.RX(iDevice).fSample);
+  if isemptyfield(Seq, 'fSampleFID') % sample rate of acquisition windows at FID (or solid echo)
+    if ~isemptyfield(HW.RecoveryCPMG, 'fSampleFID')
+      Seq.fSampleFID = HW.RecoveryCPMG.fSampleFID;
+    else
+      Seq.fSampleFID = Seq.fSample;
+    end
+  end
+  Seq.fSampleFID = 1/(round(HW.RX(iDevice).fSample/Seq.fSampleFID)/HW.RX(iDevice).fSample);
+
   if isemptyfield(Seq, 'tAQEchoDelay') % delays the acquisition windows in s
     if ~isemptyfield(HW.RecoveryCPMG, 'tAQEchoDelay')
       Seq.tAQEchoDelay = HW.RecoveryCPMG.tAQEchoDelay;
@@ -489,6 +663,12 @@ if Seq.PreProcessSequence
   end
 
   % T1 settings
+  if ~isemptyfield(Seq, 'Tau1')
+    % Seq.Tau1 has priority over other settings
+    Seq.Tau1Start = Seq.Tau1(1);
+    Seq.Tau1End = Seq.Tau1(end);
+    Seq.nTau1 = numel(Seq.Tau1);
+  end
   if isemptyfield(Seq, 'Recovery'),       Seq.Recovery      = 'Inversion';        end % type of recovery experiment, 'Inversion' or 'Saturation'
   if isemptyfield(Seq, 'T1Estimated'),    Seq.T1Estimated   = 200e-3;             end % estimated T1 time of sample in s
   if isemptyfield(Seq, 'T1EstimatedMin'), Seq.T1EstimatedMin = Seq.T1Estimated/3; end % estimated minimum value of T1 values of sample in s
@@ -522,6 +702,14 @@ if Seq.PreProcessSequence
     end
   end
 
+  if isemptyfield(Seq, 'tShiftPreparation')
+    % Additional preparation time that doesn't "count" for the magnetization.
+    % The same field name is used in `prepare_Recovery`.
+    Seq.tShiftPreparation = 0;
+  end
+
+  if ~isfield(Seq, 'Function_Prepare_Measurement'),  Seq.Function_Prepare_Measurement = [];  end
+
   if isemptyfield(Seq, 'GetDataEarly'),  Seq.GetDataEarly   = Seq.tRelax > 1;     end % early data
 
   % sequence plot settings
@@ -536,10 +724,18 @@ if Seq.PreProcessSequence
 
   % evaluation settings
   if isemptyfield(Seq, 'PlotT1'),         Seq.PlotT1        = 101;                end % figure number for the T1 plot
-  if isemptyfield(Seq, 'PlotT2'),         Seq.PlotT2        = 102;                end % figure number for the T2 plot
+  if isemptyfield(Seq, 'PlotT2'),         Seq.PlotT2        = 90;                 end % first figure number for the T2 plot
+  if isemptyfield(Seq, 'PlotT1T2'),       Seq.PlotT1T2      = 80;                 end % first figure number for the T1-T2 plots
   if isemptyfield(Seq, 'FitT1'),          Seq.FitT1         = Seq.nTau1>2;        end % Boolean: fit T1 time to values of 1st Echo in each recovery
   if isemptyfield(Seq, 'FitT2'),          Seq.FitT2         = Seq.nEcho>3;        end % Boolean: fit T2 time of CPMG with FitT2AtTau1 (see below)
-  if isemptyfield(Seq, 'FitT2AtTau1'),    Seq.FitT2AtTau1   = max(1,Seq.nTau1);   end % indices for the recovery times that are selected for T2 time fit
+  if isemptyfield(Seq, 'FitT2AtTau1')
+    % indices for the recovery times that are selected for T2 time fit
+    if strcmp(Seq.Recovery, 'Decay')
+      Seq.FitT2AtTau1 = 1;
+    else
+      Seq.FitT2AtTau1 = max(1, Seq.nTau1);
+    end
+  end
   if isemptyfield(Seq, 'intensityProfileEchoNum'), Seq.intensityProfileEchoNum = 1; end % indices of the Echoes that are selected for the lift intensity profile
   if isemptyfield(Seq, 'intensityProfileTau1'), Seq.intensityProfileTau1 = max(1,Seq.nTau1); end % indices for the recovery times that are selected for the lift intensity profile
   if isemptyfield(Seq, 'SubtractEmptyMeasurement'), Seq.SubtractEmptyMeasurement = false; end % Boolean: If true, the Echo amplitudes of an empty measurement are subtracted from the actual measurement
@@ -626,11 +822,13 @@ if Seq.PreProcessSequence
     if isemptyfield(fitExpT1, 'CorrectFrequencyDrift'), fitExpT1.CorrectFrequencyDrift = 1; end
     if isemptyfield(fitExpT1, 'CorrectFrequencyOffset'), fitExpT1.CorrectFrequencyOffset = 0; end
     if isemptyfield(fitExpT1, 'CorrectPhaseOffset'), fitExpT1.CorrectPhaseOffset = 1; end
-    if isemptyfield(fitExpT1, 'EndOffset'),   fitExpT1.EndOffset  = 1;            end
-    if isemptyfield(fitExpT1, 'hasFID'),      fitExpT1.hasFID     = 0;            end
-    if isemptyfield(fitExpT1, 'RingFilter'),  fitExpT1.RingFilter = fitExpCorr.RingFilter; end
-    if isemptyfield(fitExpT1, 'SingleExp'),   fitExpT1.SingleExp  = 1;            end
-    if isemptyfield(fitExpT1, 'DoubleExp'),   fitExpT1.DoubleExp  = 1;            end
+    if isemptyfield(fitExpT1, 'EndOffset')
+      fitExpT1.EndOffset = ~strcmp(Seq.Recovery, 'Decay');
+    end
+    if isemptyfield(fitExpT1, 'hasFID'),      fitExpT1.hasFID     = 0;  end
+    if isemptyfield(fitExpT1, 'RingFilter'),  fitExpT1.RingFilter = 0;  end
+    if isemptyfield(fitExpT1, 'SingleExp'),   fitExpT1.SingleExp  = 1;  end
+    if isemptyfield(fitExpT1, 'DoubleExp'),   fitExpT1.DoubleExp  = 1;  end
     Seq.fitExpT1 = fitExpT1;
   end
 
@@ -661,6 +859,17 @@ if Seq.PreProcessSequence
     error('PD:RecoveryCPMG:nRampNonInteger', '"Seq.Slice.nRamp" must be a positive integer.');
   end
 
+  if HW.Grad(iDevice).Inductance(HW.Grad(iDevice).Slice.channel) == 0 && ...
+      Seq.Slice.nRamp > 1
+    if ~isinf(Seq.thicknessSlice)
+      warning('PD:RecoveryCPMG:ZeroInductance', ...
+        ['Number of segments for gradient ramps is >1 (%d). ', ...
+        'But the inductance of the used gradient channel is 0. ', ...
+        'Using a linear ramp with a single segment.'], Seq.Slice.nRamp);
+    end
+    Seq.Slice.nRamp = 1;
+  end
+
   if ~isfield(Seq, 'Lift'), Seq.Lift = struct(); end
   if isemptyfield(Seq.Lift, 'useLift'),         Seq.Lift.useLift = false;         end % Boolean, move lift at end of sequence
   if isemptyfield(Seq.Lift, 'skipLift'),        Seq.Lift.skipLift = false;        end % Boolean, don't send digital IO signal for lift
@@ -670,8 +879,8 @@ if Seq.PreProcessSequence
   if isemptyfield(Seq.Lift, 'checkEncoder'),    Seq.Lift.checkEncoder = true;     end % check whether motor position and encoder position coincide
 
   if Seq.Lift.useLift && ...
-      ((isa(HW, 'PD.HW') && ~isa(HW.Lift, 'PD.SampleLift')) || ...
-      (~isa(HW, 'PD.HW') && (~isfield(HW, 'Lift') || ~isa(HW.Lift, 'PD.SampleLift'))))
+      ((isa(HW, 'PD.HWClass') && ~isa(HW.Lift, 'PD.SampleLift')) || ...
+      (~isa(HW, 'PD.HWClass') && (~isfield(HW, 'Lift') || ~isa(HW.Lift, 'PD.SampleLift'))))
     error('PD:sequence:NoSampleLift', 'Cannot use lift in sequence. It is not configured.');
   end
 
@@ -707,6 +916,41 @@ if Seq.PreProcessSequence
   end
 
 
+  % structure with settings for external power supply
+  if isemptyfield(Seq, 'PowerSupply'),  Seq.PowerSupply = struct(); end
+  if isemptyfield(Seq.PowerSupply, 'EnableAnalogChannel')
+    % digital output channel used for switching power supply to analog remote
+    % control
+    % 0 means signal is disabled
+    if (isstruct(HW.PowerSupply) && isemptyfield(HW.PowerSupply, 'EnableAnalogChannel')) || ...
+        isempty(HW.PowerSupply.EnableAnalogChannel)
+      Seq.PowerSupply.EnableAnalogChannel = 0;
+    else
+      Seq.PowerSupply.EnableAnalogChannel = HW.PowerSupply.EnableAnalogChannel;
+    end
+  end
+  if isemptyfield(Seq.PowerSupply, 'EnableAnalogTOffset')
+    % offset of the analog remote control signal before the slice gradient pulse
+    % in seconds
+    if (isstruct(HW.PowerSupply) && isemptyfield(HW.PowerSupply, 'EnableAnalogTOffset')) || ...
+        isempty(HW.PowerSupply.EnableAnalogTOffset)
+      Seq.PowerSupply.EnableAnalogTOffset = 0;
+    else
+      Seq.PowerSupply.EnableAnalogTOffset = HW.PowerSupply.EnableAnalogTOffset;
+    end
+  end
+  if isemptyfield(Seq.PowerSupply, 'EnableAnalogTPostset')
+    % postset of the analog remote control signal after the slice gradient pulse
+    % in seconds
+    if (isstruct(HW.PowerSupply) && isemptyfield(HW.PowerSupply, 'EnableAnalogTPostset')) || ...
+        isempty(HW.PowerSupply.EnableAnalogTPostset)
+      Seq.PowerSupply.EnableAnalogTPostset = 0;
+    else
+      Seq.PowerSupply.EnableAnalogTPostset = HW.PowerSupply.EnableAnalogTPostset;
+    end
+  end
+
+
   if Seq.nTau1 > 0
     Seq.Tau1SteadyState = Seq.Tau1Start + zeros(1, Seq.nTau1SteadyState);
     Seq.Tau1All = [Seq.Tau1SteadyState, Seq.Tau1];
@@ -739,7 +983,7 @@ if Seq.PreProcessSequence
   end
   if isemptyfield(Seq.SeqAverage, 'AQPhaseIncrement')
     % phase increment between averages of acquisition window at Echoes
-    Seq.SeqAverage.AQPhaseIncrement = 180;
+    Seq.SeqAverage.AQPhaseIncrement = Seq.SeqAverage.TXPhaseExcitationIncrement;
   end
   if isemptyfield(Seq.SeqAverage, 'RandomTXRXPhaseOffset')
     % Boolean: randomize TX pulse and acquisition phase (why?)
@@ -772,6 +1016,12 @@ if Seq.PreProcessSequence
       Seq.SeqAverage.AQPhaseOffset = repmat(Seq.SeqAverage.AQPhaseOffset, 1, Seq.SeqAverage.average/numel(Seq.SeqAverage.AQPhaseOffset));
     end
   end
+
+  if isemptyfield(Seq.SeqAverage, 'GetDataAfterAverages')
+    % collect data before starting the next preparation time
+    Seq.SeqAverage.GetDataAfterAverages = false;
+  end
+
   if isemptyfield(Seq, 'ResetDDSPhaseAtExcitation')
     % reset phase of transmission and acquisition at excitation pulse
     % (i.e. after preparation pulse)
@@ -781,9 +1031,9 @@ if Seq.PreProcessSequence
 
   % preliminary layout: [actions x CPMG x nTau1]
   Seq.tRep = repmat([zeros(1,Seq.nTau1>0), Seq.tEcho/2, repmat(Seq.tEcho,1,Seq.nEcho), Seq.tRelax], [1, 1, max(1,Seq.nTau1)+Seq.nTau1SteadyState]) + ...
-    reshape([Seq.Tau1All(:).'; zeros(1+Seq.nEcho+1, max(1,Seq.nTau1) + Seq.nTau1SteadyState)], [1, (Seq.nEcho+2+(Seq.nTau1>0)), (max(1,Seq.nTau1)+Seq.nTau1SteadyState)]);
+    reshape([Seq.Tau1All(:).'+Seq.tShiftPreparation; zeros(1+Seq.nEcho+1, max(1,Seq.nTau1) + Seq.nTau1SteadyState)], [1, (Seq.nEcho+2+(Seq.nTau1>0)), (max(1,Seq.nTau1)+Seq.nTau1SteadyState)]);
+  tRepsPerCMPG = size(Seq.tRep, 2);
   Seq.tOffset = zeros(size(Seq.tRep));
-  Seq.tOffset(:,(Seq.nTau1>0)+1,:) = Seq.tEcho;
 
   [Grad(1:HW.Grad(iDevice).n).Time] = deal(NaN);
   [Grad(1:HW.Grad(iDevice).n).Amp] = deal(0);
@@ -812,6 +1062,7 @@ if Seq.PreProcessSequence
   Seq.tRefocusBW = 1/(Seq.tRefocus) * Seq.refocusingPulse(HW, 'Time');
   if isempty(Seq.tExcitation)
     Seq.tExcitationBW = Seq.tRefocusBW / Seq.refocusingPulse(HW, 'Time') * Seq.excitationPulse(HW, 'Time');
+    Seq.tExcitation = 1/Seq.tExcitationBW * Seq.excitationPulse(HW, 'Time');
   else
     Seq.tExcitationBW = 1/Seq.tExcitation * Seq.excitationPulse(HW, 'Time');
   end
@@ -829,11 +1080,10 @@ if Seq.PreProcessSequence
   Seq.pulseExcitation = Seq.excitationPulse(HW, 0, PulseExcitation);
 
   PulseRefocus.Bandwidth = Seq.tRefocusBW;
-  PulseRefocus.FlipAngle = HW.tFlip180Def * (Seq.refocusingAngle/180*pi) / ...
-    (HW.TX(iDevice).Amp2FlipPiIn1Sec/HW.TX(iDevice).AmpDef);
+  PulseRefocus.FlipAngle = Seq.refocusingAngle/180*pi;
   PulseRefocus.MaxNumberOfSegments = 51;  % FIXME: Why?
   PulseRefocus.Frequency = AQ.Frequency(1);
-  PulseRefocus.Phase = 90;
+  PulseRefocus.Phase = Seq.refocusingPhase;
   PulseRefocus.iDevice = iDevice;
   Seq.pulseRefocus = Seq.refocusingPulse(HW, 0, PulseRefocus);
 
@@ -853,24 +1103,31 @@ if Seq.PreProcessSequence
     end
     switch Seq.Recovery
       case 'Inversion'
-        Seq.iLaplace2D.Recovery = 'Inversion';
+        if isemptyfield(Seq, {'iLaplace2D', 'Recovery'})
+          Seq.iLaplace2D.Recovery = 'Inversion';
+        end
         Seq.tInvert = Seq.tRefocus / Seq.refocusingPulse(HW, 'Amp') * Seq.inversionPulse(HW, 'Amp');
         if isemptyfield(Seq.PulsePreparation, 'Bandwidth')
           Seq.PulsePreparation.Bandwidth = 1/Seq.tInvert * Seq.inversionPulse(HW, 'Time');
         end
         if isemptyfield(Seq.PulsePreparation, 'FlipAngle')
-          Seq.PulsePreparation.FlipAngle = pi;
+          % default to flip angle of refocussing pulses
+          Seq.PulsePreparation.FlipAngle = Seq.refocusingAngle/180*pi;
         end
         if isemptyfield(Seq.PulsePreparation, 'Phase')
           Seq.PulsePreparation.Phase = 90;
         end
         Seq.pulsePrepare = Seq.inversionPulse(HW, 0, Seq.PulsePreparation);
 
-      case 'Saturation'
-        Seq.iLaplace2D.Recovery = 'Saturation';
-        Seq.tSaturat = 1/Seq.tExcitationBW * Seq.saturationPulse(HW, 'Amp');
+      case {'Saturation', 'Decay'}
+        if isemptyfield(Seq, {'iLaplace2D', 'Recovery'})
+          Seq.iLaplace2D.Recovery = 'Saturation';
+        end
+        if isemptyfield(Seq, 'tSaturation')
+          Seq.tSaturation = 1/Seq.tExcitationBW * Seq.saturationPulse(HW, 'Amp');
+        end
         if isemptyfield(Seq.PulsePreparation, 'Bandwidth')
-          Seq.PulsePreparation.Bandwidth = 1/Seq.tSaturat * Seq.saturationPulse(HW, 'Time');
+          Seq.PulsePreparation.Bandwidth = 1/Seq.tSaturation * Seq.saturationPulse(HW, 'Time');
         end
         if isemptyfield(Seq.PulsePreparation, 'FlipAngle')
           Seq.PulsePreparation.FlipAngle = pi/2;
@@ -886,8 +1143,8 @@ if Seq.PreProcessSequence
 
         if Seq.SpoilSaturation
           % spoil saturation pulse
-          if Seq.tSaturat/2 + HW.Grad(iDevice).tEC + Seq.tSaturationGrad + ...
-              HW.Grad(iDevice).tRamp + HW.Grad(iDevice).tEC + Seq.tSaturat/2 + 50e-6 ...
+          if Seq.tSaturation/2 + HW.Grad(iDevice).tEC + Seq.tSaturationGrad + ...
+              HW.Grad(iDevice).tRamp + HW.Grad(iDevice).tEC + Seq.tSaturation/2 + 50e-6 ...
               > Seq.Tau1Start
             error('increase Seq.Tau1Start or decrease Seq.tSaturationGrad');
           end
@@ -895,14 +1152,14 @@ if Seq.PreProcessSequence
             if ~isinf(Seq.thicknessSlice) && t == HW.Grad(iDevice).Channel2xyzB(HW.Grad(iDevice).Slice.channel)
               continue;
             end
-            Grad(t).Time = repmat(cumsum([Seq.tSaturat/2+HW.Grad(iDevice).tEC; HW.Grad(iDevice).tRamp; Seq.tSaturationGrad-HW.Grad(iDevice).tRamp*1; HW.Grad(iDevice).tRamp])*[1,nan(1,1+Seq.nEcho+1)], ...
-              1, Seq.nTau1*Seq.SeqAverage.average + Seq.nTau1SteadyState);
-            Grad(t).Amp = repmat(Seq.AmpSaturationGrad*[0;1;1;0;]*[1,zeros(1,1+Seq.nEcho+1)], 1, Seq.nTau1*Seq.SeqAverage.average+Seq.nTau1SteadyState);
-            Grad(t).Repeat = repmat([0, 0, ones(1, Seq.nEcho+1)], [1, Seq.nTau1*Seq.SeqAverage.average+Seq.nTau1SteadyState]);
+            Grad(t).Time = repmat(cumsum([Seq.tSaturation/2+HW.Grad(iDevice).tEC; HW.Grad(iDevice).tRamp; Seq.tSaturationGrad-HW.Grad(iDevice).tRamp*1; HW.Grad(iDevice).tRamp])*[1,nan(1,1+Seq.nEcho+1)], ...
+              1, 1, Seq.nTau1 + Seq.nTau1SteadyState);
+            Grad(t).Amp = repmat(Seq.AmpSaturationGrad*[0;1;1;0;]*[1,zeros(1,1+Seq.nEcho+1)], 1, 1, Seq.nTau1+Seq.nTau1SteadyState);
+            Grad(t).Repeat = repmat([0, 0, ones(1, Seq.nEcho+1)], [1, 1, Seq.nTau1+Seq.nTau1SteadyState]);
           end
         end
       otherwise
-        error('Please set Seq.Recovery to ''Inversion'' or ''Saturation''!');
+        error('Please set Seq.Recovery to ''Inversion'', ''Saturation'', or ''Decay''!');
     end
   else
     Seq.pulsePrepare.Start = [];
@@ -917,7 +1174,7 @@ if Seq.PreProcessSequence
 
   % FIXME: Seq.TXPhaseOffset wird wohl in der eigentlichen Sequenz nicht
   % auf TX angewendet (only as a default for AQ).
-  if numel(Seq.TXPhaseOffset) == 1
+  if isscalar(Seq.TXPhaseOffset)
     Seq.TXPhaseOffset = repmat(Seq.TXPhaseOffset,1,numel(Seq.tRep));
     TX.Repeat = repmat([zeros(1, Seq.nTau1>0), 0, zeros(1, Seq.nEcho>1), ones(1,max(0,Seq.nEcho-1)),0], [1, 1, max(1,Seq.nTau1)+Seq.nTau1SteadyState]);
   end
@@ -965,7 +1222,7 @@ if Seq.PreProcessSequence
   TX.Duration(1:size(Seq.pulseRefocus.Start,1),(Seq.nTau1>0)+1+(1:Seq.nEcho)) = repmat(Seq.pulseRefocus.Duration, 1, Seq.nEcho);
   TX.Amplitude(1:size(Seq.pulseRefocus.Start,1),(Seq.nTau1>0)+1+(1:Seq.nEcho)) = repmat(Seq.pulseRefocus.Amplitude, 1, Seq.nEcho);
   TX.Frequency(1:size(Seq.pulseRefocus.Start,1),(Seq.nTau1>0)+1+(1:Seq.nEcho)) = repmat(Seq.pulseRefocus.Frequency, 1, Seq.nEcho);
-  TX.Phase(1:size(Seq.pulseRefocus.Start,1),(Seq.nTau1>0)+1+(1:Seq.nEcho)) = repmat(Seq.pulseRefocus.Phase, 1, Seq.nEcho);
+  TX.Phase(1:size(Seq.pulseRefocus.Start,1),(Seq.nTau1>0)+1+(1:Seq.nEcho)) = repmat(Seq.pulseRefocus.Phase, 1, Seq.nEcho) + Seq.refocusingPhaseOffset;
 
   % sort tRep with excitation pulse
   [TX.Start(:,(Seq.nTau1>0)+2), idx] = sort(TX.Start(:,(Seq.nTau1>0)+2));
@@ -1052,7 +1309,7 @@ if Seq.PreProcessSequence
 
   %% AQ
   Seq.tAQEchoDelay = round(Seq.tAQEchoDelay.*HW.RX(iDevice).fSample)/HW.RX(iDevice).fSample;
-  AQ.fSample = 1/(round(HW.RX(iDevice).fSample/Seq.fSample)/HW.RX(iDevice).fSample);
+  AQ.fSample = Seq.fSample;
   AQ.nSamples = round(Seq.tAQEcho*AQ.fSample);
   if AQ.nSamples==0, AQ.nSamples = 1; end
   Seq.nSampleAQEcho = AQ.nSamples;
@@ -1063,14 +1320,18 @@ if Seq.PreProcessSequence
     AQ.Start(2,:) = NaN;
     AQ.Start(2,(Seq.nTau1>0)+2) = AQ.Start(1,(Seq.nTau1>0)+2);
 
-    AQ.Start(1,(Seq.nTau1>0)+2) = ...
-      max(Seq.tAQFIDStart, ...
-          Seq.pulseExcitation.Start(end,(Seq.nTau1>0)+1) + ...
-          Seq.pulseExcitation.Duration(end,(Seq.nTau1>0)+1) + ...
-          4/AQ.fSample(1)) ...
-      - Seq.tRep((Seq.nTau1>0)+1);
+    if isempty(Seq.pulseExcitation.Start)
+      AQ.Start(1,(Seq.nTau1>0)+2) = Seq.tAQFIDStart - Seq.tRep((Seq.nTau1>0)+1);
+    else
+      AQ.Start(1,(Seq.nTau1>0)+2) = ...
+        max(Seq.tAQFIDStart, ...
+            Seq.pulseExcitation.Start(end,min(end,(Seq.nTau1>0)+1)) + ...
+            Seq.pulseExcitation.Duration(end,min(end,(Seq.nTau1>0)+1)) + ...
+            get_DeadTimeTX2RX(HW, Seq.fSampleFID)) ...
+        - Seq.tRep((Seq.nTau1>0)+1);
+    end
   end
-  if numel(Seq.AQPhaseOffset) == 1
+  if isscalar(Seq.AQPhaseOffset)
     Seq.AQPhaseOffset = repmat(Seq.AQPhaseOffset, ...
       [size(AQ.Start, 1), size(Seq.tRep, 2), size(Seq.tRep, 3)]);
     % AQ.Repeat = repmat([zeros(1,Seq.nTau1>0),0,zeros(1,double(Seq.nEcho>1)),ones(1,max(0,Seq.nEcho-1)),0], 1, max(1,Seq.nTau1)+Seq.nTau1SteadyState);
@@ -1085,7 +1346,11 @@ if Seq.PreProcessSequence
     end
   end
   if isinf(Seq.tAQFID)
-    Seq.tAQFID = Seq.pulseRefocus.Start - AQ.Start(1,(Seq.nTau1>0)+2) - get_DeadTimeRX2TX(HW, AQ.fSample(1));
+    Seq.tAQFID = Seq.pulseRefocus.Start(1) - AQ.Start(1,(Seq.nTau1>0)+2) - get_DeadTimeRX2TX(HW, AQ.fSample(1));
+    if Seq.tAQFID < 1/AQ.fSample(1)
+      error('PD:sequence_RecoveryCPMG:NoAQFID', ...
+        'tEcho too short or rf pulses too long to acquire FID (or solid echo).');
+    end
   end
   % several CPMG Echo trains
   AQ.Start = cat(3, repmat(AQ.Start, [1, 1, Seq.nTau1SteadyState])*nan, ...
@@ -1095,11 +1360,14 @@ if Seq.PreProcessSequence
   if AQ.nSamples==0, AQ.nSamples = 1; end
   Seq.nSampleAQEcho = AQ.nSamples;
   if Seq.ResetDDSPhaseAtExcitation
-    % reset phase of transmission and acquisition at excitation pulse
-    % (i.e. after preparation pulse)
-    % FIXME: It would be nice if we could reset the phases at the *center* of
-    %        the excitation pulse (instead of the start of a tRep).
+    % Reset phase of transmission and acquisition at excitation pulse
+    % (i.e. after the preparation pulse). This makes sure that the absolute
+    % phase of the excitation and inversion pulses are the same for the phase
+    % cycle and averaging (even if the preparation time increases).
     AQ.ResetPhases = repmat([0, 1, zeros(1,(Seq.nTau1>0)+Seq.nEcho)], 1, 1, max(1, Seq.nTau1)+Seq.nTau1SteadyState);
+
+    % FIXME: Do we care about the absolute phase of the preparation pulse(s)?
+    % AQ.ResetPhases(1,1,:) = 1;
   else
     AQ.ResetPhases = repmat([1, 0, zeros(1,(Seq.nTau1>0)+Seq.nEcho)], 1, 1, max(1, Seq.nTau1)+Seq.nTau1SteadyState);
   end
@@ -1108,7 +1376,8 @@ if Seq.PreProcessSequence
   AQ.Frequency= AQ.Frequency + zeros(size(AQ.Start));
   AQ.nSamples = AQ.nSamples + zeros(size(AQ.Start));
   if Seq.tAQFID >= 0
-    Seq.nSampleAQFID = round((Seq.tAQFID)*AQ.fSample(1,(Seq.nTau1>0)+1,:));
+    AQ.fSample(1,(Seq.nTau1>0)+2,:) = Seq.fSampleFID;
+    Seq.nSampleAQFID = round((Seq.tAQFID)*AQ.fSample(1,(Seq.nTau1>0)+2,:));
     if Seq.nSampleAQFID==0, Seq.nSampleAQFID = 1; end
     AQ.nSamples(1,(Seq.nTau1>0)+2,:) = Seq.nSampleAQFID;
   else
@@ -1119,10 +1388,32 @@ if Seq.PreProcessSequence
   %% Command load time
   if isempty(Seq.CLTime)
     Seq.CLTime = repmat([3e-6*ones(1,Seq.nTau1>0),3e-6,1.448e-6,0400e-9+zeros(1,Seq.nEcho)], 1, 1, max(1, Seq.nTau1)+Seq.nTau1SteadyState);
-  elseif numel(Seq.CLTime) == 1
+  elseif isscalar(Seq.CLTime)
     % use uniform command load time at all tReps
     Seq.CLTime = Seq.CLTime + zeros(size(AQ.Start));
   end
+
+  % Set minimum tOffset of tRep that originally contained the excitation pulse
+  % so that it can be "consumed" by tOffset of the subsequent tRep (that now
+  % contains the excitation pulse).
+  if isemptyfield(TX, 'BlankOffset'), TX.BlankOffset = HW.TX(iDevice).BlankOffset; end
+  if isempty(Seq.pulseExcitation.Start)
+    % excitation pulse was removed
+    % Allow a negative tOffset so that this tRep can be "consumed" by the
+    % *preceding* one (e.g., for spin-lock pulse).
+    % FIXME: What would be the "best" compromise to allow the preceding and the
+    % subsequent tRep to "overlap" into this tRep?
+    pulseExcitationStart = -Seq.tEcho/2 + 8e-6;  % Why 8 us???
+    if Seq.nTau1 > 0
+      pulsePreparationEnd = max(Seq.pulsePrepare.Start(:,1)+Seq.pulsePrepare.Duration(:,1), [], 'omitnan');
+      pulseExcitationStart = pulseExcitationStart + (pulsePreparationEnd - Seq.tRep(1));
+    end
+  else
+    pulseExcitationStart = Seq.pulseExcitation.Start(1) - Seq.tEcho/2;
+  end
+  Seq.tOffset(:,(Seq.nTau1>0)+1,:) = max(Seq.tOffset(:,(Seq.nTau1>0)+1,:), ...
+    -Seq.tRep(:,(Seq.nTau1>0)+1,:) - pulseExcitationStart + ...
+    sum(Seq.CLTime(:,(Seq.nTau1>0)+1:2,:),2) + TX.BlankOffset + 100/HW.MMRT(iDevice).fSystem);
 
 
   %% Grad
@@ -1136,16 +1427,61 @@ if Seq.PreProcessSequence
     gradAmp = Seq.tRefocusBW/(HW.GammaDef/(2*pi) * Seq.thicknessSlice);
     maxAmp = HW.Grad(iDevice).MaxAmp(HW.Grad(iDevice).Channel2xyzB(HW.Grad(iDevice).Slice.channel));
     if gradAmp > maxAmp
-      error('Slice gradient amplitude too high.');
+      error('PD:sequence_RecoveryCPMG:sliceAmplitudeTooHigh', ...
+        'Slice gradient amplitude (%.3f mT/m) too high (max. %.3f mT/m).', ...
+        gradAmp*1e3, maxAmp*1e3);
     end
 
-    % calculate amplitude for steps
-    C = (1-gradAmp/maxAmp)^(1/Seq.Slice.nRamp)/(1-(1-gradAmp/maxAmp)^(1/Seq.Slice.nRamp));
+    if Seq.PowerSupply.EnableAnalogChannel > 0
+      % set function that configures the external power supply with USB commands
 
-    gradAmpStep = zeros(Seq.Slice.nRamp+1, 1);
-    for n=1:Seq.Slice.nRamp
-      gradAmpStep(n+1) = (maxAmp + C*gradAmpStep(n))/(1+C);
+      % keep previous Seq.PreStartPPGFcn
+      if isemptyfield(Seq, 'PreStartPPGFcn')
+        oldPreStartPPGFcn = [];
+      else
+        oldPreStartPPGFcn = Seq.PreStartPPGFcn;
+      end
+
+      Seq.PreStartPPGFcn = @(sq,nn) SetPowerSupplyAmp(sq,nn, oldPreStartPPGFcn, HW, gradAmp);
     end
+
+    % model for continuous current at constant driving voltage
+    % % Calculate the amplitude that would be reached after infinite time with
+    % % constant driving voltage where the desired amplitude is reached after
+    % % HW.Grad(iDevice).Slice.tRamp.
+    % % IEff = Igrad / (1 - exp(-R/L*tRamp))
+    % ampEff = gradAmp / ...
+    %   (1 - exp(-HW.Grad(iDevice).LoadRin(HW.Grad(iDevice).Slice.channel) / ...
+    %             HW.Grad(iDevice).Inductance(HW.Grad(iDevice).Slice.channel) * ...
+    %             HW.Grad(iDevice).Slice.tRamp));
+    %
+    % % calculate amplitude for steps
+    % C = (1-gradAmp/ampEff)^(1/Seq.Slice.nRamp)/(1-(1-gradAmp/ampEff)^(1/Seq.Slice.nRamp));
+    %
+    % gradAmpStep = zeros(Seq.Slice.nRamp+1, 1);
+    % for n = 1:Seq.Slice.nRamp
+    %   gradAmpStep(n+1) = (ampEff + C*gradAmpStep(n))/(1+C);
+    % end
+
+    % Model for discretized linear slopes where the voltage at the end of each
+    % segment is the same as at the end of the previous segment.
+    % V[n] = sum_(m=1)^(n) (delta_I[n]) * R  + L*delta_I[n]/delta_t
+    % V[n] = V[n-1]
+    % => delta_I[n] = delta_I[1] / (R/L*delta_t + 1)^(n-1)
+    % I[n] = I[1] * sum_(m=0)^(n) (1/(R/L*delta_t + 1)^m)
+    %   X = 1/(R/L*delta_t + 1):
+    % I[n] = I[1] * (1-X^n)/(1-X)
+    % => for n=nRamp (I[nRamp] = Igrad)
+    % I[1] = Igrad * (1-X)/(1-X^nRamp)
+    X = 1 / ...
+      (HW.Grad(iDevice).LoadRin(HW.Grad(iDevice).Slice.channel) / ...
+       HW.Grad(iDevice).Inductance(HW.Grad(iDevice).Slice.channel) * ...
+       HW.Grad(iDevice).Slice.tRamp/Seq.Slice.nRamp + 1);
+    amp1 = gradAmp / ( (1 - X^Seq.Slice.nRamp) / (1 - X) );
+    gradAmpStep = [0; amp1*(1-X.^(1:Seq.Slice.nRamp).')/(1-X)];
+
+    % FIXME: Do we need a different calculation for a "best" shape for ramping
+    % down?
 
     % Check if time between CPMGs is long enough for Seq.Slice.offBetweenCPMG
     minIETime = 1.5*HW.Grad(iDevice).Slice.tRamp + HW.Grad(iDevice).Slice.tEC + Seq.CLTime(numtRepRelax:numtRepRelax:end);
@@ -1160,6 +1496,11 @@ if Seq.PreProcessSequence
     GradSlice.Repeat = ones(1, size(AQ.Start, 2), size(AQ.Start, 3));
     GradSlice.Amp = GradSlice.Time;
 
+    if Seq.PowerSupply.EnableAnalogChannel > 0
+      DigiPS.SetTime = nan(2, size(AQ.Start, 2), size(AQ.Start, 3));
+      DigiPS.SetValue = DigiPS.SetTime;
+    end
+
     % ramp up
     if Seq.Slice.offBetweenCPMG
       GradSlice.Time(1:(1+Seq.Slice.nRamp),1,:) = repmat(linspace(-HW.Grad(iDevice).Slice.tRamp, 0, Seq.Slice.nRamp+1), 1, 1, size(GradSlice.Time, 3)) - HW.Grad(iDevice).Slice.tEC;
@@ -1170,6 +1511,10 @@ if Seq.PreProcessSequence
       end
       GradSlice.Amp(1:(1+Seq.Slice.nRamp),1,:) = repmat(gradAmpStep, 1, 1, size(GradSlice.Amp, 3));
       GradSlice.Repeat(1,1,:) = 0;
+      if Seq.PowerSupply.EnableAnalogChannel > 0
+        DigiPS.SetTime(1,1,:) = GradSlice.Time(1,1,:) - Seq.PowerSupply.EnableAnalogTOffset;
+        DigiPS.SetValue(1,1,:) = 2^(Seq.PowerSupply.EnableAnalogChannel-1);
+      end
     else
       GradSlice.Time(1:(1+Seq.Slice.nRamp),1) = linspace(-HW.Grad(iDevice).Slice.tRamp, 0, Seq.Slice.nRamp+1) - HW.Grad(iDevice).Slice.tEC;
       if Seq.nTau1 > 0
@@ -1179,6 +1524,10 @@ if Seq.PreProcessSequence
       end
       GradSlice.Amp(1:(1+Seq.Slice.nRamp),1) = gradAmpStep;
       GradSlice.Repeat(1) = 0;
+      if Seq.PowerSupply.EnableAnalogChannel > 0
+        DigiPS.SetTime(1,1) = GradSlice.Time(1,1) - Seq.PowerSupply.EnableAnalogTOffset;
+        DigiPS.SetValue(1,1) = 2^(Seq.PowerSupply.EnableAnalogChannel-1);
+      end
     end
 
     if Seq.nTau1 > 0 && Seq.Slice.offAfterPreparation
@@ -1194,6 +1543,15 @@ if Seq.PreProcessSequence
          - HW.Grad(iDevice).Slice.tEC + Seq.pulseExcitation.Start(1);
       GradSlice.Amp(1:(1+Seq.Slice.nRamp),2,selectedTau1) = repmat(gradAmpStep, 1, 1, sum(selectedTau1));
       GradSlice.Repeat(1,1:(1+Seq.Slice.nRamp),selectedTau1) = 0;
+      if Seq.PowerSupply.EnableAnalogChannel > 0
+        selectedTau1PSPrep = Seq.tRep(1,1,:) - (Seq.pulsePrepare.Start(1) + sum(Seq.pulsePrepare.Duration)) + Seq.pulseExcitation.Start(1) ...
+          > 2*HW.Grad(iDevice).Slice.tRamp + HW.Grad(iDevice).Slice.tEC + Seq.CLTime(1,1,:) + HW.Grad(iDevice).TimeDelay(HW.Grad(iDevice).Slice.channel) ...
+          + Seq.PowerSupply.EnableAnalogTPostset + Seq.PowerSupply.EnableAnalogTOffset;
+        DigiPS.SetTime(2,1,selectedTau1PSPrep) = GradSlice.Time(2*(1+Seq.Slice.nRamp),1) + Seq.PowerSupply.EnableAnalogTPostset;
+        DigiPS.SetValue(2,1,selectedTau1PSPrep) = 0;
+        DigiPS.SetTime(1,2,selectedTau1PSPrep) = GradSlice.Time(1,1) - Seq.PowerSupply.EnableAnalogTOffset;
+        DigiPS.SetValue(1,2,selectedTau1PSPrep) = 2^(Seq.PowerSupply.EnableAnalogChannel-1);
+      end
     else
       selectedTau1 = false(1, 1, size(Seq.tRep, 3));
     end
@@ -1216,16 +1574,27 @@ if Seq.PreProcessSequence
         1, 1, size(GradSlice.Time, 3)) + HW.Grad(iDevice).TimeDelay(HW.Grad(iDevice).Slice.channel);
       GradSlice.Amp(1:(1+Seq.Slice.nRamp),end,:) = repmat(gradAmp-gradAmpStep, 1, 1, size(GradSlice.Amp, 3));
       GradSlice.Repeat(1,end,:) = 0;
+      if Seq.PowerSupply.EnableAnalogChannel > 0
+        DigiPS.SetTime(1,end,:) = GradSlice.Time(1+Seq.Slice.nRamp,end,:) + Seq.PowerSupply.EnableAnalogTPostset;
+        DigiPS.SetValue(1,end,:) = 0;
+        crossingTau1PS = Seq.tRep(1,end,:) + DigiPS.SetTime(1,1,:) ...
+          <= DigiPS.SetTime(1,end,:);
+      end
     else
       GradSlice.Time(1:(1+Seq.Slice.nRamp),end) = linspace(0, HW.Grad(iDevice).Slice.tRamp/2, Seq.Slice.nRamp+1) + ...
         HW.Grad(iDevice).TimeDelay(HW.Grad(iDevice).Slice.channel);
       GradSlice.Amp(1:(1+Seq.Slice.nRamp),end) = gradAmp-gradAmpStep;
       GradSlice.Repeat(end) = 0;
+      if Seq.PowerSupply.EnableAnalogChannel > 0
+        DigiPS.SetTime(1,end,end) = GradSlice.Time(1+Seq.Slice.nRamp,end) + Seq.PowerSupply.EnableAnalogTPostset;
+        DigiPS.SetValue(1,end,end) = 0;
+        crossingTau1PS = false(1,1,size(DigiPS.SetTime,3));
+      end
     end
 
     % FIXME: This might overwrite previously set gradients. Might be a non-issue
     % if the slice gradient is on a different channel than the imaging gradients.
-    if numel(Grad(HW.Grad(iDevice).Channel2xyzB(HW.Grad(iDevice).Slice.channel)).Time) == 1 && ...
+    if isscalar(Grad(HW.Grad(iDevice).Channel2xyzB(HW.Grad(iDevice).Slice.channel)).Time) && ...
         isnan(Grad(HW.Grad(iDevice).Channel2xyzB(HW.Grad(iDevice).Slice.channel)).Time)
       Grad(HW.Grad(iDevice).Channel2xyzB(HW.Grad(iDevice).Slice.channel)).Time = GradSlice.Time;
       Grad(HW.Grad(iDevice).Channel2xyzB(HW.Grad(iDevice).Slice.channel)).Amp = GradSlice.Amp;
@@ -1238,14 +1607,40 @@ if Seq.PreProcessSequence
   end
 
 
+  if Seq.ResetDDSPhaseAtExcitation && ~isemptyfield(Seq.pulseExcitation, 'tCenterOffset')
+    % If the pulse shape function returned a value for the center of the rf
+    % pulses (e.g., Pulse_Rect_SolidEcho), move the phase reference of the DDS
+    % to that time.
+
+    % FIXME: Would we like to move the reference point for the DDS phase also
+    %        for pulses that don't return "tCenterOffset" (e.g., by assuming 0)?
+
+    % FIXME: The following is probably not correct if we'd start to support
+    %        off-center (PRESS) inversion pulses.
+    TX.Phase(:,2:end,:) = mod(bsxfun(@minus, ...
+      TX.Phase(:,2:end,:), ...
+      -TX.Frequency(1,2,:) * Seq.pulseExcitation.tCenterOffset * 360), 360);
+    AQ.Phase(:,2:end,:) = mod(bsxfun(@minus, ...
+      AQ.Phase(:,2:end,:), ...
+      -AQ.Frequency(1,2,:) * Seq.pulseExcitation.tCenterOffset * 360), 360);
+  end
+
+
+  %% User function hook for sequence manipulation
+  Seq.T2Prepare.tRepsPrepare = (Seq.nTau1>0);
+  if ~isempty(Seq.Function_Prepare_Measurement)
+    [HW, Seq, AQ, TX, Grad] = Seq.Function_Prepare_Measurement(HW, Seq, AQ, TX, Grad);
+  end
+
+
   %% Averages (phase cycle)
   if Seq.nTau1>0
     % from increment to accumulated phase offset
     tempTXPhasePrepareIncrement = cumsum(repmat(permute(Seq.SeqAverage.TXPhasePrepareIncrement, [1,4,2,3]), ...
-      [size(Seq.pulsePrepare.Start,1), 1, Seq.SeqAverage.average/numel(Seq.SeqAverage.TXPhasePrepareIncrement), max(1, Seq.nTau1)]), 3) - Seq.SeqAverage.TXPhasePrepareIncrement(1);
+      [size(Seq.pulsePrepare.Start,1), Seq.T2Prepare.tRepsPrepare, Seq.SeqAverage.average/numel(Seq.SeqAverage.TXPhasePrepareIncrement), max(1, Seq.nTau1)]), 3) - Seq.SeqAverage.TXPhasePrepareIncrement(1);
     % apply to all CPMG trains
     tempTXPhasePrepareOffset = repmat(permute(Seq.SeqAverage.TXPhasePrepareOffset, [1,4,2,3]), ...
-      [size(Seq.pulsePrepare.Start,1), 1, 1, max(1, Seq.nTau1)]);
+      [size(Seq.pulsePrepare.Start,1), Seq.T2Prepare.tRepsPrepare, 1, max(1, Seq.nTau1)]);
   else
     tempTXPhasePrepareIncrement = [];
     tempTXPhasePrepareOffset = [];
@@ -1256,7 +1651,7 @@ if Seq.PreProcessSequence
   tempTXPhaseRefocusIncrement = cumsum(repmat(permute(Seq.SeqAverage.TXPhaseRefocusIncrement, [1,4,2,3]), ...
     [size(Seq.pulseRefocus.Start,1), Seq.nEcho+1, Seq.SeqAverage.average/numel(Seq.SeqAverage.TXPhaseRefocusIncrement), max(1, Seq.nTau1)]), 3) - Seq.SeqAverage.TXPhaseRefocusIncrement(1);
   tempAQPhaseIncrement = cumsum(repmat(permute(Seq.SeqAverage.AQPhaseIncrement, [1,4,2,3]), ...
-    [size(AQ.Start, 1), 2+1*(Seq.nTau1>0)+Seq.nEcho, Seq.SeqAverage.average/numel(Seq.SeqAverage.AQPhaseIncrement), max(1, Seq.nTau1)]), 3) - Seq.SeqAverage.AQPhaseIncrement(1);
+    [size(AQ.Start, 1), 2+Seq.T2Prepare.tRepsPrepare+Seq.nEcho, Seq.SeqAverage.average/numel(Seq.SeqAverage.AQPhaseIncrement), max(1, Seq.nTau1)]), 3) - Seq.SeqAverage.AQPhaseIncrement(1);
 
   % apply offset to all CPMG trains
   tempTXPhaseExcitationOffset = repmat(permute(Seq.SeqAverage.TXPhaseExcitationOffset, [1,4,2,3]), ...
@@ -1264,7 +1659,7 @@ if Seq.PreProcessSequence
   tempTXPhaseRefocusOffset = repmat(permute(Seq.SeqAverage.TXPhaseRefocusOffset, [1,4,2,3]), ...
     [size(Seq.pulseRefocus.Start,1), Seq.nEcho+1, 1, max(1, Seq.nTau1)]);
   tempAQPhaseOffset = repmat(permute(Seq.SeqAverage.TXPhaseExcitationOffset, [1,4,2,3]), ...
-    [size(AQ.Start, 1), 2+1*(Seq.nTau1>0)+Seq.nEcho, 1, max(1, Seq.nTau1)]);
+    [size(AQ.Start, 1), 2+Seq.T2Prepare.tRepsPrepare+Seq.nEcho, 1, max(1, Seq.nTau1)]);
 
   numelPulsePrepare = size(tempTXPhasePrepareIncrement, 1);
   numelPulseExcite = size(tempTXPhaseExcitationIncrement, 1);
@@ -1274,7 +1669,7 @@ if Seq.PreProcessSequence
     cat(1, tempTXPhasePrepareIncrement+tempTXPhasePrepareOffset, zeros(maxNumelPulse-numelPulsePrepare, size(tempTXPhasePrepareIncrement, 2), Seq.SeqAverage.average, max(1, Seq.nTau1))), ...
     cat(1, tempTXPhaseExcitationIncrement+tempTXPhaseExcitationOffset, zeros(maxNumelPulse-numelPulseExcite, size(tempTXPhaseExcitationIncrement, 2), Seq.SeqAverage.average, max(1, Seq.nTau1))), ...
     cat(1, tempTXPhaseRefocusIncrement+tempTXPhaseRefocusOffset, zeros(maxNumelPulse-numelPulseRefocus, size(tempTXPhaseRefocusIncrement, 2), Seq.SeqAverage.average, max(1, Seq.nTau1))));
-  tempTXPhaseAllOffset = reshape(tempTXPhaseAllOffset, maxNumelPulse, Seq.nEcho+2+(Seq.nTau1>0), []);
+  tempTXPhaseAllOffset = reshape(tempTXPhaseAllOffset, maxNumelPulse, Seq.nEcho+2+Seq.T2Prepare.tRepsPrepare, []);
   % excitation pulse is first pulse in the same tRep as the first refocus pulse
   tempTXPhaseAllOffset(numelPulseExcite+(1:numelPulseRefocus),size(tempTXPhasePrepareIncrement,2)+2,:) = ...
     tempTXPhaseAllOffset(1:numelPulseRefocus,size(tempTXPhasePrepareIncrement,2)+2,:);
@@ -1289,7 +1684,7 @@ if Seq.PreProcessSequence
     repmat(pulseExcitationPhC.Phase-Seq.pulseExcitation.Phase, [1, 1, floor(size(tempTXPhaseAllOffset, 3)/2)]);
   tempTXPhaseAllOffset(1:numelPulseExcite,size(tempTXPhasePrepareIncrement,2)+1,:) = 0;
   tempAQPhaseAllOffset = reshape(tempAQPhaseIncrement+tempAQPhaseOffset, ...
-    size(AQ.Start, 1), Seq.nEcho+2+(Seq.nTau1>0), []);
+    size(AQ.Start, 1), Seq.nEcho+2+Seq.T2Prepare.tRepsPrepare, []);
 
   % repeat pulse programs (and apply phase offset) - but not the pre-shots
   Seq.tRep = reshape(cat(3, [Seq.tRep(:,1:end-1,1:Seq.nTau1SteadyState), Seq.tRep(:,end,1:Seq.nTau1SteadyState)+Seq.SeqAverage.averageBreak], ... % pre-shots
@@ -1315,7 +1710,7 @@ if Seq.PreProcessSequence
   TX.Phase = reshape(bsxfun(@plus, cat(3, TX.Phase(:,:,1:Seq.nTau1SteadyState), ... % pre-shots
     reshape(repmat(TX.Phase(:,:,(Seq.nTau1SteadyState+1):end), [1, Seq.SeqAverage.average, 1]), size(TX.Phase, 1), size(TX.Phase, 2), [])), ...
     reshape(cat(3, repmat(tempTXPhaseAllOffset(:,:,1), [1, 1, Seq.nTau1SteadyState]), ... % pre-shots
-    tempTXPhaseAllOffset), [], 2+1*(Seq.nTau1>0)+Seq.nEcho, max(1, Seq.nTau1)*Seq.SeqAverage.average + Seq.nTau1SteadyState)), ...
+    tempTXPhaseAllOffset), [], 2+1*Seq.T2Prepare.tRepsPrepare+Seq.nEcho, max(1, Seq.nTau1)*Seq.SeqAverage.average + Seq.nTau1SteadyState)), ...
     size(TX.Start, 1), []);
   if ~isemptyfield(TX, 'Repeat')
     TX.Repeat = reshape(cat(3, TX.Repeat(:,:,1:Seq.nTau1SteadyState), ... % pre-shots
@@ -1345,7 +1740,7 @@ if Seq.PreProcessSequence
     reshape(repmat(AQ.Phase(:,:,(Seq.nTau1SteadyState+1):end), [1, Seq.SeqAverage.average, 1]), size(AQ.Phase, 1), size(AQ.Phase, 2), [])) + ...
     reshape(cat(3, repmat(tempAQPhaseAllOffset(:,:,1), [1, 1, Seq.nTau1SteadyState]), ... % pre-shots
                    tempAQPhaseAllOffset), ...
-            [], 2+1*(Seq.nTau1>0)+Seq.nEcho, max(1, Seq.nTau1)*Seq.SeqAverage.average + Seq.nTau1SteadyState), ...
+            [], 2+1*Seq.T2Prepare.tRepsPrepare+Seq.nEcho, max(1, Seq.nTau1)*Seq.SeqAverage.average + Seq.nTau1SteadyState), ...
     size(AQ.Start, 1), []);
   AQ.ResetPhases = reshape(cat(3, AQ.ResetPhases(:,:,1:Seq.nTau1SteadyState), ... % pre-shots
     reshape(repmat(AQ.ResetPhases(:,:,(Seq.nTau1SteadyState+1):end), [1, Seq.SeqAverage.average, 1]), size(AQ.ResetPhases, 1), size(AQ.ResetPhases, 2), [])), ...
@@ -1373,7 +1768,7 @@ if Seq.PreProcessSequence
     size(AQ.Start, 1), []);
 
   for t = 1:HW.Grad(iDevice).n
-    if numel(Grad(t).Time) ~= 1
+    if ~isscalar(Grad(t).Time)
       if size(Grad(t).Time, 2) == 1, Grad(t).Time = repmat(Grad(t).Time(:,1), 1, size(Seq.tRep,2)); end
       if size(Grad(t).Amp, 2) == 1,  Grad(t).Amp  = repmat(Grad(t).Amp(:,1),  1, size(Seq.tRep,2)); end
 
@@ -1398,27 +1793,61 @@ if Seq.PreProcessSequence
     end
   end
 
+  % external power supply analog remote control
+  if Seq.PowerSupply.EnableAnalogChannel > 0 && ~isinf(Seq.thicknessSlice)
+    crossingTau1PS2 = false(1,size(DigiPS.SetTime,2),size(crossingTau1PS,3));
+    crossingTau1PS2(1,1,:) = crossingTau1PS;
+    crossingTau1PS2(1,end,:) = crossingTau1PS;
+    DigiPS.SetTime = reshape(cat(3, DigiPS.SetTime(:,:,1:Seq.nTau1SteadyState), ... % pre-shots
+      reshape(repmat(DigiPS.SetTime(:,:,(Seq.nTau1SteadyState+1):end), [1, Seq.SeqAverage.average, 1]), size(DigiPS.SetTime, 1), size(DigiPS.SetTime, 2), [])), ...
+      size(DigiPS.SetTime, 1), []);
+    DigiPS.SetValue = reshape(cat(3, DigiPS.SetValue(:,:,1:Seq.nTau1SteadyState), ... % pre-shots
+      reshape(repmat(DigiPS.SetValue(:,:,(Seq.nTau1SteadyState+1):end), [1, Seq.SeqAverage.average, 1]), size(DigiPS.SetValue, 1), size(DigiPS.SetValue, 2), [])), ...
+      size(DigiPS.SetValue, 1), []);
+    crossingTau1PS2 = reshape(cat(3, crossingTau1PS2(:,:,1:Seq.nTau1SteadyState), ... % pre-shots
+      reshape(repmat(crossingTau1PS2(:,:,(Seq.nTau1SteadyState+1):end), [1, Seq.SeqAverage.average, 1]), size(crossingTau1PS2, 1), size(crossingTau1PS2, 2), [])), ...
+      size(crossingTau1PS2, 1), []);
+    crossingTau1PS2([1,end]) = false;
+    DigiPS.SetTime(:,crossingTau1PS2) = NaN;
+    DigiPS.SetValue(:,crossingTau1PS2) = NaN;
+
+    allNaN = all(isnan(DigiPS.SetTime), 2);
+    DigiPS.SetTime(allNaN,:) = [];
+    DigiPS.SetValue(allNaN,:) = [];
+    if isemptyfield(Seq, {'DigitalIO', 'SetTime'})
+      Seq.DigitalIO = DigiPS;
+    else
+      Seq.DigitalIO = add_DigitalIO(Seq.DigitalIO, DigiPS);
+    end
+  end
+
 
   %% Get data directly after last AQ window
   AQ.GetData = zeros(size(Seq.tRep));
   if Seq.GetDataEarly
-    AQ.GetData(end-1) = 1;
+    % also consider measurements without any echoes (only FID)
+    AQ.GetData(end-(Seq.nEcho > 1)) = 1;
+  end
+  if Seq.SeqAverage.GetDataAfterAverages
+    % Mark the last acquisition of the last echo train that belongs to the same
+    % preparation time.
+    AQ.GetData(tRepsPerCMPG*(Seq.nTau1SteadyState+Seq.SeqAverage.average)-1:tRepsPerCMPG*Seq.SeqAverage.average:end) = 1;
   end
 
 
   %% sample lift
   if Seq.Lift.useLift && ~Seq.Lift.skipLift
-    if isemptyfield(Seq, 'DigitalIO') || isemptyfield(Seq.DigitalIO, 'SetTime')
-      DigitalIO.SetTime = nan(2, numel(Seq.tRep));
-      DigitalIO.SetValue = DigitalIO.SetTime;
-    else
-      DigitalIO = Seq.DigitalIO;
-    end
-    DigitalIO.SetTime(:,end) = [0; 5e-3;];
-    DigitalIO.SetValue(:,end) = [2^(Seq.Lift.startSetChannel-1) + ...
+    DigitalIOLift.SetTime = NaN(2, numel(Seq.tRep));
+    DigitalIOLift.SetValue = DigitalIOLift.SetTime;
+    DigitalIOLift.SetTime(:,end) = [0; 5e-3;];
+    DigitalIOLift.SetValue(:,end) = [2^(Seq.Lift.startSetChannel-1) + ...
       bitget(Seq.Lift.useSet-1, 1) * 2^(Seq.Lift.setBit0Channel-1); 0];
     if ~Seq.SubtractEmptyMeasurement
-      Seq.DigitalIO = DigitalIO;
+      if isemptyfield(Seq, 'DigitalIO') || isemptyfield(Seq.DigitalIO, 'SetTime')
+        Seq.DigitalIO = DigitalIOLift;
+      else
+        Seq.DigitalIO = add_DigitalIO(Seq.DigitalIO, DigitalIOLift);
+      end
     end
     Seq.DigitalIO.Repeat = [];
   end
@@ -1426,13 +1855,16 @@ if Seq.PreProcessSequence
 
   %% shorten last tRep
   if Seq.Lift.useLift && ~Seq.Lift.skipLift
-    Seq.tRep(end) = DigitalIO.SetTime(end) + Seq.CLTime(end);
+    Seq.tRep(end) = DigitalIOLift.SetTime(end) + Seq.CLTime(end);
   else
     % shorten last tRep
     Seq.tRep(end) = Seq.tEcho;
   end
 
   if ~isinf(Seq.thicknessSlice)
+    if Seq.PowerSupply.EnableAnalogChannel > 0
+      Seq.tRep(end) = max(Seq.tRep(end), DigiPS.SetTime(1,end) + Seq.CLTime(end), 'omitnan');
+    end
     Seq.tRep(end) = max(Seq.tRep(end), ...
       Grad(HW.Grad(iDevice).Channel2xyzB(HW.Grad(iDevice).Slice.channel)).Time(1+Seq.Slice.nRamp,end) + Seq.CLTime(end));
   end
@@ -1512,7 +1944,7 @@ if Seq.StartSequence || Seq.PollPPGfast || Seq.GetRawData
     end
   end
 
-  if (isa(HW, 'PD.HW') || ~isemptyfield(HW, 'Lift')) && isa(HW.Lift, 'PD.SampleLift') && isvalid(HW.Lift)
+  if (isa(HW, 'PD.HWClass') || ~isemptyfield(HW, 'Lift')) && isa(HW.Lift, 'PD.SampleLift') && isvalid(HW.Lift)
     currentLiftPosition = HW.Lift.GetUserPosition(Seq.Lift.checkEncoder);
     currentLiftPositionAbsolute = HW.Lift.GetPosition(Seq.Lift.checkEncoder);
   else
@@ -1555,13 +1987,28 @@ if Seq.StartSequence || Seq.PollPPGfast || Seq.GetRawData
       disp('Please remove sample tube and press enter.')
       beep
       if Seq.Lift.useLift && ~Seq.Lift.skipLift
-        Seq.DigitalIO = DigitalIO;
+        if isemptyfield(Seq, 'DigitalIO') || isemptyfield(Seq.DigitalIO, 'SetTime')
+          Seq.DigitalIO = DigitalIOLift;
+        else
+          Seq.DigitalIO = add_DigitalIO(Seq.DigitalIO, DigitalIOLift);
+        end
       end
       pause
-      [~, ~, dataEmpty] = set_sequence(HW, Seq, AQ, TX, Grad);
-      [pathstr, name, ext] = fileparts(HW.RecoveryCPMG.emptyReferencePath);
-      save(fullfile(pathstr, [name, HW.TX(iDevice).CoilName, ext]), 'fullScaleReference');
-
+      [~, emptyReference, dataEmpty] = set_sequence(HW, Seq, AQ, TX, Grad);
+      SeqOut.emptyReference=emptyReference;
+      clear emptyReference;
+      emptyReference=SeqOut.emptyReference;
+      emptyReference.hParent_Factors=[];
+      emptyReference.hParent_fit_exp=[];
+      emptyReference.T.hFigure=[];
+      emptyReference.T.hParent=[];
+      emptyReference.fitExpSettings.hParent=[];
+      emptyReference.T.fitExpSettings.hParent=[];
+      [pathstr,name,ext] = fileparts(HW.RecoveryCPMG.emptyReferencePath);
+      save(fullfile(pathstr, [name, HW.TX(iDevice).CoilName, ext]), 'emptyReference', 'dataEmpty')
+      clear emptyReference;
+%% fixme
+      data.dataEmpty = dataEmpty.data;
       data(iAQ).dataEmpty = dataEmpty.data;
       data(iAQ).data = data(iAQ).data - dataEmpty.data;
     end
@@ -1584,9 +2031,26 @@ if Seq.StartSequence || Seq.PollPPGfast || Seq.GetRawData
 
   end
 
+
+else
+  SeqOut = Seq;
+  if isfield(SeqOut, 'data')
+    data = SeqOut.data; % FIXME: Where should we really get the data from?
+  else
+    data = [];
+  end
+
+  iDevice = 1;  % FIXME: Support multiple MMRT devices
+  iAQ = find([SeqOut.AQ(:).Device] == iDevice, 1, 'first');  % FIXME: Support multi-channel?
+end
+
+if SeqOut.PostProcessSequenceLocal
  %% Prepare Data
 
   if ~SeqOut.RawData
+    if (SeqOut.Plot || SeqOut.PlotTR) && ~exist('data_1D', 'var')
+      [Seq, data_1D] = get_data_1D(SeqOut, data);
+    end
     % Plot
     if SeqOut.Plot
       plot_data_1D(HW, data_1D);
@@ -1601,13 +2065,13 @@ if Seq.StartSequence || Seq.PollPPGfast || Seq.GetRawData
 
     if ~isempty(SeqOut.SeqAverage) && (SeqOut.SeqAverage.average > 1)
       % nSamples x nAQs x tRep (in Echo train) x nCPMG (+pre-shots)
-      newSize = {size(data(iAQ).data,1), size(data(iAQ).data,2), SeqOut.nEcho+2+(SeqOut.nTau1>0), []};
+      newSize = {size(data(iAQ).data,1), size(data(iAQ).data,2), SeqOut.nEcho+2+SeqOut.T2Prepare.tRepsPrepare, []};
       data_CPMG = reshape(data(iAQ).data, newSize{:});
       time_all_CPMG = reshape(data(iAQ).time_all, newSize{:});
       time_of_tRep_CPMG = reshape(data(iAQ).time_of_tRep, newSize{:});
 
       % nSamples x nAQs x tRep (in Echo train) x averages x nTau1
-      newSize = {size(data(iAQ).data,1), size(data(iAQ).data,2), SeqOut.nEcho+2+(SeqOut.nTau1>0), SeqOut.SeqAverage.average, []};
+      newSize = {size(data(iAQ).data,1), size(data(iAQ).data,2), SeqOut.nEcho+2+SeqOut.T2Prepare.tRepsPrepare, SeqOut.SeqAverage.average, []};
       data(iAQ).SeqAverage.data = reshape(data_CPMG(:,:,:,SeqOut.nTau1SteadyState+1:end), newSize{:});
       data(iAQ).SeqAverage.time_all = reshape(time_all_CPMG(:,:,:,SeqOut.nTau1SteadyState+1:end), newSize{:});
       data(iAQ).SeqAverage.time_of_tRep = reshape(time_of_tRep_CPMG(:,:,:,SeqOut.nTau1SteadyState+1:end), newSize{:});
@@ -1629,7 +2093,7 @@ if Seq.StartSequence || Seq.PollPPGfast || Seq.GetRawData
 
   else
 
-    data(iAQ).tRep = reshape(find(~isnan(SeqOut.AQ(iAQ).Start(1,:))), [1, SeqOut.nEcho - SeqOut.SteadyState_PreShots180, SeqOut.SeqAverage.average, max(1, SeqOut.nTau1)]); % SampleEchoAverageTau1
+    data(iAQ).tRep = reshape(find(~isnan(SeqOut.AQ(iAQ).Start(1,:))), [1, max(1, SeqOut.nEcho - SeqOut.SteadyState_PreShots180), SeqOut.SeqAverage.average, max(1, SeqOut.nTau1)]);  % Sample x Echo x Average x Tau1
     data(iAQ).iAQ = ones(size(data(iAQ).tRep));
     if Seq.tAQFID >= 0
       data(iAQ).iAQ(1:(SeqOut.nEcho+1):end) = 2;
@@ -1645,15 +2109,16 @@ if Seq.StartSequence || Seq.PollPPGfast || Seq.GetRawData
               [size(data(iAQ).RawTimeOftRep,1), SeqOut.nEcho, max(1, SeqOut.nTau1)]);
     if Seq.tAQFID >= 0
       data(iAQ).SampleEchoTau1Time(1:SeqOut.AQ(iAQ).nSamples(1,data(iAQ).tRep(1)), 1, 1:max(1, SeqOut.nTau1)) = ...
-        data(iAQ).tStartOftRep(data(iAQ).tRep(1,1,1,:)) + ...
+        bsxfun(@plus, data(iAQ).tStartOftRep(data(iAQ).tRep(1,1,1,:)), ...
         ((SeqOut.AQ(iAQ).Start(1,data(iAQ).tRep(1)).*SeqOut.HW.RX(iDevice).fSample.*SeqOut.AQ(iAQ).fSample(1,data(iAQ).tRep(1))) ./ SeqOut.HW.RX(iDevice).fSample ...
          + 0.5 + (0:(SeqOut.AQ(iAQ).nSamples(1,data(iAQ).tRep(1))-1))).' ...
-        ./ SeqOut.AQ(iAQ).fSample(1,data(iAQ).tRep(1));
+        ./ SeqOut.AQ(iAQ).fSample(1,data(iAQ).tRep(1)));
       data(iAQ).SampleEchoTau1Time(SeqOut.AQ(iAQ).nSamples(1,data(iAQ).tRep(1))+1:end,1,:) = NaN;
       data(iAQ).SampleEchoTau1Time(SeqOut.AQ(iAQ).nSamples(1,data(iAQ).tRep(2))+1:end,2:end,:) = NaN;
     end
 
     if ~isempty(SeqOut.SeqAverage) && (SeqOut.SeqAverage.average > 1)
+      % phase cycling and averaging result
       data(iAQ).SeqAverage.data = reshape(RawData{iAQ}, ...
         [size(RawData{iAQ},1), 1, SeqOut.nEcho + (SeqOut.tAQFID>=0), SeqOut.SeqAverage.average, max(1, SeqOut.nTau1)]);
       clear RawData
@@ -1688,20 +2153,10 @@ if Seq.StartSequence || Seq.PollPPGfast || Seq.GetRawData
   end
   data(iAQ).SampleEchoTau1 = reshape(data(iAQ).data(:,~isnan(data(iAQ).data(1,:))), ...
     size(data(iAQ).data, 1), SeqOut.nEcho - SeqOut.SteadyState_PreShots180 + (SeqOut.tAQFID>=0), []);
-  data(iAQ).tRepsPerCPMG = ((SeqOut.nTau1>0)+1+SeqOut.nEcho+1);
-  data(iAQ).timeOfExcitation = data(iAQ).tStartOftRep((SeqOut.nTau1>0) + 1 + ...
+  data(iAQ).tRepsPerCPMG = (SeqOut.T2Prepare.tRepsPrepare+1+SeqOut.nEcho+1);
+  data(iAQ).timeOfExcitation = data(iAQ).tStartOftRep(SeqOut.T2Prepare.tRepsPrepare + 1 + ...
     data(iAQ).tRepsPerCPMG*(SeqOut.nTau1SteadyState+(SeqOut.SeqAverage.average*((1:max(1,SeqOut.nTau1))-1))));
 
-else
-  SeqOut = Seq;
-  if isfield(SeqOut, 'data')
-    data = SeqOut.data; % FIXME: Where should we really get the data from?
-  else
-    data = [];
-  end
-end
-
-if SeqOut.PostProcessSequenceLocal
   %% post-processing
   iDevice = 1;  % FIXME: Support multiple MMRT devices
   iAQ = find([SeqOut.AQ(:).Device] == iDevice, 1, 'first');  % FIXME: Support multi-channel?
@@ -1726,28 +2181,62 @@ if SeqOut.PostProcessSequenceLocal
         [T2_corr, SeqOut.fitExpCorr] = fit_exp(reshape(data(iAQ).SampleEchoTau1(:,:,iTau1), size(data(iAQ).SampleEchoTau1,1), 1, []), ...
           reshape(data(iAQ).SampleEchoTau1Time(:,:,iTau1)-data(iAQ).timeOfExcitation(iTau1), size(data(iAQ).SampleEchoTau1Time,1), 1, []), ...
           SeqOut.fitExpCorr);
-        data.MeanEchoTau1PhaseCorrection(1,iTau1) = T2_corr.dataPhaseCorrection;
+        data(iAQ).MeanEchoTau1PhaseCorrection(1,iTau1) = T2_corr.dataPhaseCorrection;
         % reverse correction
-        data.MeanEchoTau1PhaseCorrected(:,iTau1) = T2_corr.dataPhaseCorrected * exp(1i*T2_corr.dataPhaseCorrection);
-        data.MeanEchoTau1PhaseCorrectedTime(:,iTau1) = T2_corr.timeCorrected;
+        if iTau1 > 1 && all(isnan(T2_corr.dataPhaseCorrected))
+          % All data returned by fit_exp could be none if the postprocessing is
+          % done before all tau1 steps have been completed. Set the collected
+          % data to NaN in that case (irrespective of the dimensions).
+          data(iAQ).MeanEchoTau1PhaseCorrected(:,iTau1) = NaN;
+          data(iAQ).MeanEchoTau1PhaseCorrectedTime(:,iTau1) = NaN;
+        else
+          data(iAQ).MeanEchoTau1PhaseCorrected(:,iTau1) = T2_corr.dataPhaseCorrected * exp(1i*T2_corr.dataPhaseCorrection);
+          data(iAQ).MeanEchoTau1PhaseCorrectedTime(:,iTau1) = T2_corr.timeCorrected;
+        end
       end
+
       % apply average phase correction
       % data.MeanEchoTau1PhaseCorrected = data.MeanEchoTau1PhaseCorrected * exp(-1i * mean(unwrap(2*data.MeanEchoTau1PhaseCorrection)/2)); % Fixme *2 /2
       % data.MeanEchoTau1PhaseCorrected = data.MeanEchoTau1PhaseCorrected * exp(-1i * mean(unwrap(data.MeanEchoTau1PhaseCorrection)));
-      data(iAQ).MeanEchoTau1PhaseCorrected = data(iAQ).MeanEchoTau1PhaseCorrected * exp(-1i * data(iAQ).MeanEchoTau1PhaseCorrection(1,iTau1)); % apply relaxed phase correction
-      if real(mean(data(iAQ).MeanEchoTau1PhaseCorrected(1:max(1,floor(end/4)),end))) < 0
-        % assume that last Tau1 is relaxed
-        data(iAQ).MeanEchoTau1PhaseCorrected = -data(iAQ).MeanEchoTau1PhaseCorrected;
+      if strcmp(Seq.Recovery, 'Decay')
+        % decay
+        % use phase of echo train with shortest preparation time as reference for all
+        data(iAQ).MeanEchoTau1PhaseCorrected = data(iAQ).MeanEchoTau1PhaseCorrected * exp(-1i * data(iAQ).MeanEchoTau1PhaseCorrection(1,1)); % apply relaxed phase correction
+        if real(mean(data(iAQ).MeanEchoTau1PhaseCorrected(1:max(1,floor(end/4)),1))) < 0
+          % assume that there is signal at first Tau1
+          data(iAQ).MeanEchoTau1PhaseCorrected = -data(iAQ).MeanEchoTau1PhaseCorrected;
+          data(iAQ).MeanEchoTau1PhaseCorrection(1,:) = ...
+            data(iAQ).MeanEchoTau1PhaseCorrection(1,:) + pi;
+        end
+      else
+        % saturation or inversion
+        % use phase of echo train with longest preparation time as reference for all
+        iRefPhase = min(iTau1, find(~isnan(data(iAQ).MeanEchoTau1PhaseCorrection), 1, 'last'));
+        data(iAQ).MeanEchoTau1PhaseCorrected = data(iAQ).MeanEchoTau1PhaseCorrected * exp(-1i * data(iAQ).MeanEchoTau1PhaseCorrection(1,iRefPhase)); % apply relaxed phase correction
+        if real(mean(data(iAQ).MeanEchoTau1PhaseCorrected(1:max(1,floor(end/4)),end))) < 0
+          % assume that last Tau1 is relaxed
+          data(iAQ).MeanEchoTau1PhaseCorrected = -data(iAQ).MeanEchoTau1PhaseCorrected;
+          data(iAQ).MeanEchoTau1PhaseCorrection(1,:) = ...
+            data(iAQ).MeanEchoTau1PhaseCorrection(1,:) + pi;
+        end
       end
     elseif SeqOut.nTau1 > 1
       % correct the Tau1 "train"
-      SeqOut.fitExpCorr.CorrectAmplitude=repmat(SeqOut.fitExpCorr.CorrectAmplitude(1),SeqOut.nTau1,1);
-      if numel(SeqOut.fitExpCorr.CorrectFrequencyDrift) == 1 && SeqOut.fitExpCorr.CorrectFrequencyDrift
+      if isscalar(SeqOut.fitExpCorr.CorrectFrequencyDrift) && SeqOut.fitExpCorr.CorrectFrequencyDrift
         SeqOut.fitExpCorr.CorrectFrequencyDrift = reshape(data(iAQ).SampleEchoTau1Time(:,1,:), size(data(iAQ).SampleEchoTau1Time,1), 1, []);
       end
+      % For the phase correction, the time of the excitation pulse is the
+      % "reference" time.
+      % FIXME: Would it be useful if (some of) the following settings could be
+      % overridden by the user?
+      SeqOut.fitExpCorr.hasFID = 0;  % If it is *only* an FID, tread it like an echo.
+      SeqOut.fitExpCorr.RingFilter = 0;  % no "ring filter" for T1 fit
+      SeqOut.fitExpCorr.CorrectFrequencyReferenceTime = 0;  % reference time for FID phase correction is center of excitation pulse
+      SeqOut.fitExpCorr.CorrectMeanFrequencyOffset = false;  % T1 measurements are usually "slow". Correct frequency of each AQ window independently.
       [T1_corr, SeqOut.fitExpCorr] = fit_exp(data(iAQ).SampleEchoTau1, ...
         bsxfun(@minus, data(iAQ).SampleEchoTau1Time, reshape(data(iAQ).timeOfExcitation, 1, 1, [])), ...
         SeqOut.fitExpCorr);
+
       data(iAQ).MeanEchoTau1PhaseCorrected(1,:) = T1_corr.dataPhaseCorrected;
       if real(data(iAQ).MeanEchoTau1PhaseCorrected(1,end)) < 0
         % assume that last Tau1 is relaxed
@@ -1770,6 +2259,8 @@ if SeqOut.PostProcessSequenceLocal
 
     data(iAQ).EchoTime = data(iAQ).MeanEchoTau1PhaseCorrectedTime;
     if SeqOut.nTau1 > 0
+      % For the T1 fit, the time between inversion (preparation) pulse and
+      % excitation pulse is the "reference" time.
       data(iAQ).Tau1Time = repmat(SeqOut.Tau1(:).', size(data(iAQ).EchoTime, 1), 1);
     end
     do = SeqOut.MeasureFullScaleReference && SeqOut.amplitude2fullScaleReference == 1;
@@ -1833,9 +2324,9 @@ if SeqOut.PostProcessSequenceLocal
     end
   end
 
-  if SeqOut.nTau1 > 1 && SeqOut.nEcho > 1
+  if SeqOut.PlotT1T2 > 0 && SeqOut.nTau1 > 1 && SeqOut.nEcho > 1
     %% plot corrected measurement amps as pseudocolor plot (2d)
-    hf80 = figure(80);
+    hf80 = figure(SeqOut.PlotT1T2);
     hf80 = clf(hf80);
     axf80 = axes('Parent', hf80);
     % imagesc(data.EchoTime(:,1),data.Tau1Time(1,:),real(data.MeanEchoTau1PhaseCorrected))
@@ -1858,7 +2349,7 @@ if SeqOut.PostProcessSequenceLocal
     % pause(0.5)
 
     % plot corrected measurement amps as surface (3d)
-    hf81 = figure(81);
+    hf81 = figure(SeqOut.PlotT1T2+1);
     hf81 = clf(hf81);
     axf81 = axes('Parent', hf81);
     surface(data(iAQ).EchoTime, data(iAQ).Tau1Time, real(data(iAQ).MeanEchoTau1PhaseCorrected), 'Parent', axf81);
@@ -1870,8 +2361,9 @@ if SeqOut.PostProcessSequenceLocal
     colorbar('peer', axf81);
     grid(axf81, 'on');
     shading(axf81, 'interp');
+
     % plot residual amps as surface (3d)
-    hf81 = figure(181);
+    hf81 = figure(SeqOut.PlotT1T2+101);
     hf81 = clf(hf81);
     axf81 = axes('Parent', hf81);
     surface(data(iAQ).EchoTime, data(iAQ).Tau1Time, imag(data(iAQ).MeanEchoTau1PhaseCorrected), 'Parent', axf81);
@@ -1885,7 +2377,7 @@ if SeqOut.PostProcessSequenceLocal
     shading(axf81, 'interp');
   end
 
-  %% T1 fit to first echoes
+  %% T1 fit to first (or last) echoes
   if SeqOut.FitT1
     if SeqOut.nTau1 > 2
       % [T1, SeqOut.fitExpT1] = fit_exp(data.MeanEchoTau1PhaseCorrected(1,:).*data.MeanEchoTau1PhaseCorrection, data.Tau1Time(1,:), fitExpSettings);
@@ -1906,38 +2398,48 @@ if SeqOut.PostProcessSequenceLocal
   %% T2 to selected CPMG trains
   if SeqOut.FitT2 && numel(SeqOut.FitT2AtTau1) > 0
     if SeqOut.nEcho > 3
-      fh = figure(82);
-      clf(fh)
-      set(fh, 'Name', 'T2 Fit');
-      ax(1) = axes('Parent', fh);
-      hold(ax(1), 'all');
+      if SeqOut.PlotT2 > 0
+        fh = figure(SeqOut.PlotT2);
+        clf(fh)
+        set(fh, 'Name', 'T2 Fit');
+        ax(1) = axes('Parent', fh);
+        hold(ax(1), 'on');
+      end
       if isemptyfield(SeqOut.fitExpT2, 'omitFirstnEchoes')
         SeqOut.fitExpT2.omitFirstnEchoes = SeqOut.fitExpCorr.omitFirstnEchoes;
       end
       for t = SeqOut.FitT2AtTau1
         % fitting exponential functions to the data
-        SeqOut.fitExpT2.hParent = figure(820+t);
+        if SeqOut.PlotT2 > 0
+          SeqOut.fitExpT2.hParent = figure(SeqOut.PlotT2*10+t);
+        else
+          SeqOut.fitExpT2.hParent = 0;
+        end
         [T2(t), SeqOut.fitExpT2] = fit_exp(data(iAQ).MeanEchoTau1PhaseCorrected(:,t), data(iAQ).EchoTime(:,t), SeqOut.fitExpT2);
-        set(SeqOut.fitExpT2.hParent, 'Name', sprintf('T2 Fit at tau_1 #%d', t));
-        plot(ax(1), T2(t).timeCorrected, T2(t).dataPhaseCorrectedReal, 'b');
-        legendEntry = {'real'};
-        if SeqOut.fitExpT2.DoubleExp
-          plot(ax(1), T2(t).functionTime, T2(t).functionAmpDouble, 'b-.');
-          legendEntry{2} = 'fit double';
-        elseif SeqOut.fitExpT2.SingleExp
-          plot(ax(1), T2(t).functionTime, T2(t).functionAmpSingle, 'b--');
-          legendEntry{2} = 'fit single';
+        if SeqOut.PlotT2 > 0
+          set(SeqOut.fitExpT2.hParent, 'Name', sprintf('T2 Fit at tau_1 #%d', t));
+          plot(ax(1), T2(t).timeCorrected, T2(t).dataPhaseCorrectedReal, 'b');
+          legendEntry = {'real'};
+          if SeqOut.fitExpT2.DoubleExp
+            plot(ax(1), T2(t).functionTime, T2(t).functionAmpDouble, 'b-.');
+            legendEntry{2} = 'fit double';
+          elseif SeqOut.fitExpT2.SingleExp
+            plot(ax(1), T2(t).functionTime, T2(t).functionAmpSingle, 'b--');
+            legendEntry{2} = 'fit single';
+          end
         end
       end
-      if numel(SeqOut.FitT2AtTau1) > 0
-        % legend(ax(1),'real');
-        xlabel(ax(1), 'time / s');
-        ylabel(ax(1), 'amplitude');
-        title(ax(1), {[' ', ' ', ' ']});
-        grid(ax(1), 'on');
-        legend(ax(1), legendEntry);
+      if SeqOut.PlotT2 > 0
+        if numel(SeqOut.FitT2AtTau1) > 0
+          % legend(ax(1),'real');
+          xlabel(ax(1), 'time / s');
+          ylabel(ax(1), 'amplitude');
+          title(ax(1), {[' ', ' ', ' ']});
+          grid(ax(1), 'on');
+          legend(ax(1), legendEntry);
+        end
+        hold(ax(1), 'off');
       end
-      hold(ax(1), 'off');
 
       data(iAQ).T2 = T2;
     else
@@ -1953,5 +2455,45 @@ if SeqOut.PostProcessSequenceLocal
 
 
 end
+
+end
+
+
+function Seq = SetPowerSupplyAmp(Seq, nn, oldPreStartPPGFcn, HW, gradAmp)
+%% Function that configures the power supply for the calculated amplitude
+
+if ~isempty(oldPreStartPPGFcn)
+  % call previous PreStartPPGFcn
+  Seq = oldPreStartPPGFcn(Seq, nn);
+end
+
+if nn ~= 1
+  % only send commands on first average loop
+  return;
+end
+
+iDevice = 1;  % FIXME: Support pulse program at secondary devices.
+
+oldLocked = HW.PowerSupply.isLocked();
+if ~oldLocked
+  % Set lock or changing the limit for the current doesn't have an effect.
+  HW.PowerSupply.SetLock(true);
+  % FIXME: Do we need to reset to the previous lock state after the measurement?
+end
+
+% Compensate reduced coil efficiency such that the actual current output is
+% limitted correctly digitally
+if HW.Grad(iDevice).PaCurrentControlled(HW.Grad(iDevice).Slice.channel)
+  HW.PowerSupply.PaIoutMax = gradAmp * HW.Grad(iDevice).Amp2PaIout(HW.Grad(iDevice).Slice.channel) ...
+    / HW.PowerSupply.AnalogOverDriveFactor;
+  % HW.PowerSupply.PaIoutMax = gradAmp * HW.Grad(iDevice).Amp2LoadIin(HW.Grad(iDevice).Slice.channel) ...
+  %   / HW.PowerSupply.AnalogOverDriveFactor;
+else
+  error('PD:SetPowerSupplyAmp:NotCC', ...
+    'Gradient amplifier must be current controlled.');
+end
+
+% FIXME: Do we need this for the remote pin to work?
+HW.PowerSupply.SetLock(false);
 
 end

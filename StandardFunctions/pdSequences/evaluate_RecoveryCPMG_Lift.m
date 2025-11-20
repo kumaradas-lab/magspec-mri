@@ -30,7 +30,7 @@ function [SeqOut, data] = evaluate_RecoveryCPMG_Lift(HW, SeqOut, data)
 %           transform of the CPMG Echo trains at SeqOut.FitT2AtTau1
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2018 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2018-2023 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -38,8 +38,8 @@ function [SeqOut, data] = evaluate_RecoveryCPMG_Lift(HW, SeqOut, data)
 if nargin ~= 3
   error('PD:evaluate_RecoveryCPMG:nargin', 'Number of input arguments must be 3');
 end
-if ~isstruct(HW) && ~isa(HW, 'PD.HW')
-  error('PD:evaluate_RecoveryCPMG:wrongHW', '"HW" must be a structure or PD.HW object');
+if ~isstruct(HW) && ~isa(HW, 'PD.HWClass')
+  error('PD:evaluate_RecoveryCPMG:wrongHW', '"HW" must be a structure or PD.HWClass object');
 end
 if ~isstruct(SeqOut)
   error('PD:evaluate_RecoveryCPMG:wrongSeq', ...

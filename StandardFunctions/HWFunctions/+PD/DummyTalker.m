@@ -4,7 +4,7 @@ classdef DummyTalker < handle
 %   this = PD.DummyTalker(DummySerial)
 %
 % ----------------------------------------------------------------------------
-% (C) Copyright 2017-2019 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2017-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ----------------------------------------------------------------------------
 

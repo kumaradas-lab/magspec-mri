@@ -28,7 +28,7 @@ function save_Seq(Seq, fName, force, channel)
 %   none
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2019 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2019-2022 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 %
@@ -90,6 +90,6 @@ Seq = rmfield(Seq, 'data');
 
 %% save data in file
 Seq; data; raw_data; averages; %#ok<VUNUS>
-save(fName, 'Seq', 'data', 'raw_data', 'averages');
+save(fName, 'Seq', 'data', 'raw_data', 'averages', '-v7.3');
 
 end

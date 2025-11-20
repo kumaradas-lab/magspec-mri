@@ -39,7 +39,7 @@ if (Intensity.nPolyfit-1) || Intensity.PolyfitPlot
        Intensity.polyfitFIDDiff(:,tt) = polyval(p,Intensity.FIDTime(iS:iE,1),S,mu)-Intensity.FIDAbsCicTc(iS:iE,tt); 
    end
    if Intensity.PolyfitPlot
-       hold(ax1, 'all');
+       hold(ax1, 'on');
        plot(ax1,zeros(size(Intensity.polyfitFID(1,1:nIMs:end))),Intensity.FIDIntensity(:,1:nIMs:end).*1e12,'x')
        plot(ax1,repmat(TempTimeOut,1,size(Intensity.polyfitFID(:,1:nIMs:end),2)),Intensity.polyfitFID(:,1:nIMs:end).*1e12)
        hold(ax1, 'off');

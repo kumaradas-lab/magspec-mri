@@ -1,7 +1,7 @@
 %% Load settings for a named coil for the Rocks Profiling System #01
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2018-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2018-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -17,6 +17,10 @@ HW.TX.BlankPostset = 80e-9;  % rf amplifier on/off and blank external LNA
 HW.TX.DampCoil.AllowShort = true; % set to true to allow a damping pulse to be shortened if necessary
 
 HW.Grad.SystemTimeDelay(1:4) = [5.112e-05, 7.9536e-05, 8.752e-05, 0]; % Time delay of grad amp
+
+% All coils are loop-gap coils.
+% The coils have likely been build with 35 um copper foil. The exact height for
+% each coil is unknown as of 2024.
 
 % settings specific for each coil
 switch HW.TX.CoilName
@@ -43,7 +47,7 @@ switch HW.TX.CoilName
     HW.TX.PaUout2AmplitudeEstimated = HW.TX.PaUout2Amplitude;
 
     HW.TX.BlankPostsetAQ = 9.5e-6;  % blank internal LNA
-    HW.TX.BlankAQ=1;
+    HW.TX.BlankAQ = 1;
     % reference sample amplitude (100% water)
     % FIXME: Add sensible settings
 
@@ -54,6 +58,26 @@ switch HW.TX.CoilName
     HW.RecoveryCPMG.tAQEcho = 34e-6;
     HW.RecoveryCPMG.tEchoMin = round((HW.RecoveryCPMG.tFlip180Def + HW.RecoveryCPMG.tAQEcho + ...
       2*max(max(0,HW.TX.DampCoil.TX2RXdeadTime-HW.RecoveryCPMG.tAQEchoDelay),HW.RecoveryCPMG.tAQEchoDelay)) * HW.TX.fSample)/HW.TX.fSample;
+
+    % coil heating model
+    % copper coil
+    coilLength = 78e-3;  % estimated length of coil in meter
+    foilThickness = 35e-6;  % thickness of conductor in meter
+    coilDiameter = 70e-3;  % diameter of coil in meter
+    densityCopper = 8.85e3;  % density of copper in kg/m^3
+    specificHeatCapacityCopper = 385;  % specific heat capacity of copper in J/kg/K
+    massCoil = coilDiameter * pi * coilLength * foilThickness * densityCopper;
+    % capacitors
+    heatCapacity = 29 * 4000 * (2.8e-3^2*2.5e-3) * 750;  % heat capacity of capacitors in J/K
+    % surrounding PTFE
+    heatThickness = 1e-3;
+    densityPTFE = 2.2e3;  % density of copper in kg/m^3
+    massPTFE = coilDiameter * pi * coilLength * heatThickness * densityPTFE;
+    specificHeatCapacityPTFE = 1.5e3;  % specific heat capacity of PTFE in J/kg/K
+    HW.TX.CoilThermalCapacity = massCoil * specificHeatCapacityCopper + heatCapacity + massPTFE * specificHeatCapacityPTFE;
+    HW.RecoveryCPMG.CoilPowerDissipationHigh = 10;  % power dissipation in Watt (with air cooling)
+    HW.RecoveryCPMG.CoilPowerDissipationLow = 2;  % power dissipation in Watt (without air cooling)
+    HW.TX.CoilPowerDissipation = HW.RecoveryCPMG.CoilPowerDissipationHigh;  % power dissipation in Watt (default)
 
 
   case '72mm Slice'
@@ -112,6 +136,26 @@ switch HW.TX.CoilName
       error('LoadCoil:RecoveryCPMG:UnknownVersionPP', ...
         'Unknown version (%d) for sequence_RecoveryCPMG for selected coil.', HW.RecoveryCPMG.versionPP);
     end
+
+    % coil heating model
+    % copper coil
+    coilLength = 78e-3;  % estimated length of coil in meter
+    foilThickness = 35e-6;  % thickness of conductor in meter
+    coilDiameter = 72e-3;  % diameter of coil in meter
+    densityCopper = 8.85e3;  % density of copper in kg/m^3
+    specificHeatCapacityCopper = 385;  % specific heat capacity of copper in J/kg/K
+    massCoil = coilDiameter * pi * coilLength * foilThickness * densityCopper;
+    % capacitors
+    heatCapacity = 29 * 4000 * (2.8e-3^2*2.5e-3) * 750;  % heat capacity of capacitors in J/K
+    % surrounding PTFE
+    heatThickness = 1e-3;
+    densityPTFE = 2.2e3;  % density of copper in kg/m^3
+    massPTFE = coilDiameter * pi * coilLength * heatThickness * densityPTFE;
+    specificHeatCapacityPTFE = 1.5e3;  % specific heat capacity of PTFE in J/kg/K
+    HW.TX.CoilThermalCapacity = massCoil * specificHeatCapacityCopper + heatCapacity + massPTFE * specificHeatCapacityPTFE;
+    HW.RecoveryCPMG.CoilPowerDissipationHigh = 10;  % power dissipation in Watt (with air cooling)
+    HW.RecoveryCPMG.CoilPowerDissipationLow = 2;  % power dissipation in Watt (without air cooling)
+    HW.TX.CoilPowerDissipation = HW.RecoveryCPMG.CoilPowerDissipationHigh;  % power dissipation in Watt (default)
 
 
   case '72mm Slice H-free'
@@ -176,6 +220,26 @@ switch HW.TX.CoilName
         'Unknown version (%d) for sequence_RecoveryCPMG for selected coil.', HW.RecoveryCPMG.versionPP);
     end
 
+    % coil heating model
+    % copper coil
+    coilLength = 78e-3;  % estimated length of coil in meter
+    foilThickness = 35e-6;  % thickness of conductor in meter
+    coilDiameter = 72e-3;  % diameter of coil in meter
+    densityCopper = 8.85e3;  % density of copper in kg/m^3
+    specificHeatCapacityCopper = 385;  % specific heat capacity of copper in J/kg/K
+    massCoil = coilDiameter * pi * coilLength * foilThickness * densityCopper;
+    % capacitors
+    heatCapacity = 29 * 4000 * (2.8e-3^2*2.5e-3) * 750;  % heat capacity of capacitors in J/K
+    % surrounding PTFE
+    heatThickness = 1e-3;
+    densityPTFE = 2.2e3;  % density of copper in kg/m^3
+    massPTFE = coilDiameter * pi * coilLength * heatThickness * densityPTFE;
+    specificHeatCapacityPTFE = 1.5e3;  % specific heat capacity of PTFE in J/kg/K
+    HW.TX.CoilThermalCapacity = massCoil * specificHeatCapacityCopper + heatCapacity + massPTFE * specificHeatCapacityPTFE;
+    HW.RecoveryCPMG.CoilPowerDissipationHigh = 10;  % power dissipation in Watt (with air cooling)
+    HW.RecoveryCPMG.CoilPowerDissipationLow = 2;  % power dissipation in Watt (without air cooling)
+    HW.TX.CoilPowerDissipation = HW.RecoveryCPMG.CoilPowerDissipationHigh;  % power dissipation in Watt (default)
+
 
   case '50mm Slice'
     % damp coil settings
@@ -208,6 +272,26 @@ switch HW.TX.CoilName
     HW.RecoveryCPMG.tAQEcho = 36e-6;
     HW.RecoveryCPMG.tEchoMin = round((HW.RecoveryCPMG.tFlip180Def + HW.RecoveryCPMG.tAQEcho + ...
       2*max(max(0,HW.TX.DampCoil.TX2RXdeadTime-HW.RecoveryCPMG.tAQEchoDelay),HW.RecoveryCPMG.tAQEchoDelay)) * HW.TX.fSample)/HW.TX.fSample;
+
+    % coil heating model
+    % copper coil
+    coilLength = 58e-3;  % estimated length of coil in meter
+    foilThickness = 35e-6;  % thickness of conductor in meter
+    coilDiameter = 50e-3;  % diameter of coil in meter
+    densityCopper = 8.85e3;  % density of copper in kg/m^3
+    specificHeatCapacityCopper = 385;  % specific heat capacity of copper in J/kg/K
+    massCoil = coilDiameter * pi * coilLength * foilThickness * densityCopper;
+    % capacitors
+    heatCapacity = 21 * 4000 * (2.8e-3^2*2.5e-3) * 750;  % heat capacity of capacitors in J/K
+    % surrounding PTFE
+    heatThickness = 1e-3;
+    densityPTFE = 2.2e3;  % density of copper in kg/m^3
+    massPTFE = coilDiameter * pi * coilLength * heatThickness * densityPTFE;
+    specificHeatCapacityPTFE = 1.5e3;  % specific heat capacity of PTFE in J/kg/K
+    HW.TX.CoilThermalCapacity = massCoil * specificHeatCapacityCopper + heatCapacity + massPTFE * specificHeatCapacityPTFE;
+    HW.RecoveryCPMG.CoilPowerDissipationHigh = 10;  % power dissipation in Watt (with air cooling)
+    HW.RecoveryCPMG.CoilPowerDissipationLow = 2;  % power dissipation in Watt (without air cooling)
+    HW.TX.CoilPowerDissipation = HW.RecoveryCPMG.CoilPowerDissipationHigh;  % power dissipation in Watt (default)
 
 
   case '52mm Slice'
@@ -263,6 +347,26 @@ switch HW.TX.CoilName
       error('LoadCoil:RecoveryCPMG:UnknownVersionPP', ...
         'Unknown version (%d) for sequence_RecoveryCPMG for selected coil.', HW.RecoveryCPMG.versionPP);
     end
+
+    % coil heating model
+    % copper coil
+    coilLength = 58e-3;  % estimated length of coil in meter
+    foilThickness = 35e-6;  % thickness of conductor in meter
+    coilDiameter = 52e-3;  % diameter of coil in meter
+    densityCopper = 8.85e3;  % density of copper in kg/m^3
+    specificHeatCapacityCopper = 385;  % specific heat capacity of copper in J/kg/K
+    massCoil = coilDiameter * pi * coilLength * foilThickness * densityCopper;
+    % capacitors
+    heatCapacity = 21 * 4000 * (2.8e-3^2*2.5e-3) * 750;  % heat capacity of capacitors in J/K
+    % surrounding PTFE
+    heatThickness = 1e-3;
+    densityPTFE = 2.2e3;  % density of copper in kg/m^3
+    massPTFE = coilDiameter * pi * coilLength * heatThickness * densityPTFE;
+    specificHeatCapacityPTFE = 1.5e3;  % specific heat capacity of PTFE in J/kg/K
+    HW.TX.CoilThermalCapacity = massCoil * specificHeatCapacityCopper + heatCapacity + massPTFE * specificHeatCapacityPTFE;
+    HW.RecoveryCPMG.CoilPowerDissipationHigh = 10;  % power dissipation in Watt (with air cooling)
+    HW.RecoveryCPMG.CoilPowerDissipationLow = 2;  % power dissipation in Watt (without air cooling)
+    HW.TX.CoilPowerDissipation = HW.RecoveryCPMG.CoilPowerDissipationHigh;  % power dissipation in Watt (default)
 
 
   case '42mm Slice'
@@ -322,6 +426,26 @@ switch HW.TX.CoilName
         'Unknown version (%d) for sequence_RecoveryCPMG for selected coil.', HW.RecoveryCPMG.versionPP);
     end
 
+    % coil heating model
+    % copper coil
+    coilLength = 38e-3;  % estimated length of coil in meter
+    foilThickness = 35e-6;  % thickness of conductor in meter
+    coilDiameter = 42e-3;  % diameter of coil in meter
+    densityCopper = 8.85e3;  % density of copper in kg/m^3
+    specificHeatCapacityCopper = 385;  % specific heat capacity of copper in J/kg/K
+    massCoil = coilDiameter * pi * coilLength * foilThickness * densityCopper;
+    % capacitors
+    heatCapacity = 14 * 4000 * (2.8e-3^2*2.5e-3) * 750;  % heat capacity of capacitors in J/K
+    % surrounding PTFE
+    heatThickness = 1e-3;
+    densityPTFE = 2.2e3;  % density of copper in kg/m^3
+    massPTFE = coilDiameter * pi * coilLength * heatThickness * densityPTFE;
+    specificHeatCapacityPTFE = 1.5e3;  % specific heat capacity of PTFE in J/kg/K
+    HW.TX.CoilThermalCapacity = massCoil * specificHeatCapacityCopper + heatCapacity + massPTFE * specificHeatCapacityPTFE;
+    HW.RecoveryCPMG.CoilPowerDissipationHigh = 10;  % power dissipation in Watt (with air cooling)
+    HW.RecoveryCPMG.CoilPowerDissipationLow = 2;  % power dissipation in Watt (without air cooling)
+    HW.TX.CoilPowerDissipation = HW.RecoveryCPMG.CoilPowerDissipationHigh;  % power dissipation in Watt (default)
+
 
   case '42mm Image'
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% damp coil settings
@@ -379,6 +503,26 @@ switch HW.TX.CoilName
       error('LoadCoil:RecoveryCPMG:UnknownVersionPP', ...
         'Unknown version (%d) for sequence_RecoveryCPMG for selected coil.', HW.RecoveryCPMG.versionPP);
     end
+
+    % coil heating model
+    % copper coil
+    coilLength = 38e-3;  % estimated length of coil in meter
+    foilThickness = 35e-6;  % thickness of conductor in meter
+    coilDiameter = 42e-3;  % diameter of coil in meter
+    densityCopper = 8.85e3;  % density of copper in kg/m^3
+    specificHeatCapacityCopper = 385;  % specific heat capacity of copper in J/kg/K
+    massCoil = coilDiameter * pi * coilLength * foilThickness * densityCopper;
+    % capacitors
+    heatCapacity = 14 * 4000 * (2.8e-3^2*2.5e-3) * 750;  % heat capacity of capacitors in J/K
+    % surrounding PTFE
+    heatThickness = 1e-3;
+    densityPTFE = 2.2e3;  % density of copper in kg/m^3
+    massPTFE = coilDiameter * pi * coilLength * heatThickness * densityPTFE;
+    specificHeatCapacityPTFE = 1.5e3;  % specific heat capacity of PTFE in J/kg/K
+    HW.TX.CoilThermalCapacity = massCoil * specificHeatCapacityCopper + heatCapacity + massPTFE * specificHeatCapacityPTFE;
+    HW.RecoveryCPMG.CoilPowerDissipationHigh = 10;  % power dissipation in Watt (with air cooling)
+    HW.RecoveryCPMG.CoilPowerDissipationLow = 2;  % power dissipation in Watt (without air cooling)
+    HW.TX.CoilPowerDissipation = HW.RecoveryCPMG.CoilPowerDissipationHigh;  % power dissipation in Watt (default)
 
 
   case '32mm Image'
@@ -441,6 +585,26 @@ switch HW.TX.CoilName
       error('LoadCoil:RecoveryCPMG:UnknownVersionPP', ...
         'Unknown version (%d) for sequence_RecoveryCPMG for selected coil.', HW.RecoveryCPMG.versionPP);
     end
+
+    % coil heating model
+    % copper coil
+    coilLength = 38e-3;  % estimated length of coil in meter
+    foilThickness = 35e-6;  % thickness of conductor in meter
+    coilDiameter = 32e-3;  % diameter of coil in meter
+    densityCopper = 8.85e3;  % density of copper in kg/m^3
+    specificHeatCapacityCopper = 385;  % specific heat capacity of copper in J/kg/K
+    massCoil = coilDiameter * pi * coilLength * foilThickness * densityCopper;
+    % capacitors
+    heatCapacity = 14 * 4000 * (2.8e-3^2*2.5e-3) * 750;  % heat capacity of capacitors in J/K
+    % surrounding PTFE
+    heatThickness = 1e-3;
+    densityPTFE = 2.2e3;  % density of copper in kg/m^3
+    massPTFE = coilDiameter * pi * coilLength * heatThickness * densityPTFE;
+    specificHeatCapacityPTFE = 1.5e3;  % specific heat capacity of PTFE in J/kg/K
+    HW.TX.CoilThermalCapacity = massCoil * specificHeatCapacityCopper + heatCapacity + massPTFE * specificHeatCapacityPTFE;
+    HW.RecoveryCPMG.CoilPowerDissipationHigh = 10;  % power dissipation in Watt (with air cooling)
+    HW.RecoveryCPMG.CoilPowerDissipationLow = 2;  % power dissipation in Watt (without air cooling)
+    HW.TX.CoilPowerDissipation = HW.RecoveryCPMG.CoilPowerDissipationHigh;  % power dissipation in Watt (default)
 
 
   case '32mm Combi'
@@ -513,6 +677,27 @@ switch HW.TX.CoilName
 
     HW.Grad.SystemTimeDelay(1:3) = [7.7712e-05, 0.000111744, 0.000118216];  % Time delay of grad amp
 
+    % coil heating model
+    % copper coil
+    coilLength = 38e-3;  % estimated length of coil in meter
+    foilThickness = 35e-6;  % thickness of conductor in meter
+    coilDiameter = 32e-3;  % diameter of coil in meter
+    densityCopper = 8.85e3;  % density of copper in kg/m^3
+    specificHeatCapacityCopper = 385;  % specific heat capacity of copper in J/kg/K
+    massCoil = coilDiameter * pi * coilLength * foilThickness * densityCopper;
+    % capacitors
+    heatCapacity = 14 * 4000 * (2.8e-3^2*2.5e-3) * 750;  % heat capacity of capacitors in J/K
+    % surrounding PTFE
+    heatThickness = 1e-3;
+    densityPTFE = 2.2e3;  % density of copper in kg/m^3
+    massPTFE = coilDiameter * pi * coilLength * heatThickness * densityPTFE;
+    specificHeatCapacityPTFE = 1.5e3;  % specific heat capacity of PTFE in J/kg/K
+    HW.TX.CoilThermalCapacity = massCoil * specificHeatCapacityCopper + heatCapacity + massPTFE * specificHeatCapacityPTFE;
+    HW.RecoveryCPMG.CoilPowerDissipationHigh = 10;  % power dissipation in Watt (with air cooling)
+    HW.RecoveryCPMG.CoilPowerDissipationLow = 2;  % power dissipation in Watt (without air cooling)
+    HW.TX.CoilPowerDissipation = HW.RecoveryCPMG.CoilPowerDissipationHigh;  % power dissipation in Watt (default)
+
+
   case '22mm Image'
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% damp coil settings
     HW.TX.DampCoil.Enable = true;    % enable coil damping
@@ -569,6 +754,26 @@ switch HW.TX.CoilName
       error('LoadCoil:RecoveryCPMG:UnknownVersionPP', ...
         'Unknown version (%d) for sequence_RecoveryCPMG for selected coil.', HW.RecoveryCPMG.versionPP);
     end
+
+    % coil heating model
+    % copper coil
+    coilLength = 28e-3;  % estimated length of coil in meter
+    foilThickness = 35e-6;  % thickness of conductor in meter
+    coilDiameter = 22e-3;  % diameter of coil in meter
+    densityCopper = 8.85e3;  % density of copper in kg/m^3
+    specificHeatCapacityCopper = 385;  % specific heat capacity of copper in J/kg/K
+    massCoil = coilDiameter * pi * coilLength * foilThickness * densityCopper;
+    % capacitors
+    heatCapacity = 10 * 4000 * (2.8e-3^2*2.5e-3) * 750;  % heat capacity of capacitors in J/K
+    % surrounding PTFE
+    heatThickness = 1e-3;
+    densityPTFE = 2.2e3;  % density of copper in kg/m^3
+    massPTFE = coilDiameter * pi * coilLength * heatThickness * densityPTFE;
+    specificHeatCapacityPTFE = 1.5e3;  % specific heat capacity of PTFE in J/kg/K
+    HW.TX.CoilThermalCapacity = massCoil * specificHeatCapacityCopper + heatCapacity + massPTFE * specificHeatCapacityPTFE;
+    HW.RecoveryCPMG.CoilPowerDissipationHigh = 10;  % power dissipation in Watt (with air cooling)
+    HW.RecoveryCPMG.CoilPowerDissipationLow = 2;  % power dissipation in Watt (without air cooling)
+    HW.TX.CoilPowerDissipation = HW.RecoveryCPMG.CoilPowerDissipationHigh;  % power dissipation in Watt (default)
 
 
   otherwise

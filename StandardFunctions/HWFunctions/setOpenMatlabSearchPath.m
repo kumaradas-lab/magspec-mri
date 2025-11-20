@@ -1,5 +1,5 @@
 function setOpenMatlabSearchPath(mySave)
-%% SETOPENMATLABSEARCHPATH - add paths for openMatlab toolbox to Matlab search path
+%% Add paths for openMatlab toolbox to Matlab search path
 %
 %   setOpenMatlabSearchPath(mySave)
 %
@@ -10,7 +10,7 @@ function setOpenMatlabSearchPath(mySave)
 %   none
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2015-2019 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2015-2024 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -18,4 +18,5 @@ end
 
 
 %#function getOpenMatlabRootPath
+%#function isAbsolutePath
 
