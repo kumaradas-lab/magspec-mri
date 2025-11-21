@@ -25,6 +25,13 @@ LoadSystem; % Load system parameters (reset to default: HW Seq AQ TX Grad)
 % HW.FindFrequencySweep.fCenter = HW.fLarmor;     % center sweep near expected resonance
 % HW.FindFrequencySweep.fRange  = 500e3;       % widen sweep to ±250 kHz just in case, can increase the range depending on the medium
 % HW.FindFrequencySweep.fOffsetFIDsStdMaxValue = 5000;  % allow more noise tolerance
+%% Trying to fix FLASH sequence formatting error
+Seq.plotSeqAQ = [];
+Seq.LoopPlot =[];
+Seq.AQSlice(1).plokSpace =[];
+Seq.AqSlice(1).plotImage=[];
+Seq.AqSlice(1).plotPhase=[];
+
 
 Seq.Loops = 1; % Number of loop averages
 
@@ -40,9 +47,11 @@ measurement_time = 60; % Run time in seconds
 
 % % Pixels and size %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Seq.AQSlice(1).nRead = resolution;
+Seq.AQSlice(1).nPhase(1) = resolution;
 Seq.AQSlice(1).nPhase(2) = resolution;
 Seq.AQSlice(1).HzPerPixMin = 0;
 Seq.AQSlice(1).sizeRead = 0.010;
+Seq.AQSlice(1).sizePhase(1) = 0.010;
 Seq.AQSlice(1).sizePhase(2) = 0.010;
 Seq.AQSlice(1).thickness = thickness;
 Seq.AQSlice(1).excitationPulse = @Pulse_Rect;
@@ -51,33 +60,36 @@ Seq.AQSlice(1).excitationPulse = @Pulse_Rect;
 Seq.AQSlice(1).PhaseOS(2) = 2;                      % oversampling phase(2)  1...
 
 % % Orientation in space %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-orientation = 'zx';                                 % 'xy', 'yz', 'zx' for one of the cardinal planes (read-phase)
-switch orientation
-  case 'xy'
-  Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
-  Seq.AQSlice(1).phi  = 0.5*pi;                   % 2nd rotation around y axis in RAD
-  Seq.AQSlice(1).theta= 0.0*pi;                   % 3rd rotation around z axis in RAD
-  case 'yz'
-  Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
-  Seq.AQSlice(1).phi  = 0.0*pi;                   % 2nd rotation around y axis in RAD
-  Seq.AQSlice(1).theta= 0.0*pi;                   % 3rd rotation around z axis in RAD
-  case 'zx'
-  Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
-  Seq.AQSlice(1).phi  = 0.0*pi;                   % 2nd rotation around y axis in RAD
-  Seq.AQSlice(1).theta= -0.5*pi;                  % 3rd rotation around z axis in RAD
-  otherwise
-  if ~ischar(orientation)
-    orientation = num2str(orientation);
-  end
-  error('Unknown orientation "%s"\n', orientation);
-end
+% orientation = 'zx';                                 % 'xy', 'yz', 'zx' for one of the cardinal planes (read-phase)
+% switch orientation
+%   case 'xy'
+%   Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
+%   Seq.AQSlice(1).phi  = 0.5*pi;                   % 2nd rotation around y axis in RAD
+%   Seq.AQSlice(1).theta= 0.0*pi;                   % 3rd rotation around z axis in RAD
+%   case 'yz'
+%   Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
+%   Seq.AQSlice(1).phi  = 0.0*pi;                   % 2nd rotation around y axis in RAD
+%   Seq.AQSlice(1).theta= 0.0*pi;                   % 3rd rotation around z axis in RAD
+%   case 'zx'
+%   Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
+%   Seq.AQSlice(1).phi  = 0.0*pi;                   % 2nd rotation around y axis in RAD
+%   Seq.AQSlice(1).theta= -0.5*pi;                  % 3rd rotation around z axis in RAD
+%   otherwise
+%   if ~ischar(orientation)
+%     orientation = num2str(orientation);
+%   end
+%   error('Unknown orientation "%s"\n', orientation);
+% end
+
+Seq.AQSlice = get_AlphaPhiTheta(Seq.AQSlice, 'zx');
+
 
 %% Set up sequence visualization %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Seq.plotSeqAQ = 1:3;
-Seq.LoopPlot = 1;
-Seq.AQSlice(1).plotkSpace = 1;
-Seq.AQSlice(1).plotImage = 1;
-Seq.AQSlice(1).plotPhase = 1;
+% Seq.plotSeqAQ = 1:3;
+% Seq.LoopPlot = 1;
+% Seq.AQSlice(1).plotkSpace = 1;
+% Seq.AQSlice(1).plotImage = 1;
+% Seq.AQSlice(1).plotPhase = 1;
 Seq.AQSlice(1).ZeroFillWindowSize = 1.4;
 Seq.AQSlice(1).ZeroFillFactor = 4;
 Seq.AQSlice(1).ThicknessPos = [0 0 -0.01]; % position of the slice
