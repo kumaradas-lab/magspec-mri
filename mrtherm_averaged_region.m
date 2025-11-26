@@ -2,7 +2,6 @@ clear all;
 close all;
 
 fName = 'exp1';
-
 % --- Set up save directory in Google Drive ---
 baseFolder = 'G:\My Drive\MR_Thermometry\My runs';             % main directory on Google Drive, can change this to match the path in your Google Drive
 todayFolder = datestr(now, 'yyyy-mm-dd');           % folder named with today's date
@@ -17,41 +16,33 @@ fName = fullfile(saveDir, ['exp1_' timestamp]);
 
 
 % Initialize Osensa temperature sensor
-osensa_dev = enable_osensa("COM3");                  % Change when setting up
+osensa_dev = enable_osensa("COM3");
 
 % Initialize MRI system parameters
 LoadSystem; % Load system parameters (reset to default: HW Seq AQ TX Grad)
 % HW.fLarmor = 23.42e6;                        % set correct Larmor frequency (0.55 T)
-% HW.FindFrequencySweep.fCenter = HW.fLarmor;     % center sweep near expected resonance
-% HW.FindFrequencySweep.fRange  = 500e3;       % widen sweep to ±250 kHz just in case, can increase the range depending on the medium
+% HW.FindFrequencySweep.fCenter = 23.42e6;     % center sweep near expected resonance
+% HW.FindFrequencySweep.fRange  = 500e3;       % widen sweep to ±250 kHz just in case
 % HW.FindFrequencySweep.fOffsetFIDsStdMaxValue = 5000;  % allow more noise tolerance
-%% Trying to fix FLASH sequence formatting error
-Seq.plotSeqAQ = [];
-Seq.LoopPlot =[];
-Seq.AQSlice(1).plokSpace =[];
-Seq.AqSlice(1).plotImage=[];
-Seq.AqSlice(1).plotPhase=[];
-
 
 Seq.Loops = 1; % Number of loop averages
 
 % Define parameters
 Seq.T1 = 100e-3;
-Seq.tEcho = 15e-3; % try for 3, 5, 20 increase TE for better  temp sensitivity
-Seq.tRep = 200e-3;   % try increasign TR 200 ms to stabilize phase
+Seq.tEcho = 15e-3; % try for 3, 5, 20
+Seq.tRep = 200e-3;    % try higher to stabilize the phase
 resolution = 32; % original 32x32
 thickness = 0.002; % original 0.002
 pausetime = 2;
 position = resolution / 2;
-measurement_time = 60; % Run time in seconds
+measurement_time = 300; % Run time in seconds
+
 
 % % Pixels and size %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Seq.AQSlice(1).nRead = resolution;
-Seq.AQSlice(1).nPhase(1) = resolution;
 Seq.AQSlice(1).nPhase(2) = resolution;
 Seq.AQSlice(1).HzPerPixMin = 0;
 Seq.AQSlice(1).sizeRead = 0.010;
-Seq.AQSlice(1).sizePhase(1) = 0.010;
 Seq.AQSlice(1).sizePhase(2) = 0.010;
 Seq.AQSlice(1).thickness = thickness;
 Seq.AQSlice(1).excitationPulse = @Pulse_Rect;
@@ -60,42 +51,48 @@ Seq.AQSlice(1).excitationPulse = @Pulse_Rect;
 Seq.AQSlice(1).PhaseOS(2) = 2;                      % oversampling phase(2)  1...
 
 % % Orientation in space %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% orientation = 'zx';                                 % 'xy', 'yz', 'zx' for one of the cardinal planes (read-phase)
-% switch orientation
-%   case 'xy'
-%   Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
-%   Seq.AQSlice(1).phi  = 0.5*pi;                   % 2nd rotation around y axis in RAD
-%   Seq.AQSlice(1).theta= 0.0*pi;                   % 3rd rotation around z axis in RAD
-%   case 'yz'
-%   Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
-%   Seq.AQSlice(1).phi  = 0.0*pi;                   % 2nd rotation around y axis in RAD
-%   Seq.AQSlice(1).theta= 0.0*pi;                   % 3rd rotation around z axis in RAD
-%   case 'zx'
-%   Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
-%   Seq.AQSlice(1).phi  = 0.0*pi;                   % 2nd rotation around y axis in RAD
-%   Seq.AQSlice(1).theta= -0.5*pi;                  % 3rd rotation around z axis in RAD
-%   otherwise
-%   if ~ischar(orientation)
-%     orientation = num2str(orientation);
-%   end
-%   error('Unknown orientation "%s"\n', orientation);
-% end
-
-Seq.AQSlice = get_AlphaPhiTheta(Seq.AQSlice, 'zx');
-
+orientation = 'zx';                                 % 'xy', 'yz', 'zx' for one of the cardinal planes (read-phase)
+switch orientation
+  case 'xy'
+  Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
+  Seq.AQSlice(1).phi  = 0.5*pi;                   % 2nd rotation around y axis in RAD
+  Seq.AQSlice(1).theta= 0.0*pi;                   % 3rd rotation around z axis in RAD
+  case 'yz'
+  Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
+  Seq.AQSlice(1).phi  = 0.0*pi;                   % 2nd rotation around y axis in RAD
+  Seq.AQSlice(1).theta= 0.0*pi;                   % 3rd rotation around z axis in RAD
+  case 'zx'
+  Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
+  Seq.AQSlice(1).phi  = 0.0*pi;                   % 2nd rotation around y axis in RAD
+  Seq.AQSlice(1).theta= -0.5*pi;                  % 3rd rotation around z axis in RAD
+  otherwise
+  if ~ischar(orientation)
+    orientation = num2str(orientation);
+  end
+  error('Unknown orientation "%s"\n', orientation);
+end
 
 %% Set up sequence visualization %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Seq.plotSeqAQ = 1:3;
-% Seq.LoopPlot = 1;
-% Seq.AQSlice(1).plotkSpace = 1;
-% Seq.AQSlice(1).plotImage = 1;
-% Seq.AQSlice(1).plotPhase = 1;
+%% Disable ALL internal plotting to prevent Pure Devices crashes
+Seq.plotSeqAQ = 0;
+Seq.LoopPlot = 0;
+Seq.AQSlice(1).plotkSpace = 0;
+Seq.AQSlice(1).plotImage = 0;
+Seq.AQSlice(1).plotImageHandle = [];
+Seq.AQSlice(1).plotPhase = 0;
+
+% Extra safety flags (PD code checks these too)
+Seq.plot = 0;
+Seq.AQPlot = 0;
+Seq.AQSlice(1).PlotImage = 0;
+Seq.AQSlice(1).PlotPhase = 0;
+Seq.AQSlice(1).PlotkSpace = 0;
 Seq.AQSlice(1).ZeroFillWindowSize = 1.4;
 Seq.AQSlice(1).ZeroFillFactor = 4;
 Seq.AQSlice(1).ThicknessPos = [0 0 -0.01]; % position of the slice
 
-Seq.CorrectSliceRephase = 1;        % Correct SliceGradTimeIntegralOffset
-Seq.CorrectReadRephase = 1;         % Correct ReadGradTimeIntegralOffset
+Seq.CorrectSliceRephase = 0;                        % Correct SliceGradTimeIntegralOffset
+Seq.CorrectReadRephase = 0;                         % Correct ReadGradTimeIntegralOffset
 Seq.CorrectPhase = 1;
 
 % Initialize data storage
@@ -118,11 +115,11 @@ while true
   [SeqLoop, mySave] = sequence_Flash(HW, Seq, AQ, TX, Grad, mySave);
   Acquisitiondata(i) = SeqLoop;
   
-  % % Extract phase data from acquired image
-  % Imagephase = unwrap(angle(SeqLoop.data.Image(position, 1, position)));
-  % Phasedata(i) = Imagephase;
-  % 
-  % % Compute phase difference
+  % Extract phase data from acquired image
+  Imagephase = unwrap(angle(SeqLoop.data.Image(position, 1, position)));
+  Phasedata(i) = Imagephase;
+  
+  % Compute phase difference
   % if i < 4
   %   deltaphase = 0;
   % elseif i == 5
@@ -131,7 +128,6 @@ while true
   % else
   %   deltaphase = Imagephase - Referencephase;
   % end
-
   %% Trying using 3x3 ROI innstead of single pixel for phase
   roiSize = 3;
   x1 = position - floor(roiSize/2);
@@ -148,11 +144,11 @@ while true
     Referencephase = roi_mean_phase;
     deltaphase = 0;
   else
-      raw= [Reference roi_mean_phase];
+      raw= [Referencephase roi_mean_phase];
       unwrapped = unwrap(raw);
     deltaphase = unwrapped(end)-unwrapped(1);
   end
-
+  
   Deltaphase(i) = deltaphase;
   
   % Plot phase difference over time
@@ -194,6 +190,7 @@ axis equal
 title('Image Phasemap')
 % Save full figure after both subplots are drawn
 saveas(figure5, fullfile(saveDir, ['Image_Magnitude_Phase_' timestamp '.png']));
+
 
 % Save all data
 save([fName '.mat'], 'Timedata', 'TemperatureData', 'Phasedata', 'Deltaphase', 'Acquisitiondata');

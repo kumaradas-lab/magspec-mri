@@ -6,3 +6,5 @@ This respository contains MATLAB code to interface with the Osensa temperature s
 - Discover the COM port of the Osensa device and set it in `mrtherm_averaged_region.m` file. You can double check if you have the right port by going into Device Manager on Windows. 
 - Connect your Google Drive and set the path 
 - One can, as a first step, test Osensa alone by runing `test_osensa.m` file.
+- If you encounter an error with the osensaMatlab mak sure that you add osensaMatlab to the path by rightclicking go to add path add folders and subfolders
+- Make sure that your G drive is connected and update the path if necessary for your ouput files to be stored properly. 
