@@ -3,7 +3,7 @@ function pulseData = Pulse_Sinc_2(HW, Center, Pulse, varargin)
 %
 %   pulseData = Pulse_Sinc_2(HW, Center, Pulse)
 % or:
-%   pulseData = Pulse_Sinc_2(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments,  maxLength, Frequency, Phase)
+%   pulseData = Pulse_Sinc_2(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments, MaxLength, Frequency, Phase)
 % additionally:
 %   excitationAngleFactor = Pulse_Sinc_2(HW, 'Amp')
 %   bandwidthFactor = Pulse_Sinc_2(HW, 'Time')
@@ -56,14 +56,16 @@ function pulseData = Pulse_Sinc_2(HW, Center, Pulse, varargin)
 % the duration of the pulse to have the same bandwidth (FWHM) as a rect pulse.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2013-2020 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2013-2024 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %-------------------------------------------------------------------------------
+
 
 %% check input
 if nargin == 2
   % short path (additional syntax)
   if strcmp(Center, 'Amp')
+    % pulseData = 6 * 1.06;  % Would probably also be possible
     pulseData = 6.6;
   elseif strcmp(Center, 'Time')
     pulseData = 6;
@@ -73,6 +75,7 @@ if nargin == 2
   return;
 end
 
+
 %% Convert from syntax (2) to syntax (1)
 if nargin < 3, Pulse = []; end
 if ~isstruct(Pulse), Pulse = struct('Bandwidth', Pulse); end
@@ -81,6 +84,7 @@ if nargin > 4, Pulse.MaxNumberOfSegments = varargin{2}; end
 if nargin > 5, Pulse.MaxLength = varargin{3}; end
 if nargin > 6, Pulse.Frequency = varargin{4}; end
 if nargin > 7, Pulse.Phase = varargin{5}; end
+
 
 %% default values
 Pulse = set_EmptyField(Pulse, 'FlipAngle', pi/2);
@@ -92,12 +96,13 @@ Pulse = set_EmptyField(Pulse, 'Phase', 0);
 Pulse = set_EmptyField(Pulse, 'Bandwidth', max(1/Pulse.MaxLength, 2e3));  % FIXME: Is this a sensible default?
 Pulse = set_EmptyField(Pulse, 'iDevice', 1);
 
+
 %% sinc pulse
 numberOfZeroCrossings = 6;  % number ot times the sinc function crosses zero [2,4,6,8,...]
 
 pulseDuration = numberOfZeroCrossings/Pulse.Bandwidth;  % duration of the whole pulse
 if Pulse.MaxLength+1/HW.TX(Pulse.iDevice).fSample < pulseDuration
-  error('maxLength is too short');
+  error('PD:Pulse_Sinc_2:MaxLengthTooShort', 'MaxLength is too short.');
 end
 
 % reduce the number of segments if the pulse is too short
@@ -110,23 +115,31 @@ else
 end
 
 % timeline rounded to DAC sample times
-tShape = round(linspace(-pulseDuration/2 + pulseDuration/numbersOfSegments, ...
-                        pulseDuration/2 - pulseDuration/numbersOfSegments, ...
-                        numbersOfSegments).' ...
-               * (HW.TX(Pulse.iDevice).fSample/2)) / (HW.TX(Pulse.iDevice).fSample/2);
+tStart = round((linspace(-pulseDuration/2, ...
+                         pulseDuration/2, ...
+                         numbersOfSegments+1).' + Center) ...
+               * HW.TX(Pulse.iDevice).fSample) / HW.TX(Pulse.iDevice).fSample;
 
 % calculate the start time such that the tShape time is centered on the rf pulse
-pulseData.Start = tShape - [diff(tShape); tShape(end)-tShape(end-1)]/2 + Center;
+pulseData.Start = tStart(1:end-1);
 % duration of pulse segments
-pulseData.Duration = [diff(pulseData.Start); pulseData.Start(end)-pulseData.Start(end-1)];
+pulseData.Duration = diff(tStart);
 % frequency of pulse segments
-pulseData.Frequency = zeros(numbersOfSegments,1) + Pulse.Frequency;
-% normalized amplitude at tShape
-B1Shape = sinc(tShape / pulseDuration * numberOfZeroCrossings);
+pulseData.Frequency = zeros(numbersOfSegments, 1) + Pulse.Frequency;
+% normalized amplitude at center of each segment
+B1Shape = sinc((tStart(1:end-1) + pulseData.Duration/2 - Center) / pulseDuration * numberOfZeroCrossings);
 % Amplitude (Tesla) of the B1+ field in the coil
-pulseData.Amplitude = abs(B1Shape) * ...
-  (2*HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec * Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / ...
-  sum(pulseData.Duration.*B1Shape, 1);
+% Use gamma that better matches the frequency of the pulse
+% FIXME: Could this be an issue with (very) off-center slice pulses?
+if abs(Pulse.Frequency - HW.fLarmorX) < abs(Pulse.Frequency - HW.fLarmor)
+  pulseData.Amplitude = abs(B1Shape) * ...
+    (2*pi/HW.GammaX * Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / ...
+    sum(pulseData.Duration.*B1Shape, 1);
+else
+  pulseData.Amplitude = abs(B1Shape) * ...
+    (2*HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec * Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / ...
+    sum(pulseData.Duration.*B1Shape, 1);
+end
 % Phase of pulse segments (no negative amplitude is allowed, so you have to add
 % 180 degrees to the phase to get an equivalent)
 pulseData.Phase = angle(B1Shape)/pi*180 + 0 + Pulse.Phase;

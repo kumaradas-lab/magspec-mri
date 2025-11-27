@@ -29,79 +29,154 @@ function Seq = get_Piezo(Seq, HW)
 % Seq.Piezo.Samples                         % The number of Gradient points maximal used
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2017-2020 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2017-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
 %%
 
-if isemptyfield(Seq.Piezo,'Frequency');         Seq.Piezo.Frequency=HW.Piezo.Frequency;end
-if isemptyfield(Seq.Piezo,'Start');             Seq.Piezo.Start=HW.Piezo.Start;end
-if isemptyfield(Seq.Piezo,'DisplacementPhase'); Seq.Piezo.DisplacementPhase=HW.Piezo.DisplacementPhase;end
-if isemptyfield(Seq.Piezo,'Periods');           Seq.Piezo.Periods=[];end;
-if isemptyfield(Seq.Piezo,'Duration');          Seq.Piezo.Duration=[];end;
-if isempty(Seq.Piezo.Duration);
-    if isempty(Seq.Piezo.Periods);
-        if isempty(HW.Piezo.Duration);
-            Seq.Piezo.Duration=HW.Piezo.Periods/Seq.Piezo.Frequency;
-        else
-            Seq.Piezo.Duration=HW.Piezo.Duration;
-        end
-    else
-        Seq.Piezo.Duration=Seq.Piezo.Periods/Seq.Piezo.Frequency;
-    end;
+if isemptyfield(Seq.Piezo,'Frequency')
+  Seq.Piezo.Frequency = HW.Piezo.Frequency;
 end
-if isemptyfield(Seq.Piezo,'Channel');                       Seq.Piezo.Channel=              HW.Piezo.Channel;end
-if isemptyfield(Seq.Piezo,'DisplacementPerVolt');           Seq.Piezo.DisplacementPerVolt=  HW.Piezo.DisplacementPerVolt;end
-if isemptyfield(Seq.Piezo,'DisplacementPerAmpere');         Seq.Piezo.DisplacementPerAmpere=HW.Piezo.DisplacementPerAmpere;end
-if isemptyfield(Seq.Piezo,'VoltageAmplitudeMax');           Seq.Piezo.VoltageAmplitudeMax=  HW.Piezo.VoltageAmplitudeMax;end
-if isemptyfield(Seq.Piezo,'CurrentAmplitudeMax');           Seq.Piezo.CurrentAmplitudeMax=  HW.Piezo.CurrentAmplitudeMax;end
-if isemptyfield(Seq.Piezo,'Capacity');                      Seq.Piezo.Capacity=             HW.Piezo.Capacity;end                % Capacity of piezo
-if isemptyfield(Seq.Piezo,'Inductance');                    Seq.Piezo.Inductance=           HW.Piezo.Inductance;end                % Capacity of piezo
-if isemptyfield(Seq.Piezo,'Resistance');                    Seq.Piezo.Resistance=           HW.Piezo.Resistance;end              % Parallel resistance to piezo to get 20 V offset voltage e.g. 100 ohm
-if isemptyfield(Seq.Piezo,'OffsetVoltage');                 Seq.Piezo.OffsetVoltage=        HW.Piezo.OffsetVoltage;end      % offset voltage e.g. 20 V
-if isemptyfield(Seq.Piezo,'OffsetCurrent');                 Seq.Piezo.OffsetCurrent=        HW.Piezo.OffsetCurrent;end      % offeset current to get 20 V offset voltage e.g. 0.2 A
-if isemptyfield(Seq.Piezo,'OffsetOverdrivePercent');        Seq.Piezo.OffsetOverdrivePercent=       HW.Piezo.OffsetOverdrivePercent;end
-if isemptyfield(Seq.Piezo,'OffsetRampTime');                Seq.Piezo.OffsetRampTime=               HW.Piezo.OffsetRampTime;end
-if isemptyfield(Seq.Piezo,'OffsetSetTime');                 Seq.Piezo.OffsetSetTime=                HW.Piezo.OffsetSetTime;end
-if isemptyfield(Seq.Piezo,'OffsetBeforeAfterSeq');          Seq.Piezo.OffsetBeforeAfterSeq=         HW.Piezo.OffsetBeforeAfterSeq;end
-if isemptyfield(Seq.Piezo,'PreEmphasisPeriods');            Seq.Piezo.PreEmphasisPeriods=           HW.Piezo.PreEmphasisPeriods;end
-if isemptyfield(Seq.Piezo,'PreEmphasisOverdrivePercent');   Seq.Piezo.PreEmphasisOverdrivePercent=  HW.Piezo.PreEmphasisOverdrivePercent;end
-if isemptyfield(Seq.Piezo,'PreEmphasisRelativeAmplitude');  Seq.Piezo.PreEmphasisRelativeAmplitude= HW.Piezo.PreEmphasisRelativeAmplitude        ;end
-if isemptyfield(Seq.Piezo,'PreEmphasisTime');               Seq.Piezo.PreEmphasisTime=              HW.Piezo.PreEmphasisRelativeTime         .*Seq.Piezo.PreEmphasisPeriods./Seq.Piezo.Frequency;end
-if isemptyfield(Seq.Piezo,'PostEmphasisPeriods');           Seq.Piezo.PostEmphasisPeriods=          HW.Piezo.PostEmphasisPeriods;end
-if isemptyfield(Seq.Piezo,'PostEmphasisOverdrivePercent');  Seq.Piezo.PostEmphasisOverdrivePercent= HW.Piezo.PostEmphasisOverdrivePercent;end
-if isemptyfield(Seq.Piezo,'PostEmphasisRelativeAmplitude'); Seq.Piezo.PostEmphasisRelativeAmplitude=HW.Piezo.PostEmphasisRelativeAmplitude     ;end
-if isemptyfield(Seq.Piezo,'PostEmphasisTime');              Seq.Piezo.PostEmphasisTime=             HW.Piezo.PostEmphasisRelativeTime      .*Seq.Piezo.PostEmphasisPeriods./Seq.Piezo.Frequency;end
-if isemptyfield(Seq.Piezo,'UseAtRepetitionTime');           Seq.Piezo.UseAtRepetitionTime=          HW.Piezo.UseAtRepetitionTime;end
-if isemptyfield(Seq.Piezo,'CLTopBottom');                   Seq.Piezo.CLTopBottom=                  Seq.MEG.tEchoExtra>100e-6;end
-if isemptyfield(Seq.Piezo,'Samples');
-    if isempty(HW.Piezo.Samples)
-        Seq.Piezo.Samples=4*(round(Seq.Piezo.Duration*Seq.Piezo.Frequency)+round(Seq.Piezo.PreEmphasisPeriods)+round(Seq.Piezo.PostEmphasisPeriods))+2*5;
+if isemptyfield(Seq.Piezo,'Start')
+  Seq.Piezo.Start = HW.Piezo.Start;
+end
+if isemptyfield(Seq.Piezo,'DisplacementPhase')
+  Seq.Piezo.DisplacementPhase = HW.Piezo.DisplacementPhase;
+end
+if isemptyfield(Seq.Piezo,'Periods')
+  Seq.Piezo.Periods = [];
+end
+if isemptyfield(Seq.Piezo, 'Duration')
+  Seq.Piezo.Duration = [];
+end
+if isempty(Seq.Piezo.Duration)
+  if isempty(Seq.Piezo.Periods)
+    if isempty(HW.Piezo.Duration)
+      Seq.Piezo.Duration = HW.Piezo.Periods/Seq.Piezo.Frequency;
     else
-        Seq.Piezo.Samples=HW.Piezo.Samples;
+      Seq.Piezo.Duration = HW.Piezo.Duration;
     end
+  else
+    Seq.Piezo.Duration = Seq.Piezo.Periods/Seq.Piezo.Frequency;
+  end
+end
+if isemptyfield(Seq.Piezo, 'Channel')
+  Seq.Piezo.Channel = HW.Piezo.Channel;
+end
+if isemptyfield(Seq.Piezo, 'DisplacementPerVolt')
+  Seq.Piezo.DisplacementPerVolt = HW.Piezo.DisplacementPerVolt;
+end
+if isemptyfield(Seq.Piezo, 'DisplacementPerAmpere')
+  Seq.Piezo.DisplacementPerAmpere = HW.Piezo.DisplacementPerAmpere;
+end
+if isemptyfield(Seq.Piezo, 'VoltageAmplitudeMax')
+  Seq.Piezo.VoltageAmplitudeMax = HW.Piezo.VoltageAmplitudeMax;
+end
+if isemptyfield(Seq.Piezo, 'CurrentAmplitudeMax')
+  Seq.Piezo.CurrentAmplitudeMax = HW.Piezo.CurrentAmplitudeMax;
+end
+if isemptyfield(Seq.Piezo, 'Capacity')
+  % Capacity of piezo
+  Seq.Piezo.Capacity = HW.Piezo.Capacity;
+end
+if isemptyfield(Seq.Piezo, 'Inductance')
+  % Inductance of piezo
+  Seq.Piezo.Inductance = HW.Piezo.Inductance;
+end
+if isemptyfield(Seq.Piezo, 'Resistance')
+  % Parallel resistance to piezo to get 20 V offset voltage, e.g., 100 Ohm
+  Seq.Piezo.Resistance = HW.Piezo.Resistance;
+end
+if isemptyfield(Seq.Piezo, 'OffsetVoltage')
+  % offset voltage, e.g., 20 V
+  Seq.Piezo.OffsetVoltage = HW.Piezo.OffsetVoltage;
+end
+if isemptyfield(Seq.Piezo,'OffsetCurrent')
+  % offeset current to get 20 V offset voltage e.g. 0.2 A
+  Seq.Piezo.OffsetCurrent = HW.Piezo.OffsetCurrent;
+end
+if isemptyfield(Seq.Piezo, 'OffsetOverdrivePercent')
+  Seq.Piezo.OffsetOverdrivePercent = HW.Piezo.OffsetOverdrivePercent;
+end
+if isemptyfield(Seq.Piezo, 'OffsetRampTime')
+  Seq.Piezo.OffsetRampTime = HW.Piezo.OffsetRampTime;
+end
+if isemptyfield(Seq.Piezo, 'OffsetSetTime')
+  Seq.Piezo.OffsetSetTime = HW.Piezo.OffsetSetTime;
+end
+if isemptyfield(Seq.Piezo, 'OffsetBeforeAfterSeq')
+  Seq.Piezo.OffsetBeforeAfterSeq = HW.Piezo.OffsetBeforeAfterSeq;
+end
+if isemptyfield(Seq.Piezo, 'PreEmphasisPeriods')
+  Seq.Piezo.PreEmphasisPeriods = HW.Piezo.PreEmphasisPeriods;
+end
+if isemptyfield(Seq.Piezo, 'PreEmphasisOverdrivePercent')
+  Seq.Piezo.PreEmphasisOverdrivePercent = HW.Piezo.PreEmphasisOverdrivePercent;
+end
+if isemptyfield(Seq.Piezo, 'PreEmphasisRelativeAmplitude')
+  Seq.Piezo.PreEmphasisRelativeAmplitude = HW.Piezo.PreEmphasisRelativeAmplitude;
+end
+if isemptyfield(Seq.Piezo, 'PreEmphasisTime')
+  Seq.Piezo.PreEmphasisTime = HW.Piezo.PreEmphasisRelativeTime ...
+    .* Seq.Piezo.PreEmphasisPeriods ./ Seq.Piezo.Frequency;
+end
+if isemptyfield(Seq.Piezo, 'PostEmphasisPeriods')
+  Seq.Piezo.PostEmphasisPeriods = HW.Piezo.PostEmphasisPeriods;
+end
+if isemptyfield(Seq.Piezo, 'PostEmphasisOverdrivePercent')
+  Seq.Piezo.PostEmphasisOverdrivePercent = HW.Piezo.PostEmphasisOverdrivePercent;
+end
+if isemptyfield(Seq.Piezo, 'PostEmphasisRelativeAmplitude')
+  Seq.Piezo.PostEmphasisRelativeAmplitude = HW.Piezo.PostEmphasisRelativeAmplitude;
+end
+if isemptyfield(Seq.Piezo, 'PostEmphasisTime')
+  Seq.Piezo.PostEmphasisTime = HW.Piezo.PostEmphasisRelativeTime ...
+    .* Seq.Piezo.PostEmphasisPeriods ./ Seq.Piezo.Frequency;
+end
+if isemptyfield(Seq.Piezo, 'UseAtRepetitionTime')
+  Seq.Piezo.UseAtRepetitionTime = HW.Piezo.UseAtRepetitionTime;
+end
+if isemptyfield(Seq.Piezo, 'CLTopBottom')
+  Seq.Piezo.CLTopBottom = (Seq.MEG.tEchoExtra > 100e-6);
+end
+if isemptyfield(Seq.Piezo, 'Samples')
+  if isempty(HW.Piezo.Samples)
+    Seq.Piezo.Samples = 4*(round(Seq.Piezo.Duration*Seq.Piezo.Frequency)+round(Seq.Piezo.PreEmphasisPeriods)+round(Seq.Piezo.PostEmphasisPeriods))+2*5;
+  else
+    Seq.Piezo.Samples = HW.Piezo.Samples;
+  end
 end
 
 if Seq.Piezo.DisplacementPerVolt
-  if isemptyfield(Seq.Piezo,'DisplacementAmplitudeMax');      Seq.Piezo.DisplacementAmplitudeMax=Seq.Piezo.VoltageAmplitudeMax.*Seq.Piezo.DisplacementPerVolt;end
-  Seq.Piezo.Reactance=-1/(2*pi*Seq.Piezo.Frequency*Seq.Piezo.Capacity);
-  Seq.Piezo.Impedance=1/(1/Seq.Piezo.Resistance+1/(1i*Seq.Piezo.Reactance));
+  if isemptyfield(Seq.Piezo, 'DisplacementAmplitudeMax')
+    Seq.Piezo.DisplacementAmplitudeMax = ...
+      Seq.Piezo.VoltageAmplitudeMax .* Seq.Piezo.DisplacementPerVolt;
+  end
+  Seq.Piezo.Reactance = -1/(2*pi*Seq.Piezo.Frequency*Seq.Piezo.Capacity);
+  Seq.Piezo.Impedance = 1/(1/Seq.Piezo.Resistance+1/(1i*Seq.Piezo.Reactance));
 
   if ~isemptyfield(Seq.Piezo, 'DisplacementAmplitude')
-      Seq.Piezo.VoltageAmplitude=abs(Seq.Piezo.DisplacementAmplitude./Seq.Piezo.DisplacementPerVolt);
+    Seq.Piezo.VoltageAmplitude=abs(Seq.Piezo.DisplacementAmplitude./Seq.Piezo.DisplacementPerVolt);
   end
   if ~isemptyfield(Seq.Piezo, 'VoltageAmplitude')
-      Seq.Piezo.DisplacementAmplitude=abs(Seq.Piezo.DisplacementPerVolt.*Seq.Piezo.VoltageAmplitude);
-      Seq.Piezo.CurrentAmplitude=abs(Seq.Piezo.VoltageAmplitude./Seq.Piezo.Impedance);
+    Seq.Piezo.DisplacementAmplitude = ...
+      abs(Seq.Piezo.DisplacementPerVolt .* Seq.Piezo.VoltageAmplitude);
+    Seq.Piezo.CurrentAmplitude = ...
+      abs(Seq.Piezo.VoltageAmplitude ./ Seq.Piezo.Impedance);
   end
   if ~isemptyfield(Seq.Piezo, 'CurrentAmplitude')
-      Seq.Piezo.VoltageAmplitude=abs(Seq.Piezo.CurrentAmplitude.*Seq.Piezo.Impedance);
-      Seq.Piezo.DisplacementAmplitude=abs(Seq.Piezo.DisplacementPerVolt.*Seq.Piezo.VoltageAmplitude);
-      Seq.Piezo.CurrentPhase=angle(Seq.Piezo.VoltageAmplitude./Seq.Piezo.Impedance)/pi*180;
+    Seq.Piezo.VoltageAmplitude = ...
+      abs(Seq.Piezo.CurrentAmplitude .* Seq.Piezo.Impedance);
+    Seq.Piezo.DisplacementAmplitude = ...
+      abs(Seq.Piezo.DisplacementPerVolt .* Seq.Piezo.VoltageAmplitude);
+    Seq.Piezo.CurrentPhase = ...
+      angle(Seq.Piezo.VoltageAmplitude ./ Seq.Piezo.Impedance) / pi * 180;
   end
 
-  MaxRelativeOverdrive=max(max(abs(Seq.Piezo.PreEmphasisRelativeAmplitude)),max(abs(Seq.Piezo.PostEmphasisRelativeAmplitude)));
+  MaxRelativeOverdrive = max(...
+    max(abs(Seq.Piezo.PreEmphasisRelativeAmplitude)), ...
+    max(abs(Seq.Piezo.PostEmphasisRelativeAmplitude)));
 
   if Seq.Piezo.DisplacementAmplitude*MaxRelativeOverdrive > Seq.Piezo.DisplacementAmplitudeMax
     warning('Piezo:DisplacementAmplitude', ...
@@ -109,10 +184,14 @@ if Seq.Piezo.DisplacementPerVolt
       Seq.Piezo.DisplacementAmplitude*MaxRelativeOverdrive/Seq.Piezo.DisplacementAmplitudeMax*100, ...
       Seq.Piezo.DisplacementAmplitudeMax/MaxRelativeOverdrive);
     % error(['Seq.Piezo.DisplacementAmplitude too high ( ' num2str( Seq.Piezo.DisplacementAmplitude/Seq.Piezo.DisplacementAmplitudeMax*100,'%10.1f') '% )'])
-    Seq.Piezo.DisplacementAmplitude = Seq.Piezo.DisplacementAmplitudeMax/MaxRelativeOverdrive;
-    Seq.Piezo.VoltageAmplitude=abs(Seq.Piezo.DisplacementAmplitude./Seq.Piezo.DisplacementPerVolt);
-    Seq.Piezo.CurrentAmplitude=abs(Seq.Piezo.VoltageAmplitude./Seq.Piezo.Impedance);
-    Seq.Piezo.CurrentPhase=angle(Seq.Piezo.VoltageAmplitude./Seq.Piezo.Impedance)/pi*180;
+    Seq.Piezo.DisplacementAmplitude = ...
+      Seq.Piezo.DisplacementAmplitudeMax / MaxRelativeOverdrive;
+    Seq.Piezo.VoltageAmplitude = ...
+      abs(Seq.Piezo.DisplacementAmplitude ./ Seq.Piezo.DisplacementPerVolt);
+    Seq.Piezo.CurrentAmplitude = ...
+      abs(Seq.Piezo.VoltageAmplitude ./ Seq.Piezo.Impedance);
+    Seq.Piezo.CurrentPhase = ...
+      angle(Seq.Piezo.VoltageAmplitude ./ Seq.Piezo.Impedance) / pi * 180;
   end
   if Seq.Piezo.VoltageAmplitude*MaxRelativeOverdrive > Seq.Piezo.VoltageAmplitudeMax
     warning('Piezo:VoltageAmplitude', ...
@@ -120,10 +199,14 @@ if Seq.Piezo.DisplacementPerVolt
       Seq.Piezo.VoltageAmplitude*MaxRelativeOverdrive/Seq.Piezo.VoltageAmplitudeMax*100, ...
       Seq.Piezo.VoltageAmplitudeMax/MaxRelativeOverdrive);
     % error(['Seq.Piezo.VoltageAmplitude too high ( ' num2str( Seq.Piezo.VoltageAmplitude/Seq.Piezo.VoltageAmplitudeMax*100,'%10.1f') '% )'])
-    Seq.Piezo.VoltageAmplitude = Seq.Piezo.VoltageAmplitudeMax/MaxRelativeOverdrive;
-    Seq.Piezo.DisplacementAmplitude=abs(Seq.Piezo.DisplacementPerVolt.*Seq.Piezo.VoltageAmplitude);
-    Seq.Piezo.CurrentAmplitude=abs(Seq.Piezo.VoltageAmplitude./Seq.Piezo.Impedance);
-    Seq.Piezo.CurrentPhase=angle(Seq.Piezo.VoltageAmplitude./Seq.Piezo.Impedance)/pi*180;
+    Seq.Piezo.VoltageAmplitude = ...
+      Seq.Piezo.VoltageAmplitudeMax / MaxRelativeOverdrive;
+    Seq.Piezo.DisplacementAmplitude = ...
+      abs(Seq.Piezo.DisplacementPerVolt .* Seq.Piezo.VoltageAmplitude);
+    Seq.Piezo.CurrentAmplitude = ...
+      abs(Seq.Piezo.VoltageAmplitude ./ Seq.Piezo.Impedance);
+    Seq.Piezo.CurrentPhase = ...
+      angle(Seq.Piezo.VoltageAmplitude ./ Seq.Piezo.Impedance) / pi * 180;
   end
   if Seq.Piezo.CurrentAmplitude*MaxRelativeOverdrive > Seq.Piezo.CurrentAmplitudeMax
     warning('Piezo:CurrentAmplitude', ...
@@ -131,45 +214,63 @@ if Seq.Piezo.DisplacementPerVolt
       Seq.Piezo.CurrentAmplitude*MaxRelativeOverdrive/Seq.Piezo.CurrentAmplitudeMax*100, ...
       Seq.Piezo.CurrentAmplitudeMax/MaxRelativeOverdrive)
     % error(['Seq.Piezo.CurrentAmplitude too high( ' num2str( Seq.Piezo.CurrentAmplitude/Seq.Piezo.CurrentAmplitudeMax*100,'%10.1f') '% )'])
-    Seq.Piezo.CurrentAmplitude = Seq.Piezo.CurrentAmplitudeMax/MaxRelativeOverdrive;
-    Seq.Piezo.VoltageAmplitude=abs(Seq.Piezo.CurrentAmplitude.*Seq.Piezo.Impedance);
-    Seq.Piezo.DisplacementAmplitude=abs(Seq.Piezo.DisplacementPerVolt.*Seq.Piezo.VoltageAmplitude);
-    Seq.Piezo.CurrentPhase=angle(Seq.Piezo.VoltageAmplitude./Seq.Piezo.Impedance)/pi*180;
+    Seq.Piezo.CurrentAmplitude = ...
+      Seq.Piezo.CurrentAmplitudeMax / MaxRelativeOverdrive;
+    Seq.Piezo.VoltageAmplitude = ...
+      abs(Seq.Piezo.CurrentAmplitude .* Seq.Piezo.Impedance);
+    Seq.Piezo.DisplacementAmplitude = ...
+      abs(Seq.Piezo.DisplacementPerVolt .* Seq.Piezo.VoltageAmplitude);
+    Seq.Piezo.CurrentPhase = ...
+      angle(Seq.Piezo.VoltageAmplitude ./ Seq.Piezo.Impedance) / pi * 180;
   end
 
   if HW.Grad.PaCurrentControlled(HW.Piezo.Channel)
-      Seq.Piezo.Phase         =Seq.Piezo.DisplacementPhase+Seq.Piezo.CurrentPhase;    % corrected Phase
-      Seq.Piezo.Amplitude     =Seq.Piezo.CurrentAmplitude;                            % Amplitude of Piezo current
-      Seq.Piezo.OffsetAmplitude=Seq.Piezo.OffsetCurrent;
-      Seq.Piezo.OffsetVoltage=Seq.Piezo.OffsetCurrent*HW.Piezo.Resistance;
+    % corrected phase
+    Seq.Piezo.Phase = Seq.Piezo.DisplacementPhase + Seq.Piezo.CurrentPhase;
+    % amplitude of piezo current
+    Seq.Piezo.Amplitude = Seq.Piezo.CurrentAmplitude;
+    Seq.Piezo.OffsetAmplitude = Seq.Piezo.OffsetCurrent;
+    Seq.Piezo.OffsetVoltage = Seq.Piezo.OffsetCurrent * HW.Piezo.Resistance;
   else
-      Seq.Piezo.Phase         =Seq.Piezo.DisplacementPhase;                             % not corrected Phase
-      Seq.Piezo.Amplitude     =Seq.Piezo.VoltageAmplitude*HW.Piezo.DisplacementPerVolt; % Amplitude of Piezo
-      Seq.Piezo.OffsetAmplitude=Seq.Piezo.OffsetVoltage*HW.Piezo.DisplacementPerVolt;
-      Seq.Piezo.OffsetCurrent =Seq.Piezo.OffsetVoltage/HW.Piezo.Resistance;
+    % not corrected phase
+    Seq.Piezo.Phase = Seq.Piezo.DisplacementPhase;
+    % amplitude of piezo
+    Seq.Piezo.Amplitude = Seq.Piezo.VoltageAmplitude * HW.Piezo.DisplacementPerVolt;
+    Seq.Piezo.OffsetAmplitude = Seq.Piezo.OffsetVoltage * HW.Piezo.DisplacementPerVolt;
+    Seq.Piezo.OffsetCurrent = Seq.Piezo.OffsetVoltage / HW.Piezo.Resistance;
   end
 
 
 else % Coil
-  if isemptyfield(Seq.Piezo,'DisplacementAmplitudeMax');      Seq.Piezo.DisplacementAmplitudeMax=Seq.Piezo.CurrentAmplitudeMax.*Seq.Piezo.DisplacementPerAmpere;end
+  if isemptyfield(Seq.Piezo,'DisplacementAmplitudeMax')
+    Seq.Piezo.DisplacementAmplitudeMax = ...
+      Seq.Piezo.CurrentAmplitudeMax .* Seq.Piezo.DisplacementPerAmpere;
+  end
   Seq.Piezo.Reactance=2*pi*Seq.Piezo.Frequency*Seq.Piezo.Inductance;
   Seq.Piezo.Impedance=Seq.Piezo.Resistance+1i*Seq.Piezo.Reactance;
 
   if ~isemptyfield(Seq.Piezo, 'DisplacementAmplitude')
-      Seq.Piezo.CurrentAmplitude=abs(Seq.Piezo.DisplacementAmplitude./Seq.Piezo.DisplacementPerAmpere);
+    Seq.Piezo.CurrentAmplitude = ...
+      abs(Seq.Piezo.DisplacementAmplitude ./ Seq.Piezo.DisplacementPerAmpere);
   end
   if ~isemptyfield(Seq.Piezo, 'CurrentAmplitude')
-      Seq.Piezo.DisplacementAmplitude=abs(Seq.Piezo.CurrentAmplitude.*Seq.Piezo.DisplacementPerAmpere);
-      Seq.Piezo.VoltageAmplitude=abs(Seq.Piezo.CurrentAmplitude.*Seq.Piezo.Impedance);
-
+    Seq.Piezo.DisplacementAmplitude = ...
+      abs(Seq.Piezo.CurrentAmplitude .* Seq.Piezo.DisplacementPerAmpere);
+    Seq.Piezo.VoltageAmplitude = ...
+      abs(Seq.Piezo.CurrentAmplitude .* Seq.Piezo.Impedance);
   end
   if ~isemptyfield(Seq.Piezo, 'VoltageAmplitude')
-      Seq.Piezo.CurrentAmplitude=abs(Seq.Piezo.VoltageAmplitude./Seq.Piezo.Impedance);
-      Seq.Piezo.DisplacementAmplitude=abs(Seq.Piezo.CurrentAmplitude.*Seq.Piezo.DisplacementPerAmpere);
-      Seq.Piezo.VoltagePhase=angle(Seq.Piezo.VoltageAmplitude./Seq.Piezo.Impedance)/pi*180;
- end
+    Seq.Piezo.CurrentAmplitude = ...
+      abs(Seq.Piezo.VoltageAmplitude ./ Seq.Piezo.Impedance);
+    Seq.Piezo.DisplacementAmplitude = ...
+      abs(Seq.Piezo.CurrentAmplitude .* Seq.Piezo.DisplacementPerAmpere);
+    Seq.Piezo.VoltagePhase = ...
+      angle(Seq.Piezo.VoltageAmplitude ./ Seq.Piezo.Impedance) / pi * 180;
+  end
 
-  MaxRelativeOverdrive=max(max(abs(Seq.Piezo.PreEmphasisRelativeAmplitude)),max(abs(Seq.Piezo.PostEmphasisRelativeAmplitude)));
+  MaxRelativeOverdrive = max(...
+    max(abs(Seq.Piezo.PreEmphasisRelativeAmplitude)), ...
+    max(abs(Seq.Piezo.PostEmphasisRelativeAmplitude)));
 
   if Seq.Piezo.DisplacementAmplitude*MaxRelativeOverdrive > Seq.Piezo.DisplacementAmplitudeMax
     warning('Piezo:DisplacementAmplitude', ...
@@ -177,10 +278,14 @@ else % Coil
       Seq.Piezo.DisplacementAmplitude*MaxRelativeOverdrive/Seq.Piezo.DisplacementAmplitudeMax*100, ...
       Seq.Piezo.DisplacementAmplitudeMax/MaxRelativeOverdrive)
     % error(['Seq.Piezo.DisplacementAmplitude too high ( ' num2str( Seq.Piezo.DisplacementAmplitude/Seq.Piezo.DisplacementAmplitudeMax*100,'%10.1f') '% )'])
-    Seq.Piezo.DisplacementAmplitude = Seq.Piezo.DisplacementAmplitudeMax/MaxRelativeOverdrive;
-    Seq.Piezo.CurrentAmplitude=abs(Seq.Piezo.DisplacementAmplitude./Seq.Piezo.DisplacementPerAmpere);
-    Seq.Piezo.VoltageAmplitude=abs(Seq.Piezo.CurrentAmplitude.*Seq.Piezo.Impedance);
-    Seq.Piezo.VoltagePhase=angle(Seq.Piezo.VoltageAmplitude./Seq.Piezo.Impedance)/pi*180;
+    Seq.Piezo.DisplacementAmplitude = ...
+      Seq.Piezo.DisplacementAmplitudeMax / MaxRelativeOverdrive;
+    Seq.Piezo.CurrentAmplitude = ...
+      abs(Seq.Piezo.DisplacementAmplitude ./ Seq.Piezo.DisplacementPerAmpere);
+    Seq.Piezo.VoltageAmplitude = ...
+      abs(Seq.Piezo.CurrentAmplitude .* Seq.Piezo.Impedance);
+    Seq.Piezo.VoltagePhase = ...
+      angle(Seq.Piezo.VoltageAmplitude ./ Seq.Piezo.Impedance) / pi * 180;
   end
   if Seq.Piezo.VoltageAmplitude*MaxRelativeOverdrive > Seq.Piezo.VoltageAmplitudeMax
     warning('Piezo:VoltageAmplitude', ...
@@ -188,10 +293,14 @@ else % Coil
       Seq.Piezo.VoltageAmplitude*MaxRelativeOverdrive/Seq.Piezo.VoltageAmplitudeMax*100, ...
       Seq.Piezo.VoltageAmplitudeMax/MaxRelativeOverdrive);
     % error(['Seq.Piezo.VoltageAmplitude too high ( ' num2str( Seq.Piezo.VoltageAmplitude/Seq.Piezo.VoltageAmplitudeMax*100,'%10.1f') '% )'])
-    Seq.Piezo.VoltageAmplitude = Seq.Piezo.VoltageAmplitudeMax/MaxRelativeOverdrive;
-    Seq.Piezo.CurrentAmplitude=abs(Seq.Piezo.VoltageAmplitude./Seq.Piezo.Impedance);
-    Seq.Piezo.DisplacementAmplitude=abs(Seq.Piezo.CurrentAmplitude.*Seq.Piezo.DisplacementPerAmpere);
-    Seq.Piezo.VoltagePhase=angle(Seq.Piezo.VoltageAmplitude./Seq.Piezo.Impedance)/pi*180;
+    Seq.Piezo.VoltageAmplitude = ...
+      Seq.Piezo.VoltageAmplitudeMax / MaxRelativeOverdrive;
+    Seq.Piezo.CurrentAmplitude = ...
+      abs(Seq.Piezo.VoltageAmplitude ./ Seq.Piezo.Impedance);
+    Seq.Piezo.DisplacementAmplitude = ...
+      abs(Seq.Piezo.CurrentAmplitude .* Seq.Piezo.DisplacementPerAmpere);
+    Seq.Piezo.VoltagePhase = ...
+      angle(Seq.Piezo.VoltageAmplitude ./ Seq.Piezo.Impedance) / pi * 180;
   end
   if Seq.Piezo.CurrentAmplitude*MaxRelativeOverdrive > Seq.Piezo.CurrentAmplitudeMax
     warning('Piezo:CurrentAmplitude', ...
@@ -199,82 +308,94 @@ else % Coil
       Seq.Piezo.CurrentAmplitude*MaxRelativeOverdrive/Seq.Piezo.CurrentAmplitudeMax*100, ...
       Seq.Piezo.CurrentAmplitudeMax/MaxRelativeOverdrive);
     % error(['Seq.Piezo.CurrentAmplitude too high( ' num2str( Seq.Piezo.CurrentAmplitude/Seq.Piezo.CurrentAmplitudeMax*100,'%10.1f') '% )'])
-    Seq.Piezo.CurrentAmplitude = Seq.Piezo.CurrentAmplitudeMax/MaxRelativeOverdrive;
-    Seq.Piezo.DisplacementAmplitude=abs(Seq.Piezo.CurrentAmplitude.*Seq.Piezo.DisplacementPerAmpere);
-    Seq.Piezo.VoltageAmplitude=abs(Seq.Piezo.CurrentAmplitude.*Seq.Piezo.Impedance);
-    Seq.Piezo.VoltagePhase=angle(Seq.Piezo.VoltageAmplitude./Seq.Piezo.Impedance)/pi*180;
+    Seq.Piezo.CurrentAmplitude = ...
+      Seq.Piezo.CurrentAmplitudeMax / MaxRelativeOverdrive;
+    Seq.Piezo.DisplacementAmplitude = ...
+      abs(Seq.Piezo.CurrentAmplitude .* Seq.Piezo.DisplacementPerAmpere);
+    Seq.Piezo.VoltageAmplitude = ...
+      abs(Seq.Piezo.CurrentAmplitude .* Seq.Piezo.Impedance);
+    Seq.Piezo.VoltagePhase = ...
+      angle(Seq.Piezo.VoltageAmplitude ./ Seq.Piezo.Impedance) / pi * 180;
   end
 
   if HW.Grad.PaCurrentControlled(HW.Piezo.Channel)
-    Seq.Piezo.Phase               =Seq.Piezo.DisplacementPhase;                           % not corrected Phase
-    Seq.Piezo.Amplitude           =Seq.Piezo.CurrentAmplitude*HW.Piezo.DisplacementPerAmpere; % Amplitude of Coil
-    Seq.Piezo.OffsetAmplitude     =Seq.Piezo.OffsetCurrent*HW.Piezo.DisplacementPerAmpere;
-    Seq.Piezo.OffsetVoltage       =Seq.Piezo.OffsetCurrent*HW.Piezo.Resistance;
+    % not corrected phase
+    Seq.Piezo.Phase = Seq.Piezo.DisplacementPhase;
+    % amplitude of coil
+    Seq.Piezo.Amplitude = Seq.Piezo.CurrentAmplitude * HW.Piezo.DisplacementPerAmpere;
+    Seq.Piezo.OffsetAmplitude = Seq.Piezo.OffsetCurrent * HW.Piezo.DisplacementPerAmpere;
+    Seq.Piezo.OffsetVoltage = Seq.Piezo.OffsetCurrent * HW.Piezo.Resistance;
   else
-    Seq.Piezo.Phase               =Seq.Piezo.DisplacementPhase+Seq.Piezo.VoltagePhase;      % corrected Phase
-    Seq.Piezo.Amplitude           =Seq.Piezo.VoltageAmplitude;                              % Amplitude of coil Voltage
-    Seq.Piezo.OffsetAmplitude     =Seq.Piezo.OffsetCurrent*HW.Piezo.Resistance;
-    Seq.Piezo.OffsetCurrent       =Seq.Piezo.OffsetCurrent;
-    HW.Grad.LoadRin(4)=abs(Seq.Piezo.Impedance);
+    % corrected phase
+    Seq.Piezo.Phase = Seq.Piezo.DisplacementPhase + Seq.Piezo.VoltagePhase;
+    % amplitude of coil Voltage
+    Seq.Piezo.Amplitude = Seq.Piezo.VoltageAmplitude;
+    Seq.Piezo.OffsetAmplitude = Seq.Piezo.OffsetCurrent * HW.Piezo.Resistance;
+    Seq.Piezo.OffsetCurrent = Seq.Piezo.OffsetCurrent;
+    HW.Grad.LoadRin(4) = abs(Seq.Piezo.Impedance);
   end
 
 
 end
 
-Seq.Piezo.Periods=round(Seq.Piezo.Duration*Seq.Piezo.Frequency);
-Seq.Piezo.Duration=Seq.Piezo.Periods/Seq.Piezo.Frequency;
-Seq.Piezo.PreEmphasisPeriods=round(Seq.Piezo.PreEmphasisPeriods);
-Seq.Piezo.PostEmphasisPeriods=round(Seq.Piezo.PostEmphasisPeriods);
+Seq.Piezo.Periods = round(Seq.Piezo.Duration*Seq.Piezo.Frequency);
+Seq.Piezo.Duration = Seq.Piezo.Periods/Seq.Piezo.Frequency;
+Seq.Piezo.PreEmphasisPeriods = round(Seq.Piezo.PreEmphasisPeriods);
+Seq.Piezo.PostEmphasisPeriods = round(Seq.Piezo.PostEmphasisPeriods);
 if Seq.SingletRep
-  Seq.Piezo.SamplesPerPeriode=floor((Seq.Piezo.Samples-2*16)/(Seq.Piezo.Periods+Seq.Piezo.PreEmphasisPeriods+Seq.Piezo.PostEmphasisPeriods)/2+1e-12)*2;
+  Seq.Piezo.SamplesPerPeriode = ...
+    floor((Seq.Piezo.Samples-2*16) / ...
+          (Seq.Piezo.Periods+Seq.Piezo.PreEmphasisPeriods+Seq.Piezo.PostEmphasisPeriods)/2+1e-12)*2;
 else
   Seq.Piezo.SamplesPerPeriode = ...
     floor((Seq.Piezo.Samples-2*16) / ...
           (min([max([Seq.tRep(1), Seq.tEcho-Seq.Piezo.Start]), Seq.Piezo.Duration]) * Seq.Piezo.Frequency + ...
            max([Seq.Piezo.PreEmphasisPeriods, Seq.Piezo.PostEmphasisPeriods]))/2 + 1e-12)*2;
 end
-Seq.Piezo.SamplesPerPeriode(Seq.Piezo.SamplesPerPeriode>22)=22;
+Seq.Piezo.SamplesPerPeriode(Seq.Piezo.SamplesPerPeriode>22) = 22;
 
-Seq.Piezo.Phase=mod(Seq.Piezo.Phase,360);
+Seq.Piezo.Phase = mod(Seq.Piezo.Phase, 360);
 
 
-if Seq.Piezo.SamplesPerPeriode<4;
+if Seq.Piezo.SamplesPerPeriode < 4
   error(['Seq.Piezo.Samples too small, min= ' num2str(4*(round(Seq.Piezo.Duration*Seq.Piezo.Frequency)+round(Seq.Piezo.PreEmphasisPeriods)+round(Seq.Piezo.PostEmphasisPeriods))+2*5)])
 elseif Seq.Piezo.SamplesPerPeriode < 11
 %   figure; plot(linspace(0,2*pi,7),1.095*sin(linspace(0,2*pi,7)),'-x',linspace(0,2*pi,1000),sin(linspace(0,2*pi,1000))); shg;
-  Seq.Piezo.AmplitudeCorrected=Seq.Piezo.Amplitude*sqrt(0.5)/sqrt(mean(interp1(linspace(0,2*pi,7),sin(linspace(0,2*pi,7)),linspace(0,2*pi,1001),'linear').^2));
-  Seq.Piezo.AmplitudeVector=repmat(sin([1/6;2/6;4/6;5/6]*2*pi).*Seq.Piezo.AmplitudeCorrected,[1,Seq.Piezo.Periods+Seq.Piezo.PreEmphasisPeriods+Seq.Piezo.PostEmphasisPeriods+2]);
+  Seq.Piezo.AmplitudeCorrected = Seq.Piezo.Amplitude * sqrt(0.5) / sqrt(mean(interp1(linspace(0,2*pi,7),sin(linspace(0,2*pi,7)),linspace(0,2*pi,1001),'linear').^2));
+  Seq.Piezo.AmplitudeVector = ...
+    repmat(sin([1/6;2/6;4/6;5/6]*2*pi).*Seq.Piezo.AmplitudeCorrected, ...
+           [1,Seq.Piezo.Periods+Seq.Piezo.PreEmphasisPeriods+Seq.Piezo.PostEmphasisPeriods+2]);
   Seq.Piezo.TimeLine = ...
     repmat([1/Seq.Piezo.Frequency/6; 2/Seq.Piezo.Frequency/6; 4/Seq.Piezo.Frequency/6; 5/Seq.Piezo.Frequency/6], ...
            [1,Seq.Piezo.Periods+Seq.Piezo.PreEmphasisPeriods+Seq.Piezo.PostEmphasisPeriods+2]) + ...
     repmat(-(Seq.Piezo.PreEmphasisPeriods+1)/Seq.Piezo.Frequency:1/Seq.Piezo.Frequency:(Seq.Piezo.Periods+Seq.Piezo.PostEmphasisPeriods)/Seq.Piezo.Frequency, ...
            [4,1]);
-  Seq.Piezo.TimeLine=Seq.Piezo.TimeLine-Seq.Piezo.Phase/360/Seq.Piezo.Frequency;
+  Seq.Piezo.TimeLine = Seq.Piezo.TimeLine-Seq.Piezo.Phase/360/Seq.Piezo.Frequency;
 
-  Seq.Piezo.AmplitudeVector=Seq.Piezo.AmplitudeVector(Seq.Piezo.TimeLine>=(6e-6-Seq.Piezo.PreEmphasisPeriods/Seq.Piezo.Frequency));
-  Seq.Piezo.TimeLine=Seq.Piezo.TimeLine(Seq.Piezo.TimeLine>=(6e-6-Seq.Piezo.PreEmphasisPeriods/Seq.Piezo.Frequency));
+  Seq.Piezo.AmplitudeVector = Seq.Piezo.AmplitudeVector(Seq.Piezo.TimeLine>=(6e-6-Seq.Piezo.PreEmphasisPeriods/Seq.Piezo.Frequency));
+  Seq.Piezo.TimeLine = Seq.Piezo.TimeLine(Seq.Piezo.TimeLine>=(6e-6-Seq.Piezo.PreEmphasisPeriods/Seq.Piezo.Frequency));
 
-  Seq.Piezo.AmplitudeVector=Seq.Piezo.AmplitudeVector(Seq.Piezo.TimeLine+6e-6<=((Seq.Piezo.Periods+Seq.Piezo.PostEmphasisPeriods)/Seq.Piezo.Frequency));
-  Seq.Piezo.TimeLine=Seq.Piezo.TimeLine(Seq.Piezo.TimeLine+6e-6<=((Seq.Piezo.Periods+Seq.Piezo.PostEmphasisPeriods)/Seq.Piezo.Frequency));
+  Seq.Piezo.AmplitudeVector = Seq.Piezo.AmplitudeVector(Seq.Piezo.TimeLine+6e-6<=((Seq.Piezo.Periods+Seq.Piezo.PostEmphasisPeriods)/Seq.Piezo.Frequency));
+  Seq.Piezo.TimeLine = Seq.Piezo.TimeLine(Seq.Piezo.TimeLine+6e-6<=((Seq.Piezo.Periods+Seq.Piezo.PostEmphasisPeriods)/Seq.Piezo.Frequency));
 
-  Seq.Piezo.AmplitudeVector=[0;Seq.Piezo.AmplitudeVector;0];
-  Seq.Piezo.TimeLine=[Seq.Piezo.TimeLine(1)-1/Seq.Piezo.Frequency/6;Seq.Piezo.TimeLine;Seq.Piezo.TimeLine(end)+1/Seq.Piezo.Frequency/6];
+  Seq.Piezo.AmplitudeVector = [0;Seq.Piezo.AmplitudeVector;0];
+  Seq.Piezo.TimeLine = [Seq.Piezo.TimeLine(1)-1/Seq.Piezo.Frequency/6;Seq.Piezo.TimeLine;Seq.Piezo.TimeLine(end)+1/Seq.Piezo.Frequency/6];
 
-  Seq.Piezo.PreEmphasisTimeRegrid=Seq.Piezo.TimeLine(Seq.Piezo.TimeLine<0);
+  Seq.Piezo.PreEmphasisTimeRegrid = Seq.Piezo.TimeLine(Seq.Piezo.TimeLine<0);
   Seq.Piezo.PreEmphasisAmplitudeRegrid = ...
     interp1(Seq.Piezo.PreEmphasisTime-Seq.Piezo.PreEmphasisPeriods./Seq.Piezo.Frequency, ...
             Seq.Piezo.PreEmphasisRelativeAmplitude, ...
             Seq.Piezo.PreEmphasisTimeRegrid, 'pchip', 'extrap') .* ...
     Seq.Piezo.AmplitudeVector(Seq.Piezo.TimeLine<0);
 
-  Seq.Piezo.PostEmphasisTimeRegrid=Seq.Piezo.TimeLine(Seq.Piezo.TimeLine>Seq.Piezo.Periods/Seq.Piezo.Frequency);
+  Seq.Piezo.PostEmphasisTimeRegrid = Seq.Piezo.TimeLine(Seq.Piezo.TimeLine>Seq.Piezo.Periods/Seq.Piezo.Frequency);
   Seq.Piezo.PostEmphasisAmplitudeRegrid = ...
     interp1(Seq.Piezo.PostEmphasisTime+Seq.Piezo.Periods/Seq.Piezo.Frequency, ...
     Seq.Piezo.PostEmphasisRelativeAmplitude, ...
     Seq.Piezo.PostEmphasisTimeRegrid,'pchip','extrap') .* ...
     Seq.Piezo.AmplitudeVector(Seq.Piezo.TimeLine>Seq.Piezo.Periods/Seq.Piezo.Frequency);
 
-  Seq.Piezo.AmplitudeVector=Seq.Piezo.AmplitudeVector(and(~(Seq.Piezo.TimeLine<0),~(Seq.Piezo.TimeLine>+Seq.Piezo.Periods/Seq.Piezo.Frequency)));
+  Seq.Piezo.AmplitudeVector = Seq.Piezo.AmplitudeVector(and(~(Seq.Piezo.TimeLine<0),~(Seq.Piezo.TimeLine>+Seq.Piezo.Periods/Seq.Piezo.Frequency)));
 else
   Seq.Piezo.TimeLine = ...
     linspace(-Seq.Piezo.PreEmphasisPeriods/Seq.Piezo.Frequency, ...
@@ -310,16 +431,16 @@ else
             Seq.Piezo.PostEmphasisRelativeAmplitude, ...
             Seq.Piezo.PostEmphasisTimeRegrid, 'pchip', 'extrap') .* ...
     sin(Seq.Piezo.PostEmphasisTimeRegrid*2*pi*Seq.Piezo.Frequency+Seq.Piezo.Phase./180.*pi)*Seq.Piezo.AmplitudeCorrected;
-  Seq.Piezo.PostEmphasisAmplitudeRegrid=Seq.Piezo.PostEmphasisAmplitudeRegrid(2:end);
+  Seq.Piezo.PostEmphasisAmplitudeRegrid = Seq.Piezo.PostEmphasisAmplitudeRegrid(2:end);
 end
 
-Seq.Piezo.Samples=numel(Seq.Piezo.TimeLine)+16+16;
+Seq.Piezo.Samples = numel(Seq.Piezo.TimeLine) + 16 + 16;
 
-Seq.Piezo.Time=nan(Seq.Piezo.Samples, numel(Seq.tRep));
-Seq.Piezo.Amp=nan(Seq.Piezo.Samples, numel(Seq.tRep));
+Seq.Piezo.Time = NaN(Seq.Piezo.Samples, numel(Seq.tRep));
+Seq.Piezo.Amp = NaN(Seq.Piezo.Samples, numel(Seq.tRep));
 
-OffsetRampTime=linspace(0,Seq.Piezo.OffsetRampTime,16).';
-OffsetRampAmp=interp1([Seq.Piezo.OffsetRampTime*(-1)/2;0;Seq.Piezo.OffsetRampTime*1/2;Seq.Piezo.OffsetRampTime*2/2;Seq.Piezo.OffsetRampTime*3/2],...
+OffsetRampTime = linspace(0,Seq.Piezo.OffsetRampTime,16).';
+OffsetRampAmp = interp1([Seq.Piezo.OffsetRampTime*(-1)/2;0;Seq.Piezo.OffsetRampTime*1/2;Seq.Piezo.OffsetRampTime*2/2;Seq.Piezo.OffsetRampTime*3/2],...
         [0;0;Seq.Piezo.OffsetAmplitude.*(Seq.Piezo.OffsetOverdrivePercent+100)./100;Seq.Piezo.OffsetAmplitude;Seq.Piezo.OffsetAmplitude],...
         OffsetRampTime,'PCHIP');
 % figure(234); plot(OffsetRampTime,OffsetRampAmp);
@@ -337,29 +458,33 @@ else
   Seq.Piezo.OffsetSetTimeAfter=Seq.Piezo.OffsetSetTime;
 end
 
-Seq.Piezo.Time(:,Seq.Piezo.UseAtRepetitionTime)...
-          =(cumsum([...                                    % time of gradient points in seconds
-                    (Seq.Piezo.Start+Seq.Piezo.TimeLine(1))-Seq.Piezo.OffsetSetTimeBefore-Seq.Piezo.OffsetRampTime;...
-                    diff(OffsetRampTime);...
-                    Seq.Piezo.OffsetSetTimeBefore;...
-                    diff(Seq.Piezo.TimeLine(1:end));...
-                    Seq.Piezo.OffsetSetTimeAfter;...
-                    diff(-OffsetRampTime(end:-1:1))])...
-                    )*ones(1,numel(Seq.Piezo.UseAtRepetitionTime));
-
-Seq.Piezo.Amp(:,Seq.Piezo.UseAtRepetitionTime)...
-                 =([    ...                                 % amplitude of gradient points
-                    OffsetRampAmp;...
-                    Seq.Piezo.PreEmphasisAmplitudeRegrid+Seq.Piezo.OffsetAmplitude;...
-                    Seq.Piezo.AmplitudeVector+Seq.Piezo.OffsetAmplitude;...
-                    Seq.Piezo.PostEmphasisAmplitudeRegrid+Seq.Piezo.OffsetAmplitude;...
-                    OffsetRampAmp(end:-1:1)
-                    ])*ones(1,numel(Seq.Piezo.UseAtRepetitionTime));
+% time of gradient points in seconds
+Seq.Piezo.Time(:,Seq.Piezo.UseAtRepetitionTime) = ...
+  (cumsum([...
+          (Seq.Piezo.Start+Seq.Piezo.TimeLine(1))-Seq.Piezo.OffsetSetTimeBefore-Seq.Piezo.OffsetRampTime;...
+          diff(OffsetRampTime);...
+          Seq.Piezo.OffsetSetTimeBefore;...
+          diff(Seq.Piezo.TimeLine(1:end));...
+          Seq.Piezo.OffsetSetTimeAfter;...
+          diff(-OffsetRampTime(end:-1:1))])...
+          ) * ones(1, numel(Seq.Piezo.UseAtRepetitionTime));
+% amplitude of gradient points
+Seq.Piezo.Amp(:,Seq.Piezo.UseAtRepetitionTime) = ...
+  ([...                                 
+    OffsetRampAmp;...
+    Seq.Piezo.PreEmphasisAmplitudeRegrid+Seq.Piezo.OffsetAmplitude;...
+    Seq.Piezo.AmplitudeVector+Seq.Piezo.OffsetAmplitude;...
+    Seq.Piezo.PostEmphasisAmplitudeRegrid+Seq.Piezo.OffsetAmplitude;...
+    OffsetRampAmp(end:-1:1)
+    ]) * ones(1, numel(Seq.Piezo.UseAtRepetitionTime));
 
 %  figure(2);plot(Seq.Piezo.Time(:,Seq.Piezo.UseAtRepetitionTime(1)),Seq.Piezo.Amp(:,Seq.Piezo.UseAtRepetitionTime(1)))
 if ~Seq.SingletRep
 
-  Seq=set_EmptyField(Seq,'CLTime',20e-6+4/HW.MMRT.fSystem*2*2*(Seq.Piezo.SamplesPerPeriode+4)*ceil(Seq.tEcho*Seq.Piezo.Frequency));
+  if isemptyfield(Seq, 'CLTime')
+    Seq.CLTime = 20e-6 ...
+      + 4/HW.MMRT.fSystem*2*2*(Seq.Piezo.SamplesPerPeriode+4)*ceil(Seq.tEcho*Seq.Piezo.Frequency);
+  end
 
   t2=Seq.CLTime(1)+20e-6;
   t1=Seq.Slice(2).CenterOfPulse-Seq.Slice(2).GradLength/2-t2/2;

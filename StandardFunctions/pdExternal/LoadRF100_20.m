@@ -6,7 +6,7 @@ HW.TX.ChannelDef = 2;         % Default TX Channel set to Tx2
 
 % Amplifier
 HW.TX.Uout2PaUout(2) = 50;  % 50x amplification
-HW.TX.Max.PaUout(2) = 100;  % maximum peak output voltage in V
+HW.TX.Max.PaUout(2) = 126.7;  % maximum peak output voltage in V in calibration file @ 24.128 MHz
 
 HW.TX.Def.PaUout(2) = 75;  % default peak output voltage in V (might be reduced by other HW.TX.Def settings)
 

@@ -31,7 +31,18 @@ classdef TXClass < handleHidden
 %                       seconds
 %   BlankPostset        postset of blanking signal after TX pulse in
 %                       seconds
-%   Rout                output impedance of HF amplifier (???)
+%
+%   Rout                output impedance of rf amplifier in Ohm
+%
+%   LoadRin             1xHW.TX.n vector with the resistance of the connected
+%                       transmission coil in Ohm
+%   Inductance          1xHW.TX.n vector with the inductance of the connected
+%                       transmission coil in Henry
+%   Capacitance         1xHW.TX.n vector with the capacitance of the connected
+%                       transmission coil in Farad
+%
+%   AmplitudeOffsetDC   1xHW.TX.n vector with the DC offset at the respective
+%                       TX output port in amplitude units.
 %
 %   PaUout2Amplitude    conversion factor from voltage amplitude at
 %                       inlet of coil to B1 field amplitude in T/V
@@ -54,7 +65,7 @@ classdef TXClass < handleHidden
 %   HW_Standard
 %
 % ----------------------------------------------------------------------------
-% (C) Copyright 2016-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ----------------------------------------------------------------------------
 

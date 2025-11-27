@@ -54,7 +54,7 @@ function hLines = sheerPlot(varargin)
 %   calling "sheerPlot".
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2020 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2020-2024 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -217,6 +217,15 @@ Y = bsxfun(@plus, Y, cumsum(offsetY*ones(1, size(Y,2)), 2) - offsetY);
 hLines = line(hAxes, X, Y, varargin{:});
 
 axesColor = get(groot, 'DefaultAxesColor');
+if isnumeric(axesColor) && numel(axesColor) == 3
+  % Work around issue where full black or full white are inverted by Matlab when
+  % printing.
+  if all(axesColor == ones(1,3))
+    axesColor = ones(1,3) * 0.999;
+  elseif all(axesColor == zeros(1,3))
+    axesColor = ones(1,3) * 0.001;
+  end
+end
 xColor = get(groot, 'DefaultAxesXColor');
 set(hAxes, 'Box', 'off', 'YTick', [], 'YColor', 'none', 'XColor', 'none', 'Color', 'none');
 

@@ -177,7 +177,7 @@ if windowPosition(2) + windowPosition(4) - 1 > ...
   windowPosition(2) = max(monitorPosition(:,4)) - windowPosition(4);
 end
 % reduce size
-if windowPosition(4) > max(monitorPosition(:,4)) - min(monitorPosition(:,2));
+if windowPosition(4) > max(monitorPosition(:,4)) - min(monitorPosition(:,2))
   windowPosition(4) = max(monitorPosition(:,4)) - min(monitorPosition(:,2));
 end
 
@@ -910,11 +910,11 @@ function uitable_hold_CellEditCallback(hObject, eventdata, handles)
 %% Executes when entered data in editable cell(s) in uitable_hold.
 % hObject    handle to uitable_hold (see GCBO)
 % eventdata  structure with the following fields (see UITABLE)
-%	Indices: row and column indices of the cell(s) edited
-%	PreviousData: previous data for the cell(s) edited
-%	EditData: string(s) entered by the user
-%	NewData: EditData or its converted form set on the Data property. Empty if Data was not changed
-%	Error: error string when failed to convert EditData to appropriate value for Data
+%  Indices: row and column indices of the cell(s) edited
+%  PreviousData: previous data for the cell(s) edited
+%  EditData: string(s) entered by the user
+%  NewData: EditData or its converted form set on the Data property. Empty if Data was not changed
+%  Error: error string when failed to convert EditData to appropriate value for Data
 % handles    structure with handles and user data (see GUIDATA)
 
 %% check whether last column was selected
@@ -1296,7 +1296,7 @@ while true
       plot(handles.axes_FID, ...
         data.time_of_tRep, abs(handles.data.plot(iPlot).data), ...
         ['-' lineColors{iPlot}]);
-      hold all
+      hold(handles.axes_FID, 'on');
     end
   end
 
@@ -1334,7 +1334,7 @@ while true
     PhaseOffsetRad = mean(unwrap(angle(data.dataPC(1:10))));    % get the phase offset
     data.dataPCo = data.dataPC(:) .* exp(-1i * PhaseOffsetRad);    % correct the phase offset
     data.dataPCo = data.dataPC(:);
-    % hold(handles.axes_FID(1), 'all');
+    % hold(handles.axes_FID(1), 'on');
 
     line(data.time_of_tRep(FIDIdx), unwrap(angle(data.dataPCo(FIDIdx))), 'Color', 'black', 'Parent', handles.axes_FID2);
     set(handles.axes_FID2, 'YAxisLocation', 'right', 'YLim', [-1 1] + PhaseOffsetRad);
@@ -1359,13 +1359,13 @@ while true
   title(handles.axes_fLarmor, 'Larmor frequency over runs');
   ylabel(handles.axes_fLarmor, sprintf('Larmor frequency - %.0f Hz', handles.data.fLarmor(1)));
   xlabel(handles.axes_fLarmor, 'Number of run');
-  
+
   %% check whether loop is on
   if ~get(handles.checkbox_autoRunFID, 'Value')
     evalin('base', 'HW.tRepInit = 0.1;');
     return
   end
-  
+
   %% add delay
   repRate = str2double(get(handles.edit_repRateFID, 'String'));
   pause(repRate - toc(tStart));

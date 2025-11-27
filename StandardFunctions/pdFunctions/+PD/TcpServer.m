@@ -24,7 +24,7 @@ classdef TcpServer < handle
   %           to 0, the server waits for a client indefinitely. (Default: 10000)
   %
   % ----------------------------------------------------------------------------
-  % (C) Copyright 2020-2023 Pure Devices GmbH, Wuerzburg, Germany
+  % (C) Copyright 2020-2025 Pure Devices GmbH, Wuerzburg, Germany
   % www.pure-devices.com
   % ----------------------------------------------------------------------------
 
@@ -40,6 +40,19 @@ classdef TcpServer < handle
     clientSocket
     inputStream
     outputStream
+  end
+
+
+  methods (Static)
+
+    function this = loadobj(~)
+      %% override for loading a saved object from a file
+      % The Java socket objects cannot be serialized. Also we cannot wait for
+      % client connections in general while loading. So don't try to load the
+      % TcpServer object.
+      this = PD.TcpServer.empty;
+    end
+
   end
 
 
@@ -81,6 +94,14 @@ classdef TcpServer < handle
       if ~isempty(this.serverSocket) && ~this.serverSocket.isClosed()
         this.serverSocket.close();
       end
+    end
+
+
+    function s = saveobj(~)
+      %% override the save method
+      % The Java socket objects cannot be serialized. So don't try to save the
+      % TcpServer object.
+      s = struct();
     end
 
 

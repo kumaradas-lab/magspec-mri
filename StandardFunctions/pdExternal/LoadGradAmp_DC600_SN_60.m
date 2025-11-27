@@ -23,8 +23,17 @@ HW.Grad(iDevice).PaRout(1:4) = [15000, 15000, 15000, 15000];  % output impedance
 
 HW.Grad(iDevice).tRamp = 50e-6;                               % minimum ramp time in s
 HW.Grad(iDevice).tEC = 50e-6;                                 % eddy current time in s
-% TODO: Run Grad Delay with DC-600 calibration!
-HW.Grad(iDevice).SystemTimeDelay(1:3) = [50e-6, 50e-6, 50e-6];  % time delay of gradient amplifier in s
+
+switch HW.UserName
+  case {'probe_10mm', 'teach'}
+    HW.Grad(iDevice).SystemTimeDelay(HW.Grad(iDevice).xyzB(1:3)) = [35.262, 32.252, 29.902]*1e-6;  % time delay of gradient amplifier in s
+  case 'probe_20mm'
+    HW.Grad(iDevice).SystemTimeDelay(HW.Grad(iDevice).xyzB(1:3)) = [81.078, 97.554, 59.146]*1e-6;  % time delay of gradient amplifier in s
+  otherwise
+    error('PD:LoadGradAmp:UnknownUser', ...
+      'No settings for user "%s" specified in "%s"', HW.UserName, mfilename());
+end
+
 HW.Grad(iDevice).MaxAmpSlice = 0.1;                           % maximum gradient amplitude for slice selection in T/m
 
 HW.Grad(iDevice).Status1 = 1;                                 % power supply of DC-600 ok

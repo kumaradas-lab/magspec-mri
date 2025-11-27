@@ -43,7 +43,9 @@ HW.Piezo.PostEmphasisRelativeTime=      [-1;    0;    1/2;                      
 HW.Piezo.UseAtRepetitionTime=           1;
 HW.Piezo.Samples=                       900;
 
-if numel(HW.Grad.SystemTimeDelay)==1; HW.Grad.SystemTimeDelay=ones(HW.Grad.n,1)*HW.Grad.SystemTimeDelay; end
+if isscalar(HW.Grad.SystemTimeDelay)
+  HW.Grad.SystemTimeDelay = ones(HW.Grad.n, 1) * HW.Grad.SystemTimeDelay;
+end
 HW.Grad.SystemTimeDelay(HW.Piezo.Channel)=18.0e-06;              % Time delay of grad amp at piezo channel
 HW.Grad.CoilMaxDcCurrent(HW.Piezo.Channel)=0.75*0.9*1;          % Fuse DC current in A
 HW.Grad.CoilCurrentSquareTime(HW.Piezo.Channel)=0.9*0.9;      % Fuse delay in A^2*sec

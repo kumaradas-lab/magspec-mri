@@ -22,7 +22,7 @@ function version_str = get_default_firmware_libs(MMRTNumbers, type, useTeach)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2023-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2023-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %-------------------------------------------------------------------------------
 

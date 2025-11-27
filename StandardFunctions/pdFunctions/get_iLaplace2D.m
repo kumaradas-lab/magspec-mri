@@ -65,6 +65,15 @@ function [C, T1, T2, Seq] = get_iLaplace2D(tau1, tau2, amplitude, Seq)
 %       FullScaleAmplitude
 %                 Amplitude for scaling the results.
 %                 (Default: max(abs(amplitude(:))) )
+%       skip_iLaplace
+%                 If true, the function returns before actually computing the
+%                 inverse Laplace transform. This can be useful because
+%                 computing the inverse Laplace transform can take a
+%                 considerable amount of time. In some situations its still
+%                 useful to call this function to get the correctly formatted
+%                 time-domain data (i.e., the input for the inverse Laplace
+%                 transform).
+%                 (Default: false)
 %     If Seq.iLaplace2D.ntau2Smooth > 0, the following field is also used:
 %     iLaplace1D
 %               Structure as used for get_iLaplace1D. Please, see the help of
@@ -89,6 +98,13 @@ function [C, T1, T2, Seq] = get_iLaplace2D(tau1, tau2, amplitude, Seq)
 %               the alternative syntax.)
 %
 %   Seq       Same as input "Seq" with the actually used settings.
+%             Additionally, the following fields are added (among others):
+%     iLaplace2D.FullScaleAmplitude
+%               The data is normalized such that the (extrapolated, 1d-fitted)
+%               value at tau2=0 equals 1 for the last echo train (for inversion
+%               recovery with Seq.iLaplace2D.n_tau2Smooth>0). The data is
+%               normalized to the maximum input amplitude otherwise. This value
+%               is the "actual" value where the normalized amplitude is 1.
 %
 %
 % EXAMPLE:
@@ -100,7 +116,7 @@ function [C, T1, T2, Seq] = get_iLaplace2D(tau1, tau2, amplitude, Seq)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2015-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2015-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -121,17 +137,22 @@ if isemptyfield(Seq.iLaplace2D, 'QualityFactor'), Seq.iLaplace2D.QualityFactor =
 if isemptyfield(Seq.iLaplace2D, 'n_Lcomp'),       Seq.iLaplace2D.n_Lcomp = 101;       end % Number of relevant singular values T1
 if isemptyfield(Seq.iLaplace2D, 'n_Tcomp'),       Seq.iLaplace2D.n_Tcomp = 101;       end % Number of relevant singular values T2
 if isemptyfield(Seq.iLaplace2D, 'n_tau2Smooth'),  Seq.iLaplace2D.n_tau2Smooth = 100;  end % Number of data amplitudes in tau2 direction after smooth T2
-if isemptyfield(Seq.iLaplace2D, 'T1Start'),       Seq.iLaplace2D.T1Start = tau1(1);   end % T1 grid start
-if isemptyfield(Seq.iLaplace2D, 'T1End'),         Seq.iLaplace2D.T1End = tau1(end)*10;end % T1 grid stop
-if isemptyfield(Seq.iLaplace2D, 'T2Start'),       Seq.iLaplace2D.T2Start = tau2(1);   end % T2 grid start
-if isemptyfield(Seq.iLaplace2D, 'T2End'),         Seq.iLaplace2D.T2End = tau2(end)*10;end % T2 grid stop
+if isemptyfield(Seq.iLaplace2D, 'T1Start'),       Seq.iLaplace2D.T1Start = min(tau1); end % T1 grid start
+if isemptyfield(Seq.iLaplace2D, 'T1End'),         Seq.iLaplace2D.T1End = max(tau1)*10;end % T1 grid stop
+if isemptyfield(Seq.iLaplace2D, 'T2Start'),       Seq.iLaplace2D.T2Start = min(tau2); end % T2 grid start
+if isemptyfield(Seq.iLaplace2D, 'T2End'),         Seq.iLaplace2D.T2End = max(tau2)*10;end % T2 grid stop
 if isemptyfield(Seq.iLaplace2D, 'Recovery'),      Seq.iLaplace2D.Recovery = 'Inversion'; end % 'Saturation' or 'Inversion'
 if isemptyfield(Seq.iLaplace2D, 'IgnoreFirstEcho'), Seq.iLaplace2D.IgnoreFirstEcho = 0; end % ignore first n Echoes
 if isemptyfield(Seq.iLaplace2D, 'LastEchoTrainCorrection')
   % subtract last Echo train from all others
   Seq.iLaplace2D.LastEchoTrainCorrection = ~strcmp(Seq.iLaplace2D.Recovery, 'Decay');
 end
-if isemptyfield(Seq.iLaplace2D, 'RingFilter'),    Seq.iLaplace2D.RingFilter = 1;      end % mean value of two Echoes
+if isemptyfield(Seq.iLaplace2D, 'RingFilter'),    Seq.iLaplace2D.RingFilter = 0;      end % mean value of two Echoes
+
+if isemptyfield(Seq.iLaplace2D, 'skip_iLaplace')
+  % return before actually calculating the inverse Laplace transform
+  Seq.iLaplace2D.skip_iLaplace = false;
+end 
 
 if Seq.iLaplace2D.IgnoreFirstEcho > 0
   amplitude = amplitude(Seq.iLaplace2D.IgnoreFirstEcho+1:end,:);
@@ -139,6 +160,13 @@ if Seq.iLaplace2D.IgnoreFirstEcho > 0
 end
 
 if isemptyfield(Seq.iLaplace2D, 'FullScaleAmplitude'), Seq.iLaplace2D.FullScaleAmplitude = max(abs(amplitude(:))); end % amplitude for scaling results
+
+% plot parents
+if isemptyfield(Seq.iLaplace2D, 'plotAmp'), Seq.iLaplace2D.plotAmp = 83; end  % figure for measured amplitude
+if isemptyfield(Seq.iLaplace2D, 'plotFitAmp'), Seq.iLaplace2D.plotFitAmp = 85; end  % figure for fitted amplitude
+if isemptyfield(Seq.iLaplace2D, 'plotResAmp'), Seq.iLaplace2D.plotResAmp = 86; end  % figure for residual amplitude
+if isemptyfield(Seq.iLaplace2D, 'plotT1T2Map'), Seq.iLaplace2D.plotT1T2Map = 84; end  % figure for T1-T2 map
+
 
 % Initialization
 tau1 = reshape(tau1, 1, []);
@@ -168,26 +196,38 @@ if Seq.iLaplace2D.n_tau2Smooth && strcmp(Seq.iLaplace2D.Recovery, 'Inversion')
   for t = numel(tau1):-1:1
     Seq.iLaplace1D.FullScaleAmplitude = 1;
     [~, ~, Seq] = get_iLaplace1D(tau2, amplitude(:,t), Seq);
+    % revert scaling done by get_iLaplace1D
     amplitudeSmooth(:,t) = Seq.iLaplace1D.FitAmplitude * Seq.iLaplace1D.FullScaleAmplitude;
+    % save scaling factors
     FS(1,t) = Seq.iLaplace1D.FullScaleAmplitude;
 
     if t==numel(tau1)
       % Subtract last Echo train (~>2*T1) to ensure decay (lsqnonneg)
-      Seq.iLaplace2D.LastEchoTrainCorrectionAmplitude = Seq.iLaplace1D.FitAmplitudeAtDataTime*Seq.iLaplace1D.FullScaleAmplitude;
-      Seq.iLaplace2D.LastEchoTrainCorrectionAmplitudeSmooth = Seq.iLaplace1D.FitAmplitude*Seq.iLaplace1D.FullScaleAmplitude;
+      Seq.iLaplace2D.LastEchoTrainCorrectionAmplitude = Seq.iLaplace1D.FitAmplitudeAtDataTime * Seq.iLaplace1D.FullScaleAmplitude;
+      Seq.iLaplace2D.LastEchoTrainCorrectionAmplitudeSmooth = Seq.iLaplace1D.FitAmplitude * Seq.iLaplace1D.FullScaleAmplitude;
       amplitude = -bsxfun(@minus, amplitude, Seq.iLaplace2D.LastEchoTrainCorrectionAmplitude);
-      Seq.iLaplace2D.LastEchoTrainCorrectionAmplitude = Seq.iLaplace2D.LastEchoTrainCorrectionAmplitudeSmooth;
       amplitudeSmooth(:,t) = 0;
     end
   end
+  % Scale such that (extrapolated) value at tau2=0 equals 1 for the last echo
+  % train.
   amplitude = -amplitudeSmooth ./ FS(end);
-  Seq.iLaplace2D.FullScaleAmplitude = Seq.iLaplace2D.FullScaleAmplitude .* FS(end);
+  Seq.iLaplace2D.LastEchoTrainCorrectionAmplitude = Seq.iLaplace2D.LastEchoTrainCorrectionAmplitude ./ FS(end);
+  Seq.iLaplace2D.LastEchoTrainCorrectionAmplitudeSmooth = Seq.iLaplace2D.LastEchoTrainCorrectionAmplitudeSmooth ./ FS(end);
+  Seq.iLaplace2D.FullScaleAmplitude = Seq.iLaplace2D.FullScaleAmplitude * FS(end);
+
   tau2 = Seq.iLaplace1D.FitTime.';
 elseif Seq.iLaplace2D.LastEchoTrainCorrection
-  Seq.iLaplace2D.LastEchoTrainCorrectionAmplitude = amplitude(:,end);
+  iLastValid = find(~isnan(amplitude(1,:)), 1, 'last');
+  Seq.iLaplace2D.LastEchoTrainCorrectionAmplitude = amplitude(:,iLastValid);
+  Seq.iLaplace2D.LastEchoTrainCorrectionAmplitudeSmooth = Seq.iLaplace2D.LastEchoTrainCorrectionAmplitude;
+
   amplitude = bsxfun(@minus, amplitude, Seq.iLaplace2D.LastEchoTrainCorrectionAmplitude);
 end
 tau2 = tau2(:).';
+
+data.iLaplace2D.tau1 = tau1;
+data.iLaplace2D.tau2 = tau2;
 
 % if Seq.iLaplace2D.n_tau2Smooth
 %   tau2Smooth=logspace(log10(tau2(1)),log10(tau2(end)),Seq.iLaplace2D.n_tau2Smooth);
@@ -251,15 +291,17 @@ if strcmp(Seq.iLaplace2D.Recovery, 'Inversion')
   if Seq.iLaplace2D.LastEchoTrainCorrection
     % Effectively, a decay problem
     L = (-2)*exp(-tau1.' * (1./T1));
-    % LR = 1-2*exp(-tau1.' * (1./T1));
   else
     L = 1-2*exp(-tau1.' * (1./T1));
-    % LR = 1-2*exp(-tau1.' * (1./T1));
   end
 elseif strcmp(Seq.iLaplace2D.Recovery, 'Saturation')
   % Saturation Recovery
-  L = 1-1*exp(-tau1.' * (1./T1));
-  % LR = 1-1*exp(-tau1.' * (1./T1));
+  if Seq.iLaplace2D.LastEchoTrainCorrection
+    % Effectively, a decay problem
+    L = (-1)*exp(-tau1.' * (1./T1));
+  else
+    L = 1-1*exp(-tau1.' * (1./T1));
+  end
 elseif strcmp(Seq.iLaplace2D.Recovery, 'Decay')
   % Decay
   L = exp(-tau1.' * (1./T1));
@@ -270,6 +312,21 @@ end
 
 T = exp(-tau2.' * (1./T2));  % T2 (decay) measurement
 T = permute(T, [1,3,2]);
+data.iLaplace2D.DataAmplitude = reshape(real(amplitude), [], 1);
+
+if Seq.iLaplace2D.skip_iLaplace
+  if nargin == 2
+    data.iLaplace2D.DataAmplitude = reshape(data.iLaplace2D.DataAmplitude, size(T,1), size(L,1));
+
+    if Seq.iLaplace2D.LastEchoTrainCorrection
+      data.iLaplace2D.DataAmplitude = bsxfun(@plus, data.iLaplace2D.DataAmplitude, Seq.iLaplace2D.LastEchoTrainCorrectionAmplitudeSmooth);
+    end
+    C = data;
+    T1 = Seq;
+  end
+  return;
+end
+
 TL = zeros(size(T,1), size(L,1), size(T,3), size(L,2));
 for t = 1:size(L, 2)
   TL(:,:,:,t) = bsxfun(@times, L(:,t).', T);
@@ -277,7 +334,6 @@ for t = 1:size(L, 2)
 end
 A = reshape(TL, size(T,1)*size(L,1), size(T,3)*size(L,2));
 % AR = reshape(TLR, size(T,1)*size(L,1), size(T,3)*size(L,2));
-data.iLaplace2D.DataAmplitude = reshape(real(amplitude), [], 1);
 
 if Seq.iLaplace2D.QualityFactor<1e6
   G = [A; repmat((1/Seq.iLaplace2D.QualityFactor^4*sum(abs(A),1)).^0.5,size(A,2),1).*eye(size(A,2))];  % include Regularization in design matrix
@@ -287,129 +343,38 @@ else
   d = data.iLaplace2D.DataAmplitude;  % no zeros in signal-vector
 end
 
-clear('options');
 options.TolX = 1*eps*norm(G,1)*length(G);
+% do regularized non-negative least squares
 [data.iLaplace2D.SpectrumAmplitude, data.iLaplace2D.resnorm, ...
   data.iLaplace2D.FitResidual, data.iLaplace2D.exitflag, ...
-  data.iLaplace2D.output, data.iLaplace2D.lambda] = lsqnonneg(G, d,options);  % do regularized non-negative least squares
+  data.iLaplace2D.output, data.iLaplace2D.lambda] = lsqnonneg(G, double(d), options);
 
 % data.iLaplace2D.FitAmplitude = AR*data.iLaplace2D.SpectrumAmplitude;
 data.iLaplace2D.FitAmplitude = G(1:length(data.iLaplace2D.DataAmplitude),:)*data.iLaplace2D.SpectrumAmplitude;
 % data.iLaplace2D.FitAmplitude = data.iLaplace2D.FitAmplitude(1:length(data.iLaplace2D.DataAmplitude));
 
-data.iLaplace2D.FitAmplitude=reshape(data.iLaplace2D.FitAmplitude,size(T,1),size(L,1));
-data.iLaplace2D.DataAmplitude=reshape(data.iLaplace2D.DataAmplitude,size(T,1),size(L,1));
-data.iLaplace2D.SpectrumAmplitude=reshape(data.iLaplace2D.SpectrumAmplitude,size(T,3),size(L,2));
+data.iLaplace2D.FitAmplitude = reshape(data.iLaplace2D.FitAmplitude, size(T,1), size(L,1));
+data.iLaplace2D.DataAmplitude = reshape(data.iLaplace2D.DataAmplitude, size(T,1), size(L,1));
+data.iLaplace2D.SpectrumAmplitude = reshape(data.iLaplace2D.SpectrumAmplitude, size(T,3), size(L,2));
 
 if Seq.iLaplace2D.LastEchoTrainCorrection
-  data.iLaplace2D.FitAmplitude=bsxfun(@plus,data.iLaplace2D.FitAmplitude,Seq.iLaplace2D.LastEchoTrainCorrectionAmplitude);
-  data.iLaplace2D.DataAmplitude=bsxfun(@plus,data.iLaplace2D.DataAmplitude,Seq.iLaplace2D.LastEchoTrainCorrectionAmplitude);
+  data.iLaplace2D.FitAmplitude = bsxfun(@plus, data.iLaplace2D.FitAmplitude, Seq.iLaplace2D.LastEchoTrainCorrectionAmplitudeSmooth);
+  data.iLaplace2D.DataAmplitude = bsxfun(@plus, data.iLaplace2D.DataAmplitude, Seq.iLaplace2D.LastEchoTrainCorrectionAmplitudeSmooth);
 end
 
 
-% data.iLaplace2D.SpectrumAmplitude(or(SpectrumTime<Seq.iLaplace1D.SpectrumTimeStartCut,Seq.iLaplace1D.SpectrumTimeEndCut<SpectrumTime))=0;
-% data.iLaplace2D.SpectrumAmplitude(SpectrumTime<diff(DataTime(1:2))/2)=0;
-% figure; imagesc(data.iLaplace2D.SpectrumAmplitude)
-% figure; imagesc(data.iLaplace2D.DataAmplitude)
-% figure; imagesc(data.iLaplace2D.DataAmplitude-data.iLaplace2D.FitAmplitude)
-% figure; imagesc(data.iLaplace2D.FitAmplitude)
-FS = sum(data.iLaplace2D.SpectrumAmplitude(:));
-% data.iLaplace2D.SpectrumAmplitude=data.iLaplace2D.SpectrumAmplitude./FS;
-% data.iLaplace2D.DataAmplitude=data.iLaplace2D.DataAmplitude./FS;
-% Seq.iLaplace1D.FullScaleAmplitude=Seq.iLaplace1D.FullScaleAmplitude.*FS;
-
-
-
-%% plot "measured" signals
-%
-hf = figure(83);
-clf(hf);
-hax = axes(hf);
-surf(hax, tau2*1000, tau1*1000, data.iLaplace2D.DataAmplitude.', 'LineStyle', 'none');
-colormap(hf, 'jet');
-title(hax, 'Measured Signal Amplitude');
-ylabel(hax, 'Inversion Time [ms]');
-xlabel(hax, 'Echo Time [ms]');
-
-
-%% plot final result
-%
-hf = figure(85);
-clf(hf);
-hax = axes(hf);
-surf(hax, tau2, tau1, data.iLaplace2D.FitAmplitude.', 'LineStyle', 'none');
-colormap(hf, 'jet');
-title(hax, 'Fitted Signal Amplitude');
-ylabel(hax, 'Inversion Time [s]');
-xlabel(hax, 'Echo Time [s]');
-
-hf = figure(86);
-clf(hf);
-hax = axes(hf);
-surf(hax, tau2, tau1, data.iLaplace2D.DataAmplitude.'-data.iLaplace2D.FitAmplitude.', ...
-  'LineStyle', 'none');
-colormap(hf, 'jet');
-title(hax, {'Residuals', 'Measured Signal Amplitude - Fitted Signal Amplitude'});
-ylabel(hax, 'Inversion Time [s]');
-xlabel(hax, 'Echo Time [s]');
-
-% T1-T2-map
-hf = figure(84);
-set(hf, 'Name', 'T1-T2-map');
-ax(1) = subplot(10,10,[3:10,13:20,23:30,33:40,43:50,53:60,63:70,73:80], 'Parent', hf);
-s = data.iLaplace2D.SpectrumAmplitude.';
-s(~conv2(double(s~=0), ones(3,3), 'same')) = NaN; % nans are transparent
-pcolor(ax(1), T2, T1, s * 100/FS);
-set(ax(1), 'XScale', 'log', 'YScale', 'log', 'Tag', 'main');
-
-shading(ax(1), 'interp');
-cmap = colormap(ax(1), 'jet');
-cmap = [1,1,1; cmap];
-colormap(ax(1), cmap);
-axis(ax(1), [min(T2) max(T2) min(T1) max(T1)]);
-
-title(ax(1), ['Fitted Spectrum [% FS] (FS = ' num2str(Seq.iLaplace2D.FullScaleAmplitude*1e9) ' nT)']);
-set(ax(1), 'XTickLabel', []);
-set(ax(1), 'YTickLabel', []);
-grid(ax(1), 'on');
-
-ax(2) = subplot(10,10,2:10:72, 'Parent', hf);
-semilogy(ax(2), sum(data.iLaplace2D.SpectrumAmplitude.'*100/FS,2), T1, 'LineWidth', 2);
-grid(ax(2), 'on');
-set(ax(2), 'YTickLabel', [], 'XDir', 'reverse', 'XAxisLocation', 'top', 'XTickLabelRotation', 90, 'Tag', 'tau1_spec');
-
-ax(3) = subplot(10,10,83:90, 'Parent', hf, 'Tag', 'tau2_spec');
-semilogx(ax(3), T2, sum(data.iLaplace2D.SpectrumAmplitude.'*100/FS,1), 'LineWidth', 2);
-grid(ax(3), 'on');
-set(ax(3), 'XTickLabel', [], 'YAxisLocation', 'right');
-
-ax(4) = subplot(10,10,1:10:71, 'Parent', hf);
-semilogy(ax(4), cumsum(sum(data.iLaplace2D.SpectrumAmplitude.'*100/FS,2),1), T1, 'LineWidth', 2);
-ylabel(ax(4), 'T1 [s]');
-xlim(ax(4), [0, 100]);
-grid(ax(4), 'on');
-set(ax(4), 'XDir', 'reverse', 'XAxisLocation', 'top', 'XTickLabelRotation', 90, 'Tag', 'tau1_accum');
-
-ax(5) = subplot(10,10,93:100, 'Parent', hf, 'YAxisLocation', 'right');
-semilogx(ax(5), T2, cumsum(sum(data.iLaplace2D.SpectrumAmplitude.'*100/FS,1),2), 'LineWidth', 2);
-xlabel(ax(5), 'T2 [s]');
-ylim(ax(5), [0, 100]);
-grid(ax(5), 'on');
-set(ax(5), 'YAxisLocation', 'right', 'Tag', 'tau2_accum');
-
-linkaxes(ax([1,2,4]), 'y');
-linkaxeskeep(ax([1,3,5]), 'x');
-set(ax(1), 'XLim', [min(T2(:)), max(T2(:))], 'YLim', [min(T1(:)), max(T1(:))]);
+data.iLaplace2D.T1 = T1;
+data.iLaplace2D.T2 = T2;
+Seq = plot_iLaplace2D(data, Seq);
 
 % residual
 % Seq.iLaplace2D.res = norm(d - G*s(:),2)^2;
 
 if nargin == 2
   C = data;
-  C.iLaplace2D.T1 = T1;
-  C.iLaplace2D.T2 = T2;
   T1 = Seq;
 else
   C = data.iLaplace2D.SpectrumAmplitude;
 end
-%
+
+end

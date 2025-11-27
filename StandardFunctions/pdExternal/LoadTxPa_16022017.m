@@ -42,31 +42,31 @@ HW.RX(iDevice).VGAGainDef = HW.RX(iDevice).VGAGainMax/1;  % default receiver amp
 
 
 %%
-% if exist('CalibrationPaUout2Amplitude.mat', 'file');
+% if exist('CalibrationPaUout2Amplitude.mat', 'file')
 %   load('CalibrationPaUout2Amplitude.mat');
 %   HW.TX(iDevice).CalibrationPaUout2Amplitude = CalibrationTX;
 %   clear CalibrationPaUout2Amplitude
 % end
-% if exist('CalibrationUout.mat', 'file');
+% if exist('CalibrationUout.mat', 'file')
 %   load('CalibrationUout.mat');
 %   HW.TX(iDevice).CalibrationUout = CalibrationUout;
 %   clear CalibrationUout
 % end
-% if exist('CalibrationNorm2MmrtUout.mat', 'file');
+% if exist('CalibrationNorm2MmrtUout.mat', 'file')
 %   load('CalibrationNorm2MmrtUout.mat');
 %   HW.TX(iDevice).CalibrationNorm2MmrtUout = CalibrationTX;
 %   clear CalibrationNorm2MmrtUout
-% end;
+% end
 %
 % if any(HW.TX(iDevice).Uout2PaUout~=1)
-%   if exist('CalibrationRfAmp.mat', 'file');
+%   if exist('CalibrationRfAmp.mat', 'file')
 %     load('CalibrationRfAmp.mat');
 %     HW.TX(iDevice).CalibrationRfAmp = CalibrationRfAmp;
 %     clear CalibrationRfAmp
 %   end
 % end
 %
-% if exist('CalibrationRx.mat', 'file');
+% if exist('CalibrationRx.mat', 'file')
 %   load('CalibrationRx.mat');
 %   HW.RX(iDevice).Calibration = CalibrationRx;
 %   clear CalibrationRx

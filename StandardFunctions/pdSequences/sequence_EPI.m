@@ -1,10 +1,11 @@
 %% EPI experiment
 %
 % Disclaimer: This function is not actively supported at the moment.
+% Use "sequence_Flash" with Seq.AQSlice(1).EPIFactor>1 instead.
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2014-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2014-2025 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -14,7 +15,7 @@ warning('PD:sequence_EPI:deprecated', ...
    'of OpenMatlab. Consider using the function "sequence_Flash" with ', ...
    'Seq.AQSlice(1).EPIFactor>1 instead.']);
 
-if exist('HW', 'var') && isa(HW, 'PD.HW')
+if exist('HW', 'var') && isa(HW, 'PD.HWClass')
   ResetStructs;  % reset variables: Seq AQ TX Grad
 else
   % mySave.DummySerial = 0;   % for Dummy measurements without an MRI device (0 or [] for real measurements or 1 for dummy measurements)
@@ -51,9 +52,9 @@ Seq.SteadyState_PostShots=1;
 
 % Readout at echo
 % rotate all image coordinates around... rotate
-Seq.AQSlice(1).plotkSpace=1;                               % Plot k-Space 
-Seq.AQSlice(1).plotImage=1;                                % Plot Image 
-Seq.AQSlice(1).plotPhase=1;                                % Plot phase of k-Space and Image 
+Seq.AQSlice(1).plotkSpace=1;                               % Plot k-Space
+Seq.AQSlice(1).plotImage=1;                                % Plot Image
+Seq.AQSlice(1).plotPhase=1;                                % Plot phase of k-Space and Image
 Seq.AQSlice(1).alfa=0.0*pi;                                % first rotation around x axis in RAD
 Seq.AQSlice(1).phi=0.0*pi;                                 % second rotation around y axis in RAD
 Seq.AQSlice(1).theta=0.0*pi;                               % third rotation around z axis in RAD
@@ -81,14 +82,19 @@ tReps= cumsum(     ones(1+Seq.SteadyState_PreShots+Seq.AQSlice(1).nPhase(1)*Seq.
 Seq.AQSlice(1).UsetRep = reshape(tReps(1+Seq.SteadyState_PreShots+(1:prod(Seq.AQSlice(1).nPhase(1))*prod(Seq.AQSlice(1).PhaseOS(1))),:), [], 1);
 Seq.AQSlice(1).UseAQWindow=1;
 Seq.AQSlice(1).AQWindowDirection=[1];
-Seq.AQSlice(1).ReadCoordinate=3;                                                   % direction of Read:  x = 1,  y = 2, z = 3  
-Seq.AQSlice(1).PhaseCoordinate(1)=1;                                                  % direction of Phase:   x = 1,  y = 2, z = 3  
-Seq.AQSlice(1).PhaseCoordinate(2)=2;                                                  % direction of Phase:   x = 1,  y = 2, z = 3  
-Seq.AQSlice(1).PhaseCoordinate(3)=3;                                                  % direction of Phase:   x = 1,  y = 2, z = 3  
-Seq.AQSlice(1).SliceCoordinate=1;                                                  % direction of Slice:   x = 1,  y = 2, z = 3  
+Seq.AQSlice(1).ReadCoordinate=3;                                                   % direction of Read:  x = 1,  y = 2, z = 3
+Seq.AQSlice(1).PhaseCoordinate(1)=1;                                                  % direction of Phase:   x = 1,  y = 2, z = 3
+Seq.AQSlice(1).PhaseCoordinate(2)=2;                                                  % direction of Phase:   x = 1,  y = 2, z = 3
+Seq.AQSlice(1).PhaseCoordinate(3)=3;                                                  % direction of Phase:   x = 1,  y = 2, z = 3
+Seq.AQSlice(1).SliceCoordinate=1;                                                  % direction of Slice:   x = 1,  y = 2, z = 3
 
 % Generate tRep times
 Seq.tRep=Seq.tEcho+0*tReps;
+if HW.RX(iDevice).ClampCoil.Enable
+  % extent last tRep with acquisition for clamp coil signal
+  Seq.tRep(end-1,:) = max(Seq.tRep(end-1,:), ...
+    Seq.tEcho/2 + 1/2/Seq.AQSlice(1).HzPerPixMin + HW.RX.ClampCoil.tPostset + 0.1e-3);
+end
 Seq.tRep(end,:)=Seq.tEcho+HW.FindFrequencyPause;
 Seq.tRep(end,end)=Seq.tEcho;
 Seq.tRep=reshape(Seq.tRep,1,[]);
@@ -96,9 +102,9 @@ Seq.tRep=reshape(Seq.tRep,1,[]);
 % 90 degrees slice excitation
 % firstLength=[];
 for t=1:2
-     if isfield(Seq, 'Slice') 
-        Seq=rmfield( Seq, 'Slice'); 
-     end;
+     if isfield(Seq, 'Slice')
+        Seq=rmfield( Seq, 'Slice');
+     end
     Seq.Slice(1).Pulse.Function=@Pulse_Rect;
     Seq.Slice(1).Pulse.FlipAngle=90;
     Seq.Slice(1).Thickness=Seq.AQSlice(1).thickness;
@@ -260,9 +266,9 @@ Seq=get_PhaseParameter(Seq,HW);
 
 
 % % Readout at FID
-% Seq.AQSlice(2).plotkSpace=1;                               % Plot k-Space 
-% Seq.AQSlice(2).plotImage=1;                                % Plot Image 
-% Seq.AQSlice(2).plotPhase=2;                                % Plot phase of k-Space and Image 
+% Seq.AQSlice(2).plotkSpace=1;                               % Plot k-Space
+% Seq.AQSlice(2).plotImage=1;                                % Plot Image
+% Seq.AQSlice(2).plotPhase=2;                                % Plot phase of k-Space and Image
 % Seq.AQSlice(2).alfa=1.5*pi;                                % first rotation around x axis in RAD
 % Seq.AQSlice(2).phi=0.0*pi;                                 % second rotation around y axis in RAD
 % Seq.AQSlice(2).theta=-0.0*pi;                               % third rotation around z axis in RAD
@@ -284,11 +290,11 @@ Seq=get_PhaseParameter(Seq,HW);
 % Seq.AQSlice(2).PhaseOS(3)=1;                                  % Oversampling phase        1...
 % Seq.AQSlice(2).UsetRep=1:length(Seq.tRep);
 % Seq.AQSlice(2).UseAQWindow=1;
-% Seq.AQSlice(2).ReadCoordinate=1;                                                   % direction of Read:  x = 1,  y = 2, z = 3  
-% Seq.AQSlice(2).PhaseCoordinate=2;                                                  % direction of Phase:   x = 1,  y = 2, z = 3  
-% Seq.AQSlice(2).Phase3DCoordinate=3;                                                % direction of Phase3D:   x = 1,  y = 2, z = 3  
-% Seq.AQSlice(2).SliceCoordinate=3;                                                  % direction of Slice:   x = 1,  y = 2, z = 3  
-% 
+% Seq.AQSlice(2).ReadCoordinate=1;                                                   % direction of Read:  x = 1,  y = 2, z = 3
+% Seq.AQSlice(2).PhaseCoordinate=2;                                                  % direction of Phase:   x = 1,  y = 2, z = 3
+% Seq.AQSlice(2).Phase3DCoordinate=3;                                                % direction of Phase3D:   x = 1,  y = 2, z = 3
+% Seq.AQSlice(2).SliceCoordinate=3;                                                  % direction of Slice:   x = 1,  y = 2, z = 3
+%
 % Seq.Read(3).HzPerPixelMin=Seq.AQSlice(2).HzPerPixMin;
 % Seq.Read(3).CenterOfReadout=0.5/Seq.Read(3).HzPerPixelMin+Seq.Slice(1).CenterOfRephase+Seq.Slice(1).GradRephaseLength/2+HW.Grad.tEC;
 % Seq.Read(3).PhaseIncrement=Seq.Read(1).PhaseIncrement;
@@ -307,7 +313,7 @@ TX=add_TX(TX, Seq.Slice(1).TX);
 Grad=add_Grad(Grad, Seq.Slice(1).Grad);
 Grad=add_Grad(Grad, Seq.Slice(1).GradRephase);
 
-% % Grad=add_Grad(Grad, Seq.Read(3).GradDephase); 
+% % Grad=add_Grad(Grad, Seq.Read(3).GradDephase);
 
 
 % Grad=add_Grad(Grad, Seq.Phase(1).GradDephase);
@@ -335,16 +341,17 @@ if double(Seq.AQSlice(1).nPhase(2)>1); Grad=add_Grad(Grad, Seq.Phase(4).GradDeph
 % Seq.Loops=1;
 % Seq.average=1;
 % for Loop=1:Seq.Loops
-% if Loop==1; Seq.Reinitialize=1;end
+% if Loop==1, Seq.Reinitialize=1;end
 % if Seq.Loops>1; Seq.TimeToNextSequence=0.5; else Seq.TimeToNextSequence=[]; end
-% if Loop==2;
-%     Seq.Reinitialize=0; 
+% if Loop==2
+%     Seq.Reinitialize=0;
 %     Seq.TimeFromLastSequence=Seq.TimeToNextSequence;
 % end
-% if Loop==Seq.Loops;
+% if Loop==Seq.Loops
 %     Seq.TimeFromLastSequence=Seq.TimeToNextSequence;
 %     Seq.TimeToNextSequence=[];
 % end
+
 
 % Run sequence
 [ ~, SeqOut, data, ~] = set_sequence(HW, Seq, AQ, TX, Grad);

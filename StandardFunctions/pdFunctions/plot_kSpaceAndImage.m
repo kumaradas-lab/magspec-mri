@@ -92,7 +92,7 @@ function [data, AQSlice] = plot_kSpaceAndImage(data, AQSlice)
 %   to these structures.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2025 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -105,11 +105,12 @@ end
 
 %% default input
 AQSlice = set_EmptyField(AQSlice, 'iSlice', 1);  % index of image to display
-AQSlice = set_EmptyField(AQSlice, 'CenterRot', [0,0,0]);
+AQSlice = set_EmptyField(AQSlice, 'CenterRot', [0, 0, 0]);
 AQSlice = set_EmptyField(AQSlice, 'plotImageHandle', 3030);
 AQSlice = set_EmptyField(AQSlice, 'plotPhase', 0);
 
 AQSlice = set_EmptyField(AQSlice, 'plotImage', 50);
+% if AQSlice.plotImage == 1,  AQSlice.plotImage = 50; end
 if AQSlice.plotImage == 1,  AQSlice.plotImage = AQSlice.plotImageHandle; end
 AQSlice = setPhaseFigure(AQSlice, 'plotImage', 'plotImagePhase', 51);
 
@@ -179,7 +180,7 @@ AQSlice = set_EmptyField(AQSlice, 'AmplitudeUnitScale', 1);
 AQSlice = set_EmptyField(AQSlice, 'LengthUnit', 'mm');
 AQSlice = set_EmptyField(AQSlice, 'LengthUnitScale', 1e-3);
 AQSlice = set_EmptyField(AQSlice, 'ZeroFillFactor', 1);
-AQSlice = set_EmptyField(AQSlice, 'ZeroFillWindowSize', inf);
+AQSlice = set_EmptyField(AQSlice, 'ZeroFillWindowSize', Inf);
 AQSlice = set_EmptyField(AQSlice, 'RoiRelativeValue', 1/5);
 AQSlice = set_EmptyField(AQSlice, 'RoiCutOffPercentile', .95);
 
@@ -202,8 +203,9 @@ if AQSlice.iSlice < 1
   warning('PD:plot_kSpaceAndImage:iSlice', ...
     'iSlice < 1. First slice is plotted.');
 end
-if AQSlice.iSlice > prod([size(data.ImageZ,5), size(data.ImageZ,6)])
-  AQSlice.iSlice = prod([size(data.ImageZ,5), size(data.ImageZ,6)]);
+szImage = arrayfun(@(x) size(data.ImageZ, x), 1:6);
+if AQSlice.iSlice > prod([szImage(5), szImage(6)])
+  AQSlice.iSlice = prod([szImage(5), szImage(6)]);
   warning('PD:plot_kSpaceAndImage:iSlice', ...
     ['iSlice > prod([size(data.ImageZ,5), size(data.ImageZ,6)]). ', ...
     'Last slice (iSlice=%d) is plotted.'], ...
@@ -216,7 +218,7 @@ end
 
 
 %% display image and k-space
-if sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) >= 3
+if sum(szImage(1:4)>1) >= 3
   %% 3d image
   % (FIXME: This does not handle 4d images completely)
 
@@ -235,7 +237,7 @@ if sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) >= 3
     end
   end
 
-  if AQSlice.nRead > 1
+  if sum(AQSlice.nPhase(:) > 1) < 3
     % read encoding for first dimension
     ZeroFillFactorPermuted = data.ZeroFillFactor(data.PermuteOrder);
   else
@@ -257,6 +259,7 @@ if sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) >= 3
   if isemptyfield(data, 'RoI') || ...
       (~(isscalar(data.RoI) && data.RoI == 1) && ...
       ~all(size(data.ImageSliceomaticZ) == size(data.RoI)))
+    % FIXME: Would it be better if this were a Boolean array (memory footprint)
     data = smoothRoI(data, AQSlice, data.ImageSliceomaticZ, 2*ZeroFillFactorPermuted+1);
     data.RoI = double(data.RoI);  % There is no logical NaN.
     data.RoI(~data.RoI) = NaN;
@@ -366,7 +369,9 @@ if sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) >= 3
   end
 
   if AQSlice.plotB0Gradient ~= 0
-    B0 = data.RoI .* unwrap3Dmiddle(-angle(data.ImageSliceomaticZ))/pi/2/AQSlice.tEcho*2*pi/AQSlice.Gamma;
+    B0 = data.RoI ...
+      .* unwrap3Dmiddle(-angle(data.ImageSliceomaticZ)) ...
+      / AQSlice.tEcho / AQSlice.Gamma;
     hParent = AQSlice.plotB0Gradient;
     if ~ishghandle(hParent, 'uipanel') && ...
         (AQSlice.raiseFigures || ~ishghandle(hParent, 'figure'))
@@ -374,20 +379,20 @@ if sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) >= 3
     end
     if AQSlice.nRead>1
       [B0Gradient_xyz{[2,1,3]}] = gradient(B0, diff(data.Ticks(1).ReadZ(1:2)), diff(data.Ticks(1).PhaseZ(1:2)), diff(data.Ticks(2).PhaseZ(1:2)));
-      B0Gradient_mean(3)=meanNAN(reshape(B0Gradient_xyz{3},[],1));
-      B0Gradient_mean(2)=meanNAN(reshape(B0Gradient_xyz{2},[],1));
-      B0Gradient_mean(1)=meanNAN(reshape(B0Gradient_xyz{1},[],1));
+      B0Gradient_mean(3) = mean(reshape(B0Gradient_xyz{3}, [], 1), 'omitnan');
+      B0Gradient_mean(2) = mean(reshape(B0Gradient_xyz{2}, [], 1), 'omitnan');
+      B0Gradient_mean(1) = mean(reshape(B0Gradient_xyz{1}, [], 1), 'omitnan');
       B0Gradient_xyz = cat(4, B0Gradient_xyz{:});
       B0Gradient = sqrt(sum(B0Gradient_xyz.^2, 4));
     else
       [B0Gradient_xyz{[2,1,3]}] = gradient(B0, diff(data.Ticks(3).PhaseZ(1:2)), diff(data.Ticks(1).PhaseZ(1:2)), diff(data.Ticks(2).PhaseZ(1:2)));
-      B0Gradient_mean(3)=meanNAN(reshape(B0Gradient_xyz{3},[],1));
-      B0Gradient_mean(2)=meanNAN(reshape(B0Gradient_xyz{2},[],1));
-      B0Gradient_mean(1)=meanNAN(reshape(B0Gradient_xyz{1},[],1));
+      B0Gradient_mean(3) = mean(reshape(B0Gradient_xyz{3}, [], 1), 'omitnan');
+      B0Gradient_mean(2) = mean(reshape(B0Gradient_xyz{2}, [], 1), 'omitnan');
+      B0Gradient_mean(1) = mean(reshape(B0Gradient_xyz{1}, [], 1), 'omtinan');
       B0Gradient_xyz = cat(4, B0Gradient_xyz{:});
       B0Gradient = sqrt(sum(B0Gradient_xyz.^2, 4));
     end
-    AQSlice.plotB0GradienthAxes{1} = plot3Ddata(hParent, data, AQSlice, B0Gradient, true, 'ReadZ', 'PhaseZ');
+    AQSlice.plotB0GradienthAxes{1} = plot3Ddata(hParent, data, AQSlice, B0Gradient*1e3, true, 'ReadZ', 'PhaseZ');
     clear B0 B0Gradient_xyz B0Gradient
     if (AQSlice.nPhase(:)>1) == 3  % 3d image
       xlabel(AQSlice.plotB0GradienthAxes{1}.hAxes, ...
@@ -412,9 +417,9 @@ if sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) >= 3
       hParent = figure(hParent);
     end
     [B0Gradient_xyz{[2,1,3]}] = gradient(B0, diff(data.Ticks(3).PhaseZ(1:2)), diff(data.Ticks(1).PhaseZ(1:2)), diff(data.Ticks(2).PhaseZ(1:2)));
-    B0Gradient_mean(3)=meanNAN(reshape(B0Gradient_xyz{3},[],1));
-    B0Gradient_mean(2)=meanNAN(reshape(B0Gradient_xyz{2},[],1));
-    B0Gradient_mean(1)=meanNAN(reshape(B0Gradient_xyz{1},[],1));
+    B0Gradient_mean(3) = mean(reshape(B0Gradient_xyz{3}, [], 1), 'omitnan');
+    B0Gradient_mean(2) = mean(reshape(B0Gradient_xyz{2}, [], 1), 'omitnan');
+    B0Gradient_mean(1) = mean(reshape(B0Gradient_xyz{1}, [], 1), 'omitnan');
     B0Gradient_xyz = cat(4, B0Gradient_xyz{:});
     B0Gradient = sqrt(sum(B0Gradient_xyz.^2, 4));
     AQSlice.plotB0GradienthAxes{2} = plot3Ddata(hParent, data, AQSlice, B0Gradient*1e3, true, 'ReadZ', 'PhaseZ');
@@ -458,7 +463,7 @@ if sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) >= 3
     set(AQSlice.plotB1hAxes{1}, 'CLim', [50 150]);
   end
 
-elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
+elseif sum(szImage(1:4)>1) == 2
   %% 2d image
   if (AQSlice.plotImage ~= 0) || (AQSlice.plotImageOs ~= 0) || (AQSlice.plotkSpace ~= 0) || ...
       (AQSlice.plotB0ppm ~= 0) || (AQSlice.plotB0Hz ~= 0)
@@ -483,6 +488,7 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
     % find axes
     foundAxes = false(1, 4);
     hKids = get(hParent{1}, 'Children');
+    hKids(~isvalid(hKids)) = [];
     if ~isempty(hKids)
       allTags = get(hKids, 'Tag');
       if ~iscell(allTags), allTags = {allTags}; end
@@ -599,8 +605,6 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
       imageTypes{end+1} = 'plotImagehAxes';
       if AQSlice.plotPhase
         figName{1} = 'Magnitude and Phase of k-Space';
-        AQSlice.plotImagehAxes{1} = subplot(2,1,1, 'Parent', hParent{1});
-        AQSlice.plotImagehAxes{3} = subplot(2,1,2, 'Parent', hParent{1});
         visAxes = [1, 3];
         for iAxes = 1:2
           subplot(2,1,iAxes, AQSlice.plotImagehAxes{visAxes(iAxes)}, 'Visible', 'on');
@@ -611,12 +615,11 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
         end
       else
         figName{1} = 'k-Space';
-        AQSlice.plotImagehAxes{1} = axes('Parent', hParent{1});
-            subplot(1,1,1, AQSlice.plotImagehAxes{1}, 'Visible', 'on');
-            for iAxes = 2:4
-              cla(AQSlice.plotImagehAxes{iAxes});
-              set(AQSlice.plotImagehAxes{iAxes}, 'Visible', 'off');
-            end
+        subplot(1,1,1, AQSlice.plotImagehAxes{1}, 'Visible', 'on');
+        for iAxes = 2:4
+          cla(AQSlice.plotImagehAxes{iAxes});
+          set(AQSlice.plotImagehAxes{iAxes}, 'Visible', 'off');
+        end
       end
     end
     for jOs = 1:iOs
@@ -629,8 +632,14 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
       for imageType = imageTypes
         hKids = get(AQSlice.(imageType{1}){1}, 'Children');
         hImg = findobj(hKids, 'flat', 'Tag', 'kSpaceAndImage_2d_image');
-        cData = 20*log10((abs(permute(squeeze(data.kSpaceOs(:,:,:,:,AQSlice.iSlice)), [2,1]) * ...
+        cData = 20*log10((abs(squeeze(data.kSpaceOs(:,:,:,:,AQSlice.iSlice)) * ...
           AQSlice.VoxelVolume / AQSlice.AreaCoil * data.Amplitude2Uin(AQSlice.UseAQWindow(1),1)/2^0.5)./1e-6));
+        if sum(AQSlice.nPhase==1) == 2
+          % read-phase encoded
+          cData = permute(cData, [2,1]);
+        else
+          % phase-phase encoded
+        end
         if isempty(hImg)
           imagesc(cData, ...
             'Parent', AQSlice.(imageType{1}){1}, 'Tag', 'kSpaceAndImage_2d_image');
@@ -643,20 +652,21 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
         title(AQSlice.(imageType{1}){1}, ['k-Space in dB' char(181) 'V']);
         k_clim = [-40,0] + [0,1].*get(AQSlice.(imageType{1}){1}, 'CLim');
         if k_clim(1) < k_clim(2), set(AQSlice.(imageType{1}){1}, 'CLim', k_clim); end
-        if sum([AQSlice.nPhase(1)>1, AQSlice.nPhase(2)>1, AQSlice.nPhase(3)>1])==1
+        if sum(AQSlice.nPhase==1) == 2
+          % read-phase encoded
           t = find(AQSlice.nPhase>1, 1, 'first');
           xlabel(AQSlice.(imageType{1}){1}, [AQSlice.ReadCartesianAxis{1} 'read in samples']);
           ylabel(AQSlice.(imageType{1}){1}, [AQSlice.PhaseCartesianAxis{t} 'phase(' num2str(t(1)) ') in samples']);
           aspect=[AQSlice.nRead/AQSlice.nPhase(find(AQSlice.nPhase>1, 1, 'first')), ...
-              AQSlice.sizeRead/AQSlice.sizePhase(find(AQSlice.nPhase>1,1,'first')), 1];
+            AQSlice.sizeRead/AQSlice.sizePhase(find(AQSlice.nPhase>1, 1, 'first')), 1];
         else
           t = find(AQSlice.nPhase>1, 2, 'first');
           xlabel(AQSlice.(imageType{1}){1}, [AQSlice.PhaseCartesianAxis{t(2)} 'phase(' num2str(t(2)) ') in samples']);
           ylabel(AQSlice.(imageType{1}){1}, [AQSlice.PhaseCartesianAxis{t(1)} 'phase(' num2str(t(1)) ') in samples']);
-          aspect = [AQSlice.nPhase(t(1))    / AQSlice.nPhase(t(2)), ...
-                    AQSlice.sizePhase(t(1)) / AQSlice.sizePhase(t(2)), 1];
+          aspect = [AQSlice.nPhase(t(2))    / AQSlice.nPhase(t(1)), ...
+                    AQSlice.sizePhase(t(2)) / AQSlice.sizePhase(t(1)), 1];
         end
-        if any([isnan(aspect),isinf(aspect),aspect==0])
+        if any([isnan(aspect), isinf(aspect), aspect==0])
           set(AQSlice.(imageType{1}){1}, 'PlotBoxAspectRatioMode', 'auto');
         else
           set(AQSlice.(imageType{1}){1}, 'PlotBoxAspectRatio', aspect);
@@ -667,7 +677,13 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
       for imageType = imageTypes
         hKids = get(AQSlice.(imageType{1}){3}, 'Children');
         hImg = findobj(hKids, 'flat', 'Tag', 'kSpaceAndImage_2d_image');
-        cData = angle(permute(squeeze(data.kSpaceOs(:,:,:,:,AQSlice.iSlice)), [2,1]));
+        cData = angle(squeeze(data.kSpaceOs(:,:,:,:,AQSlice.iSlice)));
+        if sum(AQSlice.nPhase==1) == 2
+          % read-phase encoded
+          cData = permute(cData, [2, 1]);
+        else
+          % phase-phase encoded
+        end
         if isempty(hImg)
           imagesc(cData, ...
             'Parent', AQSlice.(imageType{1}){3}, 'Tag', 'kSpaceAndImage_2d_image');
@@ -682,116 +698,59 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
           aspect = [AQSlice.nRead    / AQSlice.nPhase(find(AQSlice.nPhase>1,1,'first')), ...
                     AQSlice.sizeRead / AQSlice.sizePhase(find(AQSlice.nPhase>1,1,'first')), 1];
         else
-          aspect=[AQSlice.nPhase(t(1))    /AQSlice.nPhase(t(2)), ...
-                  AQSlice.sizePhase(t(1)) /AQSlice.sizePhase(t(2)), 1];
+          aspect=[AQSlice.nPhase(t(2))    /AQSlice.nPhase(t(1)), ...
+                  AQSlice.sizePhase(t(2)) /AQSlice.sizePhase(t(1)), 1];
         end
-        if any([isnan(aspect),isinf(aspect),aspect==0])
+        if any([isnan(aspect), isinf(aspect), aspect==0])
           set(AQSlice.(imageType{1}){3}, 'PlotBoxAspectRatioMode', 'auto');
         else
           set(AQSlice.(imageType{1}){3}, 'PlotBoxAspectRatio', aspect);
         end
+        linkaxes([AQSlice.(imageType{1}){1},AQSlice.(imageType{1}){3}],'xy');
       end
     end
     if AQSlice.plotImage ~= 0
-      hKids = get(AQSlice.plotImagehAxes{2}, 'Children');
-      hImg = findobj(hKids, 'flat', 'Tag', 'kSpaceAndImage_2d_image');
-      if sum(AQSlice.nPhase==1)==2
-        % read phase encoded
-        t = find(AQSlice.nPhase>1, 1, 'first');
-        aspect = [AQSlice.nRead    / AQSlice.nPhase(t), ...
-                  AQSlice.sizeRead / AQSlice.sizePhase(t), 1];
-
-        xData = data.Ticks(1).ReadZ;
-        if ~isinf(AQSlice.sizeRead)
-          xData = xData / AQSlice.LengthUnitScale;
-        end
-        yData = data.Ticks(t).PhaseZ;
-        if ~isinf(AQSlice.sizePhase(t))
-          yData = yData / AQSlice.LengthUnitScale;
-        end
-        cData = abs(permute(squeeze(data.ImageZ(:,:,:,:,AQSlice.iSlice)), [2,1]) / ...
-          AQSlice.AmplitudeUnitScale);
-        if isempty(hImg)
-          imagesc(xData, yData, cData, ...
-            'Parent', AQSlice.plotImagehAxes{2}, 'Tag', 'kSpaceAndImage_2d_image');
-        else
-          set(hImg, 'XData', xData, 'YData', yData, 'CData', cData);
-          axis(AQSlice.plotImagehAxes{2}, 'tight');
-        end
-        set(AQSlice.plotImagehAxes{2}, 'YDir', 'normal');
-        % colorbar
-        colormap(AQSlice.plotImagehAxes{2}, gray)
-        title(AQSlice.plotImagehAxes{2}, ['Image Amplitude in ' AQSlice.AmplitudeUnit])
-        if isinf(AQSlice.sizeRead)
-          lengthUnit = 'pixels';
-        else
-          lengthUnit = AQSlice.LengthUnit;
-        end
-        xlabel(AQSlice.plotImagehAxes{2}, [AQSlice.ReadCartesianAxis{1} 'read in ' lengthUnit]);
-        if isinf(AQSlice.sizePhase(t))
-          lengthUnit = 'pixels';
-        else
-          lengthUnit = AQSlice.LengthUnit;
-        end
-        ylabel(AQSlice.plotImagehAxes{2}, [AQSlice.PhaseCartesianAxis{t} 'phase(' num2str(t) ') in ' lengthUnit]);
-      else
-        % phase phase encoded
-        t = find(AQSlice.nPhase>1, 2, 'first');
-        aspect = [AQSlice.nPhase(t(1))    / AQSlice.nPhase(t(2)), ...
-                  AQSlice.sizePhase(t(1)) / AQSlice.sizePhase(t(2)), 1];
-
-        xData = data.Ticks(t(2)).PhaseZ;
-        if ~isinf(AQSlice.sizePhase(t(2)))
-          xData = xData / AQSlice.LengthUnitScale;
-        end
-        yData = data.Ticks(t(1)).PhaseZ;
-        if ~isinf(AQSlice.sizePhase(t(1)))
-          yData = yData / AQSlice.LengthUnitScale;
-        end
-        cData = abs(abs(squeeze(data.ImageZ(:,:,:,:,AQSlice.iSlice)) / ...
-          AQSlice.AmplitudeUnitScale));
-        if isempty(hImg)
-          imagesc(xData, yData, cData, ...
-            'Parent', AQSlice.plotImagehAxes{2}, 'Tag', 'kSpaceAndImage_2d_image');
-        else
-          set(hImg, 'XData', xData, 'YData', yData, 'CData', cData);
-          axis(AQSlice.plotImagehAxes{2}, 'tight');
-        end
-        set(AQSlice.plotImagehAxes{2}, 'YDir', 'normal');
-        % colorbar
-        colormap(AQSlice.plotImagehAxes{2}, gray)
-        title(AQSlice.plotImagehAxes{2}, ['Image Amplitude in ' AQSlice.AmplitudeUnit]);
-        if isinf(AQSlice.sizePhase(t(2)))
-          lengthUnit = 'pixels';
-        else
-          lengthUnit = AQSlice.LengthUnit;
-        end
-        xlabel(AQSlice.plotImagehAxes{2}, [AQSlice.PhaseCartesianAxis{t(2)} 'phase(' num2str(t(2)) ') in ' lengthUnit]);
-        if isinf(AQSlice.sizePhase(t(2)))
-          lengthUnit = 'pixels';
-        else
-          lengthUnit = AQSlice.LengthUnit;
-        end
-        ylabel(AQSlice.plotImagehAxes{2}, [AQSlice.PhaseCartesianAxis{t(1)} 'phase(' num2str(t(1)) ') in ' lengthUnit]);
-      end
-      if any([isnan(aspect),isinf(aspect),aspect==0])
-        set(AQSlice.plotImagehAxes{2}, 'DataAspectRatioMode', 'auto');
-      else
-        set(AQSlice.plotImagehAxes{2}, 'DataAspectRatio', [1 1 1]);
-      end
+      data = plot_Image(AQSlice.plotImagehAxes{2}, data, AQSlice, 'kSpaceAndImage_2d_image');
       if AQSlice.plotPhase
         hKids = get(AQSlice.plotImagehAxes{4}, 'Children');
         hImg = findobj(hKids, 'flat', 'Tag', 'kSpaceAndImage_2d_image');
+        if sum(AQSlice.nPhase==1) == 2
+          % read-phase encoded
+          aspect = [AQSlice.nRead    / AQSlice.nPhase(find(AQSlice.nPhase>1, 1, 'first')), ...
+                    AQSlice.sizeRead / AQSlice.sizePhase(find(AQSlice.nPhase>1, 1, 'first')), 1];
+          xData = data.Ticks(1).ReadZ;
+          if ~isinf(AQSlice.sizeRead)
+            xData = xData / AQSlice.LengthUnitScale;
+          end
+          t = find(AQSlice.nPhase>1, 1, 'first');
+          yData = data.Ticks(t).PhaseZ;
+          if ~isinf(AQSlice.sizePhase(t))
+            yData = yData / AQSlice.LengthUnitScale;
+          end
+        else
+          % phase-phase encoded
+          t = find(AQSlice.nPhase>1, 2, 'first');
+          aspect = [AQSlice.nPhase(t(1))    / AQSlice.nPhase(t(2)), ...
+                    AQSlice.sizePhase(t(1)) / AQSlice.sizePhase(t(2)), 1];
+          xData = data.Ticks(t(2)).PhaseZ;
+          if ~isinf(AQSlice.sizePhase(t(2)))
+            xData = xData / AQSlice.LengthUnitScale;
+          end
+          yData = data.Ticks(t(1)).PhaseZ;
+          if ~isinf(AQSlice.sizePhase(t(1)))
+            yData = yData / AQSlice.LengthUnitScale;
+          end
+        end
         if sum(AQSlice.nPhase==1) == 2
           cData = angle(permute(squeeze(data.ImageZ(:,:,:,:,AQSlice.iSlice)),[2,1]));
         else
           cData = angle(squeeze(data.ImageZ(:,:,:,:,AQSlice.iSlice)));
         end
         if isempty(hImg)
-          imagesc(cData, ...
+          imagesc(xData, yData, cData, ...
             'Parent', AQSlice.plotImagehAxes{4}, 'Tag', 'kSpaceAndImage_2d_image');
         else
-          set(hImg, 'CData', cData);
+          set(hImg, 'XData', xData, 'YData', yData, 'CData', cData);
           axis(AQSlice.plotImagehAxes{4}, 'tight');
         end
         set(AQSlice.plotImagehAxes{4}, 'CLim', [-pi,pi])
@@ -799,20 +758,78 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
         % colorbar
         colormap(AQSlice.plotImagehAxes{4}, gray);
         if sum(AQSlice.nPhase==1) == 2
-          aspect = [AQSlice.nRead    / AQSlice.nPhase(find(AQSlice.nPhase>1, 1, 'first')), ...
-                    AQSlice.sizeRead / AQSlice.sizePhase(find(AQSlice.nPhase>1, 1, 'first')), 1];
+          if isinf(AQSlice.sizeRead)
+            lengthUnit = 'Hz';
+          else
+            lengthUnit = AQSlice.LengthUnit;
+          end
+          xlabel(AQSlice.plotImagehAxes{2}, [AQSlice.ReadCartesianAxis{1} 'read in ' lengthUnit]);
+          if isinf(AQSlice.sizePhase(t))
+            % FIXME: Correct unit?
+            lengthUnit = 'px';
+          else
+            lengthUnit = AQSlice.LengthUnit;
+          end
+          ylabel(AQSlice.plotImagehAxes{2}, [AQSlice.PhaseCartesianAxis{t} 'phase(' num2str(t) ') in ' lengthUnit]);
         else
-          t = find(AQSlice.nPhase>1, 2, 'first');
-          aspect = [AQSlice.nPhase(t(1))    / AQSlice.nPhase(t(2)), ...
-                    AQSlice.sizePhase(t(1)) / AQSlice.sizePhase(t(2)), 1];
+          if isinf(AQSlice.sizePhase(t(2)))
+            % FIXME: Correct unit?
+            lengthUnit = 'px';
+          else
+            lengthUnit = AQSlice.LengthUnit;
+          end
+          xlabel(AQSlice.plotImagehAxes{2}, [AQSlice.PhaseCartesianAxis{t(2)} 'phase(' num2str(t(2)) ') in ' lengthUnit]);
+          if isinf(AQSlice.sizePhase(t(2)))
+            % FIXME: Correct unit?
+            lengthUnit = 'px';
+          else
+            lengthUnit = AQSlice.LengthUnit;
+          end
+          ylabel(AQSlice.plotImagehAxes{2}, [AQSlice.PhaseCartesianAxis{t(1)} 'phase(' num2str(t(1)) ') in ' lengthUnit]);
         end
-        if any([isnan(aspect),isinf(aspect),aspect==0])
+        linkaxes([AQSlice.plotImagehAxes{2}, AQSlice.plotImagehAxes{4}], 'xy');
+        if any([isnan(aspect), isinf(aspect), aspect==0])
           set(AQSlice.plotImagehAxes{4}, 'DataAspectRatioMode', 'auto');
         else
-          set(AQSlice.plotImagehAxes{4}, 'DataAspectRatio', aspect);
+          set(AQSlice.plotImagehAxes{4}, 'DataAspectRatio', [1 1 1]);
         end
       end
     end
+
+    % position axes correctly again. imagesc in one axes might affect
+    % the position of neighboring axes.
+    if AQSlice.plotImage ~= 0
+      if AQSlice.plotkSpace ~= 0
+        if AQSlice.plotPhase
+          for iAxes = 1:4
+            subplot(2,2,iAxes, AQSlice.plotImagehAxes{iAxes}, 'Visible', 'on');
+          end
+        else
+          for iAxes = 1:2
+            subplot(1,2,iAxes, AQSlice.plotImagehAxes{iAxes}, 'Visible', 'on');
+          end
+        end
+      else
+        if AQSlice.plotPhase
+          visAxes = [2, 4];
+          for iAxes = 1:2
+            subplot(2,1,iAxes, AQSlice.plotImagehAxes{visAxes(iAxes)}, 'Visible', 'on');
+          end
+        else
+          subplot(1,1,1, AQSlice.plotImagehAxes{2}, 'Visible', 'on');
+        end
+      end
+    elseif AQSlice.plotkSpace ~= 0
+      if AQSlice.plotPhase
+        visAxes = [1, 3];
+        for iAxes = 1:2
+          subplot(2,1,iAxes, AQSlice.plotImagehAxes{visAxes(iAxes)}, 'Visible', 'on');
+        end
+      else
+        subplot(1,1,1, AQSlice.plotImagehAxes{1}, 'Visible', 'on');
+      end
+    end
+
     if AQSlice.plotImageOs ~= 0
       hKids = get(AQSlice.plotImageOshAxes{2}, 'Children');
       hImg = findobj(hKids, 'flat', 'Tag', 'kSpaceAndImage_2d_image');
@@ -843,13 +860,14 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
         colormap(AQSlice.plotImageOshAxes{2}, gray);
         title(AQSlice.plotImageOshAxes{2}, ['Image Amplitude in ' AQSlice.AmplitudeUnit]);
         if isinf(AQSlice.sizeRead)
-          lengthUnit = 'pixels';
+          lengthUnit = 'Hz';
         else
           lengthUnit = AQSlice.LengthUnit;
         end
         xlabel(AQSlice.plotImageOshAxes{2}, [AQSlice.ReadCartesianAxis{1} 'read in ' lengthUnit]);
         if isinf(AQSlice.sizePhase(t))
-          lengthUnit = 'pixels';
+          % FIXME: Correct unit?
+          lengthUnit = 'px';
         else
           lengthUnit = AQSlice.LengthUnit;
         end
@@ -880,13 +898,15 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
         colormap(AQSlice.plotImageOshAxes{2}, gray);
         title(AQSlice.plotImageOshAxes{2}, ['Image Amplitude in ' AQSlice.AmplitudeUnit]);
         if isinf(AQSlice.sizePhase(t(2)))
-          lengthUnit = 'pixels';
+          % FIXME: Correct unit?
+          lengthUnit = 'px';
         else
           lengthUnit = AQSlice.LengthUnit;
         end
         xlabel(AQSlice.plotImageOshAxes{2}, [AQSlice.PhaseCartesianAxis{t(2)} 'phase(' num2str(t(2)) ') in ' lengthUnit]);
         if isinf(AQSlice.sizePhase(t(1)))
-          lengthUnit = 'pixels';
+          % FIXME: Correct unit?
+          lengthUnit = 'px';
         else
           lengthUnit = AQSlice.LengthUnit;
         end
@@ -906,10 +926,10 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
           cData = angle(squeeze(data.ImageOsZ(:,:,:,:,AQSlice.iSlice)));
         end
         if isempty(hImg)
-          imagesc(cData, ...
+          imagesc(xData, yData, cData, ...
             'Parent', AQSlice.plotImageOshAxes{4}, 'Tag', 'kSpaceAndImage_2d_image');
         else
-          set(hImg, 'CData', cData);
+          set(hImg, 'XData', xData, 'YData', yData, 'CData', cData);
           axis(AQSlice.plotImageOshAxes{4}, 'tight');
         end
         set(AQSlice.plotImageOshAxes{4}, 'CLim', [-pi,pi])
@@ -924,11 +944,12 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
           aspect = [AQSlice.nPhase(t(1))    / AQSlice.nPhase(t(2)), ...
                     AQSlice.sizePhase(t(1)) / AQSlice.sizePhase(t(2)) 1];
         end
-        if any([isnan(aspect),isinf(aspect),aspect==0])
+        if any([isnan(aspect), isinf(aspect), aspect==0])
           set(AQSlice.plotImageOshAxes{4}, 'DataAspectRatioMode', 'auto');
         else
-          set(AQSlice.plotImageOshAxes{4}, 'DataAspectRatio', aspect);
+          set(AQSlice.plotImageOshAxes{4}, 'DataAspectRatio', [1 1 1]);
         end
+        linkaxes([AQSlice.plotImageOshAxes{2}, AQSlice.plotImageOshAxes{4}], 'xy');
       end
     end
 
@@ -944,13 +965,14 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
     % find Region of Interest
     if isemptyfield(data, 'RoI') || ...
         (~(isscalar(data.RoI) && data.RoI == 1) && ...
-        ~all(size(squeeze(data.ImageZ(:,:,:,:,AQSlice.iSlice))) == size(data.RoI)))
+        ~all(size(squeeze(data.ImageZ(:,:,:,:,AQSlice.iSlice))) == size(data.RoI(:,:,min(end,AQSlice.iSlice)))))
       if sum([AQSlice.nPhase(1)>1, AQSlice.nPhase(2)>1, AQSlice.nPhase(3)>1]) == 1
         ZeroFillFactorPermuted = data.ZeroFillFactor([1, (find(AQSlice.nPhase>1)+1)]);
       else
         ZeroFillFactorPermuted = data.ZeroFillFactor([false, AQSlice.nPhase>1]);
       end
-      data = smoothRoI(data, AQSlice, data.ImageZ(:,:,:,:,AQSlice.iSlice), 2*ZeroFillFactorPermuted+1);
+      data = smoothRoI(data, AQSlice, squeeze(data.ImageZ(:,:,:,:,AQSlice.iSlice)), ....
+        2*ZeroFillFactorPermuted+1);
       data.RoI = double(data.RoI);  % There is no logical NaN.
       data.RoI(~data.RoI) = NaN;
     end
@@ -1120,29 +1142,48 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
         t = find(AQSlice.nPhase>1, 1, 'first');
         B0=permute(data.RoI,[2,1]).*permute(squeeze(unwrap3Dmiddle(-angle(data.ImageZ(:,:,:,:,AQSlice.iSlice)))/pi/2/AQSlice.tEcho*2*pi/AQSlice.Gamma),[2,1]);
         [B0Gradient_xyz{[2,1]}] = gradient(B0, diff(data.Ticks(1).ReadZ(1:2)), diff(data.Ticks(t).PhaseZ(1:2)));
-        B0Gradient_mean(2)=meanNAN(reshape(B0Gradient_xyz{2},[],1));
-        B0Gradient_mean(1)=meanNAN(reshape(B0Gradient_xyz{1},[],1));
+        B0Gradient_mean(2) = mean(reshape(B0Gradient_xyz{2}, [], 1), 'omitnan');
+        B0Gradient_mean(1) = mean(reshape(B0Gradient_xyz{1}, [], 1), 'omitnan');
         B0Gradient_xyz = cat(4, B0Gradient_xyz{:});
         B0Gradient = sqrt(sum(B0Gradient_xyz.^2, 4));
 
-        imagesc(data.Ticks(1).ReadZ/AQSlice.LengthUnitScale, ...
-                data.Ticks(find(AQSlice.nPhase>1,1,'first')).PhaseZ/AQSlice.LengthUnitScale, ...
-                B0Gradient*1e3, ...
+        xData = data.Ticks(1).ReadZ;
+        if ~isinf(AQSlice.sizeRead)
+          xData = xData / AQSlice.LengthUnitScale;
+        end
+        yData = data.Ticks(t).PhaseZ;
+        if ~isinf(AQSlice.sizePhase(t))
+          yData = yData / AQSlice.LengthUnitScale;
+        end
+        imagesc(xData, yData, B0Gradient*1e3, ...
                 'Parent', AQSlice.plotB0GradienthAxes{1});
         set(AQSlice.plotB0GradienthAxes{1}, 'YDir', 'normal');
         cbB0Gradient = colorbar('peer', AQSlice.plotB0GradienthAxes{1});
         ylabel(cbB0Gradient, 'mT/m');
         colormap(AQSlice.plotB0GradienthAxes{1}, jet);
+        if isinf(AQSlice.sizeRead)
+          lengthUnit = 'Hz';
+        else
+          lengthUnit = AQSlice.LengthUnit;
+        end
         xlabel(AQSlice.plotB0GradienthAxes{1}, ...
-          [AQSlice.ReadCartesianAxis{1} 'read in ' AQSlice.LengthUnit ' (mean ' num2str(B0Gradient_mean(2)*1e3,'%10.3f') ' mT/m)']);
+          [AQSlice.ReadCartesianAxis{1} 'read in ' lengthUnit ' (mean ' num2str(B0Gradient_mean(2)*1e3,'%10.3f') ' mT/m)']);
+        if isinf(AQSlice.sizePhase(t))
+          % FIXME: Correct unit?
+          lengthUnit = 'px';
+        else
+          lengthUnit = AQSlice.LengthUnit;
+        end
         ylabel(AQSlice.plotB0GradienthAxes{1}, ...
-          [AQSlice.PhaseCartesianAxis{t(1)} 'phase(' num2str(t(1)) ') in ' AQSlice.LengthUnit ' (mean ' num2str(B0Gradient_mean(1)*1e3,'%10.3f') ' mT/m)']);
+          [AQSlice.PhaseCartesianAxis{t} 'phase(' num2str(t) ') in ' lengthUnit ' (mean ' num2str(B0Gradient_mean(1)*1e3,'%10.3f') ' mT/m)']);
       else
         t = find(AQSlice.nPhase>1, 2, 'first');
-        B0=data.RoI.*squeeze(unwrap3Dmiddle(-angle(data.ImageZ(:,:,:,:,AQSlice.iSlice)))/pi/2/AQSlice.tEcho*2*pi/AQSlice.Gamma);
+        B0 = data.RoI ...
+          .* squeeze(unwrap3Dmiddle(-angle(data.ImageZ(:,:,:,:,AQSlice.iSlice)))) ...
+          / AQSlice.tEcho / AQSlice.Gamma;
         [B0Gradient_xyz{[2,1]}] = gradient(B0, diff(data.Ticks(t(2)).Phase(1:2)), diff(data.Ticks(t(1)).PhaseZ(1:2)));
-        B0Gradient_mean(2)=meanNAN(reshape(B0Gradient_xyz{2},[],1));
-        B0Gradient_mean(1)=meanNAN(reshape(B0Gradient_xyz{1},[],1));
+        B0Gradient_mean(2) = mean(reshape(B0Gradient_xyz{2}, [], 1), 'omitnan');
+        B0Gradient_mean(1) = mean(reshape(B0Gradient_xyz{1}, [], 1), 'omitnan');
         B0Gradient_xyz = cat(4, B0Gradient_xyz{:});
         B0Gradient = sqrt(sum(B0Gradient_xyz.^2, 4));
 
@@ -1164,7 +1205,7 @@ elseif sum([AQSlice.nPhase(:)>1; AQSlice.nRead>1]) == 2
         ['Gradient at = ' num2str(data.fCenter*1e-6,'%10.6f') ' MHz, ' num2str(data.fCenter*2*pi/AQSlice.Gamma*1e3,'%6.6f') ' mT, in mT/m']);
     end
   end
-elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
+elseif any(szImage(1:4)>1) || AQSlice.plotImageOs
   %% 1d image
   if any([AQSlice.plotB0ppm, AQSlice.plotB0Hz, AQSlice.plotB0HzPhase, ...
         AQSlice.plotB0PpmPhase, isinf(AQSlice.sizeRead), AQSlice.plotFft1_data] ~= 0)
@@ -1290,8 +1331,20 @@ elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
         title(AQSlice.(imageType{1}){1}, ['k-Space in dB' char(181) 'V']);
         ylabel(AQSlice.(imageType{1}){1}, ['Amplitude in dB' char(181) 'V']);
         grid(AQSlice.(imageType{1}){1}, 'on');
-        k_ylim = [-40,0] + [0,1].*get(AQSlice.(imageType{1}){1}, 'YLim');
-        if k_ylim(1) < k_ylim(2), set(AQSlice.(imageType{1}){1}, 'YLim', k_ylim); end
+        set(AQSlice.(imageType{1}){1}, 'XMinorGrid', 'on');
+        set(AQSlice.(imageType{1}){1}, 'YMinorGrid', 'on');
+        k_ylim = get(AQSlice.(imageType{1}){1}, 'YLim');
+        % FIXME: Optional value for lower limit (-40dB)?
+        if k_ylim(1) < -40
+          % don't show anything below -40 dB if upper limit is above -40dB
+          k_ylim(1) = -40;
+          if k_ylim(1) < k_ylim(2), set(AQSlice.(imageType{1}){1}, 'YLim', k_ylim); end
+        elseif k_ylim(2) > -40
+          % add a "line" with one singular point to force extending the y axis
+          % to -40 dB
+          k_xlim = get(AQSlice.(imageType{1}){1}, 'XLim');
+          line(AQSlice.(imageType{1}){1}, mean(k_xlim), -40);
+        end
         if AQSlice.plotPhase
           if sum(AQSlice.nPhase==1) == 3
             plot(AQSlice.(imageType{1}){3}, data.kTicks(1).ReadOs, angle(squeeze(data.kSpaceOs(:,:,:,:,AQSlice.iSlice))));
@@ -1299,8 +1352,10 @@ elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
             plot(AQSlice.(imageType{1}){3}, data.kTicks(find(AQSlice.nPhase>1,1,'first')).PhaseOs, angle(squeeze(data.kSpaceOs(:,:,:,:,AQSlice.iSlice))));
           end
           ylabel(AQSlice.(imageType{1}){3}, 'Phase in rad');
-          ylim(AQSlice.(imageType{1}){3}, [-pi,pi]);
+          ylim(AQSlice.(imageType{1}){3}, [-pi, pi]);
           grid(AQSlice.(imageType{1}){3}, 'on');
+          set(AQSlice.(imageType{1}){3}, 'XMinorGrid', 'on');
+          set(AQSlice.(imageType{1}){3}, 'YMinorGrid', 'on');
           linkaxes([AQSlice.(imageType{1}){3}, AQSlice.(imageType{1}){1}], 'x');
         end
       end
@@ -1326,6 +1381,8 @@ elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
         ylabel(AQSlice.plotImagehAxes{2}, ['Image Amplitude in ' AQSlice.AmplitudeUnit]);
       end
       grid(AQSlice.plotImagehAxes{2}, 'on');
+      set(AQSlice.plotImagehAxes{2}, 'XMinorGrid', 'on');
+      set(AQSlice.plotImagehAxes{2}, 'YMinorGrid', 'on');
       ylim(AQSlice.plotImagehAxes{2},ylim(AQSlice.plotImagehAxes{2}).*[0,1]);
       if AQSlice.plotPhase
         if sum(AQSlice.nPhase==1) == 3
@@ -1340,9 +1397,11 @@ elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
           plot(AQSlice.plotImagehAxes{4}, data.Ticks(find(AQSlice.nPhase>1,1,'first')).PhaseZ/AQSlice.LengthUnitScale, ...
             angle(squeeze(data.ImageZ(:,:,:,:,AQSlice.iSlice))));
         end
-        ylim(AQSlice.plotImagehAxes{4}, [-pi,pi]);
+        ylim(AQSlice.plotImagehAxes{4}, [-pi, pi]);
         ylabel(AQSlice.plotImagehAxes{4}, 'Phase in rad');
         grid(AQSlice.plotImagehAxes{4}, 'on');
+        set(AQSlice.plotImagehAxes{4}, 'XMinorGrid', 'on');
+        set(AQSlice.plotImagehAxes{4}, 'YMinorGrid', 'on');
         linkaxes([AQSlice.plotImagehAxes{4}, AQSlice.plotImagehAxes{2}], 'x');
       end
     end
@@ -1357,13 +1416,14 @@ elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
         ZeroFillFactorPermuted = data.ZeroFillFactor(find(AQSlice.nPhase>1)+1);
       end
       % FIXME: Is the image always along the first dimension?
-      data = smoothRoI(data, AQSlice, data.ImageZ(:,:,:,:,AQSlice.iSlice), [2*ZeroFillFactorPermuted+1, 1]);
+      data = smoothRoI(data, AQSlice, reshape(data.ImageZ(:,:,:,:,AQSlice.iSlice), [], 1), ...
+        [2*ZeroFillFactorPermuted+1, 1]);
       data.RoI = double(data.RoI);  % There is no logical NaN.
       data.RoI(~data.RoI) = NaN;
     end
 
     if AQSlice.plotB0Hz ~= 0
-       hParent = AQSlice.plotB0Hz;
+      hParent = AQSlice.plotB0Hz;
       if ~ishghandle(hParent, 'uipanel')
         if (AQSlice.raiseFigures || ~ishghandle(hParent, 'figure'))
           hParent = figure(hParent);
@@ -1387,11 +1447,13 @@ elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
         ylabel(AQSlice.plotB0HzhAxes{1}, 'Offset frequency in Hz');
       end
       grid(AQSlice.plotB0HzhAxes{1}, 'on');
+      set(AQSlice.plotB0HzhAxes{1}, 'XMinorGrid', 'on');
+      set(AQSlice.plotB0HzhAxes{1}, 'YMinorGrid', 'on');
       title(AQSlice.plotB0HzhAxes{1}, ['Offset to = ' num2str(data.fCenter*1e-6,'%10.6f') ' MHz, ' num2str(data.fCenter*2*pi/AQSlice.Gamma*1e3,'%6.6f') ' mT']);
     end
 
     if AQSlice.plotB0ppm ~= 0
-       hParent = AQSlice.plotB0ppm;
+      hParent = AQSlice.plotB0ppm;
       if ~ishghandle(hParent, 'uipanel')
         if (AQSlice.raiseFigures || ~ishghandle(hParent, 'figure'))
           hParent = figure(hParent);
@@ -1403,7 +1465,7 @@ elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
       AQSlice.plotB0ppmhAxes{1} = axes('Parent', hParent);
       if sum(AQSlice.nPhase==1) == 3
         plot(AQSlice.plotB0ppmhAxes{1}, data.Ticks(1).ReadZ/AQSlice.LengthUnitScale, ...
-             data.RoI.*unwrap3Dmiddle(-angle(reshape(data.ImageZ(:,:,:,:,AQSlice.iSlice),[],1)))/pi/2/AQSlice.tEcho);
+             data.RoI.*unwrap3Dmiddle(-angle(reshape(data.ImageZ(:,:,:,:,AQSlice.iSlice),[],1)))/pi/2/AQSlice.tEcho/data.fCenter*1e6);
         xlabel(AQSlice.plotB0ppmhAxes{1}, [AQSlice.ReadCartesianAxis{1} 'read in ' AQSlice.LengthUnit]);
         ylabel(AQSlice.plotB0ppmhAxes{1}, 'Offset in ppm');
       else
@@ -1414,11 +1476,13 @@ elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
         ylabel(AQSlice.plotB0ppmhAxes{1}, 'Offset in ppm');
       end
       grid(AQSlice.plotB0ppmhAxes{1}, 'on');
+      set(AQSlice.plotB0ppmhAxes{1}, 'XMinorGrid', 'on');
+      set(AQSlice.plotB0ppmhAxes{1}, 'YMinorGrid', 'on');
       title(AQSlice.plotB0ppmhAxes{1}, ['Offset to = ' num2str(data.fCenter*1e-6,'%10.6f') ' MHz, ' num2str(data.fCenter*2*pi/AQSlice.Gamma*1e3,'%6.6f') ' mT']);
     end
 
     if (AQSlice.plotB0HzPhase ~= 0) && isfield(data, 'ImageZFrequency')
-       hParent = AQSlice.plotB0HzPhase;
+      hParent = AQSlice.plotB0HzPhase;
       if ~ishghandle(hParent, 'uipanel')
         if (AQSlice.raiseFigures || ~ishghandle(hParent, 'figure'))
           hParent = figure(hParent);
@@ -1435,11 +1499,13 @@ elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
       xlabel(AQSlice.plotB0HzhAxes{3}, [AQSlice.PhaseCartesianAxis{t(1)} 'phase(' num2str(t(1)) ') in ' AQSlice.LengthUnit]);
       ylabel(AQSlice.plotB0HzhAxes{3}, 'Offset frequency in Hz');
       grid(AQSlice.plotB0HzhAxes{3}, 'on');
+      set(AQSlice.plotB0HzhAxes{3}, 'XMinorGrid', 'on');
+      set(AQSlice.plotB0HzhAxes{3}, 'YMinorGrid', 'on');
       title(AQSlice.plotB0HzhAxes{3}, ['Offset to = ' num2str(data.fCenter*1e-6,'%10.6f') ' MHz, ' num2str(data.fCenter*2*pi/AQSlice.Gamma*1e3,'%6.6f') ' mT']);
     end
 
     if (AQSlice.plotB0PpmPhase ~= 0) && isfield(data, 'ImageZFrequency')
-       hParent = AQSlice.plotB0PpmPhase;
+      hParent = AQSlice.plotB0PpmPhase;
       if ~ishghandle(hParent, 'uipanel')
         if (AQSlice.raiseFigures || ~ishghandle(hParent, 'figure'))
           hParent = figure(hParent);
@@ -1456,6 +1522,8 @@ elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
       xlabel(AQSlice.plotB0ppmhAxes{2}, [AQSlice.PhaseCartesianAxis{t(1)} 'phase(' num2str(t(1)) ') in ' AQSlice.LengthUnit]);
       ylabel(AQSlice.plotB0ppmhAxes{2}, 'Offset in ppm');
       grid(AQSlice.plotB0ppmhAxes{2}, 'on');
+      set(AQSlice.plotB0ppmhAxes{2}, 'XMinorGrid', 'on');
+      set(AQSlice.plotB0ppmhAxes{2}, 'YMinorGrid', 'on');
       title(AQSlice.plotB0ppmhAxes{2}, ['Offset to = ' num2str(data.fCenter*1e-6,'%10.6f') ' MHz, ' num2str(data.fCenter*2*pi/AQSlice.Gamma*1e3,'%6.6f') ' mT']);
     end
 
@@ -1473,36 +1541,40 @@ elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
         xlabel(AQSlice.plotImageOshAxes{2}, xTickLabel);
         ylabel(AQSlice.plotImageOshAxes{2}, ['Image Amplitude in ' AQSlice.AmplitudeUnit]);
       else
-        t=find(AQSlice.nPhase>1,1,'first');
-        lengthTicks=data.Ticks(t).PhaseOsZ/AQSlice.LengthUnitScale;
+        t = find(AQSlice.nPhase>1, 1, 'first');
+        lengthTicks = data.Ticks(t).PhaseOsZ / AQSlice.LengthUnitScale;
         plot(AQSlice.plotImageOshAxes{2}, lengthTicks, ...
              abs(squeeze(data.ImageOsZ(:,:,:,:,AQSlice.iSlice))/AQSlice.AmplitudeUnitScale));
         xlabel(AQSlice.plotImageOshAxes{2}, [AQSlice.PhaseCartesianAxis{t(1)} 'phase(' num2str(t(1)) ') in ' AQSlice.LengthUnit]);
         ylabel(AQSlice.plotImageOshAxes{2}, ['Image Amplitude in ' AQSlice.AmplitudeUnit]);
       end
       grid(AQSlice.plotImageOshAxes{2}, 'on');
+      set(AQSlice.plotImageOshAxes{2}, 'XMinorGrid', 'on');
+      set(AQSlice.plotImageOshAxes{2}, 'YMinorGrid', 'on');
       ylim(AQSlice.plotImageOshAxes{2},ylim(AQSlice.plotImageOshAxes{2}).*[0,1]);
       if AQSlice.plotPhase
         plot(AQSlice.plotImageOshAxes{4}, lengthTicks, ...
           angle(squeeze(data.ImageOsZ(:,:,:,:,AQSlice.iSlice))));
-        ylim(AQSlice.plotImageOshAxes{4}, [-pi,pi]);
+        ylim(AQSlice.plotImageOshAxes{4}, [-pi, pi]);
         ylabel(AQSlice.plotImageOshAxes{4}, 'Phase in rad');
         grid(AQSlice.plotImageOshAxes{4}, 'on');
+        set(AQSlice.plotImageOshAxes{4}, 'XMinorGrid', 'on');
+        set(AQSlice.plotImageOshAxes{4}, 'YMinorGrid', 'on');
         linkaxes([AQSlice.plotImageOshAxes{4}, AQSlice.plotImageOshAxes{2}], 'x');
       end
     end
   end
 
   if AQSlice.plotData ~= 0 || AQSlice.plotFft1_data ~= 0
-    hParent = max(AQSlice.plotData,AQSlice.plotFft1_data);
-      if ~ishghandle(hParent, 'uipanel')
-        if (AQSlice.raiseFigures || ~ishghandle(hParent, 'figure'))
-          hParent = figure(hParent);
-        end
-        hParent = clf(hParent);
-      else
-        delete(get(hParent, 'Children'));
+    hParent = max(AQSlice.plotData, AQSlice.plotFft1_data);
+    if ~ishghandle(hParent, 'uipanel')
+      if (AQSlice.raiseFigures || ~ishghandle(hParent, 'figure'))
+        hParent = figure(hParent);
       end
+      hParent = clf(hParent);
+    else
+      delete(get(hParent, 'Children'));
+    end
     if AQSlice.plotData ~= 0 && AQSlice.plotFft1_data ~= 0
       if AQSlice.plotPhase
         figName{1} = 'Magnitude and phase of data and fft1_data';
@@ -1545,33 +1617,40 @@ elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
         hLinesCurr = plot(AQSlice.plotDatahAxes{1}, data.kTicks(1).ReadOs*diff(data.time_of_tRep([1,2],AQSlice.UseAQWindow(1),AQSlice.UsetRep(1)))*1e3, d);
         xlabel(AQSlice.plotDatahAxes{1}, ['Time offset to ' num2str(data.tImageZ*1e3,'%10.3f') ' ms, in ms']);
       else
-        hLinesCurr=plot(AQSlice.plotDatahAxes{1}, data.kTicks(1).ReadOs, d);
+        hLinesCurr = plot(AQSlice.plotDatahAxes{1}, data.kTicks(1).ReadOs, d);
         xlabel(AQSlice.plotDatahAxes{1}, [AQSlice.ReadCartesianAxis{1} 'read spatial frequency in 1/m']);
       end
-      set(hLinesCurr,{'Color'},mat2cell(parula(size(d,2)),ones(1,size(d,2)),3));
+      set(hLinesCurr, {'Color'}, mat2cell(parula(size(d, 2)), ones(1, size(d, 2)), 3));
       title(AQSlice.plotDatahAxes{1}, ['k-Space in dB' char(181) 'V']);
       ylabel(AQSlice.plotDatahAxes{1}, ['Amplitude in dB' char(181) 'V']);
       grid(AQSlice.plotDatahAxes{1}, 'on');
+      set(AQSlice.plotDatahAxes{1}, 'XMinorGrid', 'on');
+      set(AQSlice.plotDatahAxes{1}, 'YMinorGrid', 'on');
       k_ylim = [-40,0] + [0,1].*get(AQSlice.plotDatahAxes{1}, 'YLim');
-      if k_ylim(1) < k_ylim(2), set(AQSlice.plotDatahAxes{1}, 'YLim', k_ylim); end
-      xlim(AQSlice.plotDatahAxes{1},[-inf,inf]);
+      if k_ylim(1) < k_ylim(2)
+        set(AQSlice.plotDatahAxes{1}, 'YLim', k_ylim);
+      end
+      xlim(AQSlice.plotDatahAxes{1}, [-Inf, Inf]);
       if AQSlice.plotPhase
       if isinf(AQSlice.sizeRead)
          hLinesCurr = plot(AQSlice.plotDatahAxes{3}, data.kTicks(1).ReadOs*diff(data.time_of_tRep([1,2],AQSlice.UseAQWindow(1),AQSlice.UsetRep(1)))*1e3, ...
            angle(squeeze(data.kSpaceOsRaw(:,:,:,:,AQSlice.iSlice))));
       else
-         hLinesCurr=plot(AQSlice.plotDatahAxes{3}, data.kTicks(1).ReadOs, angle(squeeze(data.kSpaceOsRaw(:,:,:,:,AQSlice.iSlice))));
+         hLinesCurr = plot(AQSlice.plotDatahAxes{3}, data.kTicks(1).ReadOs, angle(squeeze(data.kSpaceOsRaw(:,:,:,:,AQSlice.iSlice))));
       end
         ylabel(AQSlice.plotDatahAxes{3}, 'Phase in rad');
-        ylim(AQSlice.plotDatahAxes{3}, [-pi,pi]);
+        ylim(AQSlice.plotDatahAxes{3}, [-pi, pi]);
         grid(AQSlice.plotDatahAxes{3}, 'on');
-        set(hLinesCurr,{'Color'},mat2cell(parula(size(d,2)),ones(1,size(d,2)),3));
+        set(AQSlice.plotDatahAxes{3}, 'XMinorGrid', 'on');
+        set(AQSlice.plotDatahAxes{3}, 'YMinorGrid', 'on');
+        set(hLinesCurr, {'Color'}, mat2cell(parula(size(d, 2)), ones(1, size(d, 2)), 3));
         linkaxes([AQSlice.plotDatahAxes{1}, AQSlice.plotDatahAxes{3}], 'x');
       end
 
     end
     if AQSlice.plotFft1_data ~= 0
-      d=abs(squeeze(data.fft1_dataCut(:,:,:,:,AQSlice.iSlice)) * data.Amplitude2Uin(AQSlice.UseAQWindow(1),1)/2^0.5*1e6);
+      d = abs(squeeze(data.fft1_dataCut(:,:,:,:,AQSlice.iSlice)) ...
+              * data.Amplitude2Uin(AQSlice.UseAQWindow(1),1) / 2^0.5 * 1e6);
       if isinf(AQSlice.sizeRead)
         hLinesCurr=plot(AQSlice.plotDatahAxes{2}, squeeze(data.f_fft1_dataCut(:,:,:,:,AQSlice.iSlice))-data.fCenter, d);
         ylabel(AQSlice.plotDatahAxes{2}, ['Image Amplitude in ' char(181) 'V']);
@@ -1581,10 +1660,12 @@ elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
         ylabel(AQSlice.plotDatahAxes{2}, ['Image Amplitude in ' char(181) 'V']);
         xlabel(AQSlice.plotDatahAxes{2}, [AQSlice.ReadCartesianAxis{1} 'read in ' AQSlice.LengthUnit]);
       end
-      set(hLinesCurr,{'Color'},mat2cell(parula(size(d,2)),ones(1,size(d,2)),3));
+      set(hLinesCurr, {'Color'}, mat2cell(parula(size(d, 2)), ones(1, size(d, 2)), 3));
       grid(AQSlice.plotDatahAxes{2}, 'on');
-      ylim(AQSlice.plotDatahAxes{2},ylim(AQSlice.plotDatahAxes{2}).*[0,1]);
-      xlim(AQSlice.plotDatahAxes{2},[-inf,inf]);
+      set(AQSlice.plotDatahAxes{2}, 'XMinorGrid', 'on');
+      set(AQSlice.plotDatahAxes{2}, 'YMinorGrid', 'on');
+      xlim(AQSlice.plotDatahAxes{2}, [-Inf, Inf]);
+      ylim(AQSlice.plotDatahAxes{2}, ylim(AQSlice.plotDatahAxes{2}) .* [0, 1]);
       if AQSlice.plotPhase
         if isinf(AQSlice.sizeRead)
           hLinesCurr=plot(AQSlice.plotDatahAxes{4}, squeeze(data.f_fft1_dataCut(:,:,:,:,AQSlice.iSlice))-data.fCenter, ...
@@ -1599,11 +1680,13 @@ elseif any(AQSlice.nPhase>1) || (AQSlice.nRead>1) || AQSlice.plotImageOs
           ylabel(AQSlice.plotDatahAxes{4}, 'Phase in rad');
           xlabel(AQSlice.plotDatahAxes{4}, [AQSlice.ReadCartesianAxis{1} 'read in ' AQSlice.LengthUnit]);
         end
-        set(hLinesCurr,{'Color'},mat2cell(parula(size(d,2)),ones(1,size(d,2)),3));
-        ylim(AQSlice.plotDatahAxes{4}, [-pi,pi]);
+        set(hLinesCurr, {'Color'}, mat2cell(parula(size(d, 2)), ones(1, size(d, 2)), 3));
+        ylim(AQSlice.plotDatahAxes{4}, [-pi, pi]);
         ylabel(AQSlice.plotDatahAxes{4}, 'Phase in rad');
         grid(AQSlice.plotDatahAxes{4}, 'on');
-        linkaxes([ AQSlice.plotDatahAxes{2}, AQSlice.plotDatahAxes{4}], 'x');
+        set(AQSlice.plotDatahAxes{4}, 'XMinorGrid', 'on');
+        set(AQSlice.plotDatahAxes{4}, 'YMinorGrid', 'on');
+        linkaxes([AQSlice.plotDatahAxes{2}, AQSlice.plotDatahAxes{4}], 'x');
       end
     end
   end
@@ -1633,65 +1716,6 @@ end
 end
 
 
-function data = smoothRoI(data, AQSlice, image, kernel_sz)
-%% Calculate Boolean array "RoI", remove isolated outliers and fill isolated holes
-
-if isemptyfield(AQSlice, 'RoiAbsoluteValue')
-  % determine value of lower percentile
-  if AQSlice.RoiCutOffPercentile == 0 || AQSlice.RoiRelativeValue == 0
-    data.RoICutOff = 0;
-  else
-    imageSorted = sort(abs(image(:)));
-    data.RoICutOff = imageSorted(round(numel(image)*AQSlice.RoiCutOffPercentile)) ...
-      * AQSlice.RoiRelativeValue;
-  end
-else
-  data.RoICutOff = AQSlice.RoiAbsoluteValue;
-end
-
-if data.RoICutOff == 0
-  data.RoI = 1;
-  return;
-end
-
-image = squeeze(image);
-img_sz = size(image);
-
-% insert roi in corner
-data.RoI = double(abs(image) >= data.RoICutOff);
-% pad with the values at the border
-zffp = (kernel_sz-1)/2;  % ZeroFillFactorPermuted
-data.RoI(end+(1:zffp(1)),:,:) = repmat(data.RoI(end,:,:), zffp(1), 1, 1);
-data.RoI(end+(1:zffp(1)),:,:) = repmat(data.RoI(1,:,:), zffp(1), 1, 1);
-if numel(kernel_sz) > 1 && zffp(2) > 1
-  data.RoI(:,end+(1:zffp(2)),:) = repmat(data.RoI(:,end,:), 1, zffp(2), 1);
-  data.RoI(:,end+(1:zffp(2)),:) = repmat(data.RoI(:,1,:), 1, zffp(2), 1);
-end
-if numel(kernel_sz) > 2 && zffp(3) > 1
-  data.RoI(:,:,end+(1:zffp(3))) = repmat(data.RoI(:,:,end), 1, 1, zffp(3));
-  data.RoI(:,:,end+(1:zffp(3))) = repmat(data.RoI(:,:,1), 1, 1, zffp(3));
-end
-
-% convolution with kernel of weight 1
-data.RoI = fftn(data.RoI);
-kernel_roi = zeros(size(data.RoI));  % pad with zeros
-kernel_idx = arrayfun(@(x) 1:x, kernel_sz, 'UniformOutput', false);
-kernel_roi(kernel_idx{:}) = 1/prod(kernel_sz);
-kernel_roi = circshift(kernel_roi, -(kernel_sz-1)/2);  % shift center of kernel to idx 1
-kernel_roi = fftn(kernel_roi);
-data.RoI = data.RoI .* kernel_roi;
-data.RoI = ifftn(data.RoI);
-
-% select corner with RoI (size of image)
-img_idx = arrayfun(@(x) 1:x, img_sz, 'UniformOutput', false);
-data.RoI = data.RoI(img_idx{:});
-
-% finally create RoI array
-data.RoI = data.RoI > 1/2;
-
-end
-
-
 function hsl = plot3Ddata(hParent, data, AQSlice, imageData, isImage, readField, phaseField)
 %% Plot 3d data using sliceomatic and set up the correct descriptions
 
@@ -1708,48 +1732,105 @@ if isappdata(hParent, 'sliceomatic')
   end
 end
 
+autoAspectRatio = false;
 if isImage
   tickType = 'Ticks';
   if sum(AQSlice.nPhase(:)>1) == 3
     % CSI image (FIXME: This does not handle 4d images completely)
-    xLabelStr = [AQSlice.PhaseCartesianAxis{3} 'phase(3) in ' AQSlice.LengthUnit];
+    ticks{3} = data.(tickType)(3).(phaseField);
+    if isinf(AQSlice.sizePhase(3))
+      autoAspectRatio = true;
+      lengthUnit = 'Hz';
+    else
+      lengthUnit = AQSlice.LengthUnit;
+      ticks{3} = ticks{3} / AQSlice.LengthUnitScale;
+    end
+    xLabelStr = [AQSlice.PhaseCartesianAxis{3} 'phase(3) in ' lengthUnit];
     xTitleStr = AQSlice.PhaseCartesianAxis{3};
   else
-    xLabelStr = [AQSlice.ReadCartesianAxis{1} 'read in ' AQSlice.LengthUnit];
+    ticks{3} = data.(tickType)(1).(readField);
+    if isinf(AQSlice.sizeRead)
+      autoAspectRatio = true;
+      lengthUnit = 'Hz';
+    else
+      lengthUnit = AQSlice.LengthUnit;
+      ticks{3} = ticks{3} / AQSlice.LengthUnitScale;
+    end
+    xLabelStr = [AQSlice.ReadCartesianAxis{1} 'read in ' lengthUnit];
     xTitleStr = AQSlice.ReadCartesianAxis{1};
   end
-  yLabelStr = [AQSlice.PhaseCartesianAxis{1} 'phase(1) in ' AQSlice.LengthUnit];
-  zLabelStr = [AQSlice.PhaseCartesianAxis{2} 'phase(2) in ' AQSlice.LengthUnit];
+  ticks{1} = data.(tickType)(1).(phaseField);
+  if isinf(AQSlice.sizePhase(1))
+    autoAspectRatio = true;
+    lengthUnit = 'Hz';
+  else
+    lengthUnit = AQSlice.LengthUnit;
+    ticks{1} = ticks{1} / AQSlice.LengthUnitScale;
+  end
+  yLabelStr = [AQSlice.PhaseCartesianAxis{1} 'phase(1) in ' lengthUnit];
+  ticks{2} = data.(tickType)(2).(phaseField);
+  if isinf(AQSlice.sizePhase(2))
+    autoAspectRatio = true;
+    lengthUnit = 'Hz';
+  else
+    lengthUnit = AQSlice.LengthUnit;
+    ticks{2} = ticks{2} / AQSlice.LengthUnitScale;
+  end
+  zLabelStr = [AQSlice.PhaseCartesianAxis{2} 'phase(2) in ' lengthUnit];
 else  % k-space
   tickType = 'kTicks';
   if sum(AQSlice.nPhase(:)>1) == 3
     % CSI image (FIXME: This does not handle 4d images completely)
-    xLabelStr = [AQSlice.PhaseCartesianAxis{3} 'phase(3) spatial frequency in 1/m'];
+    ticks{3} = data.(tickType)(3).(phaseField);
+    if isinf(AQSlice.sizePhase(3))
+      autoAspectRatio = true;
+      lengthUnit = 'samples';
+    else
+      lengthUnit = '1/m';
+    end
+    xLabelStr = [AQSlice.PhaseCartesianAxis{3}, 'phase(3) spatial frequency in ', lengthUnit];
     xTitleStr = AQSlice.PhaseCartesianAxis{3};
   else
-    xLabelStr = [AQSlice.ReadCartesianAxis{1} 'read spatial frequency in 1/m'];
+    ticks{3} = data.(tickType)(1).(readField);
+    if isinf(AQSlice.sizeRead)
+      autoAspectRatio = true;
+      lengthUnit = 'samples';
+    else
+      lengthUnit = '1/m';
+    end
+    xLabelStr = [AQSlice.ReadCartesianAxis{1}, 'read spatial frequency in ', lengthUnit];
     xTitleStr = AQSlice.ReadCartesianAxis{1};
   end
-  yLabelStr = [AQSlice.PhaseCartesianAxis{1} 'phase(1) spatial frequency in 1/m'];
-  zLabelStr = [AQSlice.PhaseCartesianAxis{2} 'phase(2) spatial frequency in 1/m'];
+  ticks{1} = data.(tickType)(1).(phaseField);
+  if isinf(AQSlice.sizePhase(1))
+    autoAspectRatio = true;
+    lengthUnit = 'samples';
+  else
+    lengthUnit = '1/m';
+  end
+  yLabelStr = [AQSlice.PhaseCartesianAxis{1}, 'phase(1) spatial frequency in ', lengthUnit];
+  ticks{2} = data.(tickType)(2).(phaseField);
+  if isinf(AQSlice.sizePhase(2))
+    autoAspectRatio = true;
+    lengthUnit = 'samples';
+  else
+    lengthUnit = '1/m';
+  end
+  zLabelStr = [AQSlice.PhaseCartesianAxis{2} 'phase(2) spatial frequency in ' lengthUnit];
 end
-if AQSlice.nRead > 1
-  % 3D read Grad
-  hsl = sliceomatic(hsl, imageData, ...
-    data.(tickType)(1).(readField)/AQSlice.LengthUnitScale, ...
-    data.(tickType)(1).(phaseField)/AQSlice.LengthUnitScale, ...
-    data.(tickType)(2).(phaseField)/AQSlice.LengthUnitScale, AQSlice.sliceomaticProps);
-else
-  % 3D KPM CSI
-  hsl = sliceomatic(hsl, imageData, ...
-    data.(tickType)(3).(phaseField)/AQSlice.LengthUnitScale, ...
-    data.(tickType)(1).(phaseField)/AQSlice.LengthUnitScale, ...
-    data.(tickType)(2).(phaseField)/AQSlice.LengthUnitScale, AQSlice.sliceomaticProps);
-end
+
+hsl = sliceomatic(hsl, imageData, ...
+  ticks{3}, ticks{1}, ticks{2}, AQSlice.sliceomaticProps);
 light('Parent', hsl.hAxes);
 xlabel(hsl.hAxes, xLabelStr);
 ylabel(hsl.hAxes, yLabelStr);
 zlabel(hsl.hAxes, zLabelStr);
+if autoAspectRatio
+  % FIXME: Is there a better way to have the correct aspect ratio between axes
+  % that are encoded but a "free" aspect ratio for axes that are not encoded?
+  set(hsl.hAxes, 'DataAspectRatioMode', 'auto');
+  set(hsl.hAxes, 'PlotboxAspectRatioMode', 'auto');
+end
 
 title(hsl.GetSliderX(), xTitleStr);
 title(hsl.GetSliderY(), AQSlice.PhaseCartesianAxis{1});

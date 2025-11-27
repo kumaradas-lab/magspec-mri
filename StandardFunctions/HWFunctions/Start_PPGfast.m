@@ -16,7 +16,7 @@ function Seq = Start_PPGfast(Seq)
 % Seq.average
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2013-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2013-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %-------------------------------------------------------------------------------
 
@@ -24,6 +24,8 @@ end
 
 
 %#function AbortMeasurement
+%#function PD.MagnetReadyState
+%#function PD.ReceiveMode
 %#function PD.Talker
 %#function PD.UnwindProtectGuard
 %#function check_GradientAmplifier

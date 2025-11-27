@@ -33,5 +33,5 @@ HW.TX.BlankAQ = 1;               % Switch TRx to 50 Ohm resistor during TX pulse
 HW.RX.VGAGainDef = HW.RX.VGAGainMax/1; % reduce VGA gain to avoid saturation
 
 %%
-UseExtRFAmpSwitch = 0;  % use switch of RF-200
+UseExtRFAmpSwitch = 1;  % use switch of RF-200
 LoadExtRFAmp_Cal;  % new cal Uout and 6 A FET

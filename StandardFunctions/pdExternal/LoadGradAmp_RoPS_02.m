@@ -15,7 +15,7 @@ for iDevice = 1:numel(talker)
 
     LoadPowerSupply_01;
 
-    HW.Grad.Slice.channel = 4;
+    HW.Grad(iDevice).Slice.channel = 4;
     HW.Grad(iDevice).CoilMaxDcCurrent(4) = 6.5 * 0.9; % A
     HW.Grad(iDevice).CoilCurrentSquareTime(4) = 0.9 * 0.9; % A^2*sec
 
@@ -36,7 +36,7 @@ for iDevice = 1:numel(talker)
     combinedChannels = true;
     LoadGradSystem_300mT_01;
 
-    HW.Grad.Slice.channel = 2;
+    HW.Grad(iDevice).Slice.channel = 2;
     HW.Grad(iDevice).CoilMaxDcCurrent([2 4]) = 6.5 * 0.9; % A
     HW.Grad(iDevice).CoilCurrentSquareTime([2 4]) = 0.9 * 0.9; % A^2*sec
 

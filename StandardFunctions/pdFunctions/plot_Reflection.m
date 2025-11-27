@@ -23,7 +23,7 @@ function hf = plot_Reflection(HW, Network, hax)
 %           handle to the figure that contains the reflection graphs.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2019 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -142,10 +142,11 @@ if exist('hf', 'var')
   ylabel(hax2, {'Angle', 'rad'});
   xlabel(hax2, 'Frequency Hz');
   text(HW.fLarmor, ...
-    angle(interp1(Frequency,Reflection, HW.fLarmor, 'nearest')), ...
+    angle(interp1(Frequency, double(Reflection), HW.fLarmor, 'nearest')), ...
     '\leftarrow fLarmor', ...
     'HorizontalAlignment', 'left', ...
     'Rotation', 90, 'Parent', hax2);
+  grid(hax2, 'on');
 end
 
 % drawnow

@@ -39,12 +39,12 @@ HW.Grad(iDevice).LoadIin2Amp(1:4) = [0.061952, 0.063381/2, 0.071987, 0.063381/2]
 if combinedChannels
   % Independently of what was set before, element 2 and 4 must always have the
   % same values for this setup! (Y-connector or just mirror)
-  HW.Grad.LoadRin(4) = HW.Grad.LoadRin(2);
-  HW.Grad.LoadIin2Amp(4) = HW.Grad.LoadIin2Amp(2);
+  HW.Grad(iDevice).LoadRin(4) = HW.Grad(iDevice).LoadRin(2);
+  HW.Grad(iDevice).LoadIin2Amp(4) = HW.Grad(iDevice).LoadIin2Amp(2);
 
-  HW.Grad(iDevice).LoadIin2Amp(HW.Grad.CombineCurrentOutputs(1,:)) = 2*HW.Grad(iDevice).LoadIin2Amp(HW.Grad(iDevice).CombineCurrentOutputs(1,:));
-  HW.Grad(iDevice).LoadIin2Amp(HW.Grad.CombineCurrentOutputs(2,:)) = HW.Grad(iDevice).LoadIin2Amp(HW.Grad(iDevice).CombineCurrentOutputs(1,:));
-  HW.Grad(iDevice).LoadRin(HW.Grad.CombineCurrentOutputs(2,:)) = HW.Grad(iDevice).LoadRin(HW.Grad(iDevice).CombineCurrentOutputs(1,:));
+  HW.Grad(iDevice).LoadIin2Amp(HW.Grad(iDevice).CombineCurrentOutputs(1,:)) = 2*HW.Grad(iDevice).LoadIin2Amp(HW.Grad(iDevice).CombineCurrentOutputs(1,:));
+  HW.Grad(iDevice).LoadIin2Amp(HW.Grad(iDevice).CombineCurrentOutputs(2,:)) = HW.Grad(iDevice).LoadIin2Amp(HW.Grad(iDevice).CombineCurrentOutputs(1,:));
+  HW.Grad(iDevice).LoadRin(HW.Grad(iDevice).CombineCurrentOutputs(2,:)) = HW.Grad(iDevice).LoadRin(HW.Grad(iDevice).CombineCurrentOutputs(1,:));
 end
 
 % maximum amplitude in T/(m*A)
@@ -58,7 +58,7 @@ HW.Grad(iDevice).ImageVol = [-0.025, 0.025, -0.025, 0.025, -0.025, 0.025];  % [x
 HW.Grad(iDevice).ImageVolOffset = [0, 0, 0];  % [x y z] offset of tube in m
 
 % time until gradient is stable after ramp (eddy current time)
-HW.Grad(iDevice).tEC = max(HW.Grad.SystemTimeDelay(1:3))*.5;
+HW.Grad(iDevice).tEC = max(HW.Grad(iDevice).SystemTimeDelay(1:3))*.5;
 % HW.Grad(iDevice).tEC = max(250e-6)*.5;
 
 HW.Grad(iDevice).tRamp = 250e-6;  % minimum ramp time in s

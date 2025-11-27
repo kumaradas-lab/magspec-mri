@@ -3,36 +3,63 @@ function [data, SeqOut, mySave, HW] = sequence_Grad_Echo_Slice(HW, mySave, Seq, 
 % Use sequence_Flash instead.
 
 %----------- Parameter ------------------------------------------------
-if ~isfield(Seq,'WaitSeqenzeTime');Seq.WaitSeqenzeTime=[];end
-if ~isfield(Seq,'StartSequenceTime');Seq.StartSequenceTime=[];end
-if  isempty(Seq.StartSequenceTime)
-    if isempty(Seq.WaitSeqenzeTime);
-        Seq.WaitSeqenzeTime=0;
-    else
-        Seq.StartSequenceTime=now*24*3600+Seq.WaitSeqenzeTime;
-    end   
+if ~isfield(Seq, 'WaitSeqenzeTime')
+  Seq.WaitSeqenzeTime=[];
 end
-if ~isfield(Seq,'plot_k_image');   Seq.plot_k_image=[];  end; if isempty(Seq.plot_k_image);              Seq.plot_k_image    = 0;                               end
-if ~isfield(Seq,'plotPhase');   Seq.plotPhase=[];  end; if isempty(Seq.plotPhase);              Seq.plotPhase    = 1;                               end
+if isemptyfield(Seq, 'StartSequenceTime')
+  if isempty(Seq.WaitSeqenzeTime)
+    Seq.WaitSeqenzeTime=0;
+  else
+    Seq.StartSequenceTime=now*24*3600+Seq.WaitSeqenzeTime;
+  end
+end
+if isemptyfield(Seq, 'plot_k_image')
+  Seq.plot_k_image = 0;
+end
+if isemptyfield(Seq, 'plotPhase')
+  Seq.plotPhase = 1;
+end
 
-if ~isfield(Seq,'RandomTXRXPhase') ; Seq.RandomTXRXPhase=[];end; if isempty(Seq.RandomTXRXPhase);   Seq.RandomTXRXPhase       =   0;      end
-if ~isfield(Seq,'AQPhaseOffset') ; Seq.AQPhaseOffset=[];end; if isempty(Seq.AQPhaseOffset);   Seq.AQPhaseOffset       =   [];      end
-if ~isfield(Seq,'TXPhaseOffset') ; Seq.TXPhaseOffset=[];end; if isempty(Seq.TXPhaseOffset);   Seq.TXPhaseOffset       =   [];      end
-if ~isfield(Seq,'TXRXPhaseIncrement') ; Seq.TXRXPhaseIncrement=[];end; if isempty(Seq.TXRXPhaseIncrement);   Seq.TXRXPhaseIncrement       =   HW.Constant.GoldenAngle138    ;  end
-if ~isfield(Seq,'HzPixMin');   Seq.HzPixMin=[];  end; if isempty(Seq.HzPixMin);              Seq.HzPixMin    = 0;                               end
+if isemptyfield(Seq, 'RandomTXRXPhase')
+  Seq.RandomTXRXPhase = 0;
+end
+if ~isfield(Seq,'AQPhaseOffset')
+  Seq.AQPhaseOffset = [];
+end
+if ~isfield(Seq, 'TXPhaseOffset')
+  Seq.TXPhaseOffset = [];
+end
+if isemptyfield(Seq, 'TXRXPhaseIncrement')
+  Seq.TXRXPhaseIncrement = HW.Constant.GoldenAngle138;
+end
+if isemptyfield(Seq, 'HzPixMin')
+  Seq.HzPixMin = 0;
+end
 
-if nargin<4; SliceSelect=[];end
-if ~isfield(SliceSelect,'thickness');   SliceSelect.thickness=[];  end; if isempty(SliceSelect.thickness);              SliceSelect.thickness    = 1000000;                               end
-if ~isfield(SliceSelect,'CenterRot');   SliceSelect.CenterRot=[];  end; if isempty(SliceSelect.CenterRot);              SliceSelect.CenterRot    =[0.0, 0.0, 0.0];                               end
-if ~isfield(SliceSelect,'alfa');   SliceSelect.alfa=[];  end; if isempty(SliceSelect.alfa);              SliceSelect.alfa    =0;                               end
-if ~isfield(SliceSelect,'phi');   SliceSelect.phi=[];  end; if isempty(SliceSelect.phi);              SliceSelect.phi    =0;                               end
-if ~isfield(SliceSelect,'theta');   SliceSelect.theta=[];  end; if isempty(SliceSelect.theta);              SliceSelect.theta    =0;                               end
+if nargin < 4
+  SliceSelect = struct();
+end
+if isemptyfield(SliceSelect, 'thickness')
+  SliceSelect.thickness = 1000000;
+end
+if isemptyfield(SliceSelect, 'CenterRot')
+  SliceSelect.CenterRot = [0.0, 0.0, 0.0];
+end
+if isemptyfield(SliceSelect, 'alfa')
+  SliceSelect.alfa = 0;
+end
+if isemptyfield(SliceSelect,'phi')
+  SliceSelect.phi = 0;
+end
+if isemptyfield(SliceSelect,'theta')
+  SliceSelect.theta = 0;
+end
 
 
 % AQSlice.thickness=SliceSelect.thickness;
 if isempty(whos('global','SliceSelect'))
-    
-%-----------------------------------------------------------------------   
+
+%-----------------------------------------------------------------------
 
     SliceSelect.Center=SliceSelect.CenterRot([2,3,1]).*[1,-1,1];
     SliceSelect.CenterRot=SliceSelect.Center([3,1,2]).*[1,1,-1];
@@ -42,11 +69,11 @@ if isempty(whos('global','SliceSelect'))
     SliceSelect.RaufCenter=SliceSelect.CenterRot-SliceSelect.Rauf;
     SliceSelect.CenterRauf=SliceSelect.Rauf-SliceSelect.CenterRot;
     SliceSelect.CenterRaufImage=tpaRotate( SliceSelect.CenterRauf',-SliceSelect.alfa ,-SliceSelect.phi, -SliceSelect.theta)';
-    SliceSelect.CenterRaufImage=SliceSelect.CenterRaufImage([3,2,1]).*[1,-1,1];             
+    SliceSelect.CenterRaufImage=SliceSelect.CenterRaufImage([3,2,1]).*[1,-1,1];
     SliceSelect.Center2OriginImage=[SliceSelect.CenterRaufImage([1,2]),SliceSelect.R];
 else
     clear SliceSelect;
-    global SliceSelect; 
+    global SliceSelect;
 end
 
 %  [HW,mySave]  = Find_Frequency( HW, mySave);
@@ -56,7 +83,7 @@ SliceSelect.Flip=acos(exp(-Seq.tRep/Seq.T1));  %in RAD
 SliceSelect.ReadOS=Seq.ReadOS;
 SliceSelect.PhaseOS=Seq.PhaseOS;
 AQSlice=SliceSelect;
-    
+
 Seq.tTxSlicemax=max(HW.TX.Amp2FlipPiIn1Sec/(HW.TX.AmpDef*0.9)*AQSlice.Flip/pi*Seq.SlicePulse(HW,'Amp'),  1/(min(HW.Grad.MaxAmp(1:3))*HW.GammaDef/2/pi*AQSlice.thickness)*Seq.SlicePulse(HW,'Time'));
 
 Seq.tRep=Seq.tRep*ones(1,AQSlice.nPhase*AQSlice.PhaseOS);
@@ -67,10 +94,8 @@ Seq.tInvert=0;%Seq.tInvertmax+2*HW.Grad.tEC;
 Seq.tSlice=Seq.tTxSlicemax+2*HW.Grad.tRamp+2*HW.Grad.tEC;
 Seq.tGrad=Seq.tEcho/2-Seq.tSlice/4;
 Seq.tAQmaxt=Seq.tEcho-2*HW.Grad.tRamp-2*HW.Grad.tEC-Seq.tSlice/2;
-if Seq.HzPixMin ~= 0;
-    if 1/Seq.HzPixMin>Seq.tAQmaxt;
-        warning(['Seq.HzPixMin is too low. ' num2str(ceil(1/Seq.tAQmaxt)) ' Hz is used'])
-    end
+if Seq.HzPixMin ~= 0 &&  1/Seq.HzPixMin>Seq.tAQmaxt
+  warning(['Seq.HzPixMin is too low. ' num2str(ceil(1/Seq.tAQmaxt)) ' Hz is used'])
 end
 
 Seq.tAQmax=min(1/Seq.HzPixMin, Seq.tAQmaxt);
@@ -81,20 +106,20 @@ Seq=createSeq(Seq,AQSlice,HW);
 
 % AQPInc=0;
 % TXPInc=AQPInc;
-if  Seq.RandomTXRXPhase
-    if isempty( Seq.AQPhaseOffset);
-        Seq.AQPhaseOffset=rand(1,AQSlice.nPhase*AQSlice.PhaseOS)*360;
-    end
-    if isempty( Seq.TXPhaseOffset);
-        Seq.TXPhaseOffset=Seq.AQPhaseOffset;
-    end
+if Seq.RandomTXRXPhase
+  if isempty(Seq.AQPhaseOffset)
+    Seq.AQPhaseOffset=rand(1,AQSlice.nPhase*AQSlice.PhaseOS)*360;
+  end
+  if isempty(Seq.TXPhaseOffset)
+    Seq.TXPhaseOffset=Seq.AQPhaseOffset;
+  end
 else
-    if isempty( Seq.AQPhaseOffset);
-        Seq.AQPhaseOffset=zeros(1,AQSlice.nPhase*AQSlice.PhaseOS);
-    end
-    if isempty( Seq.TXPhaseOffset);
-        Seq.TXPhaseOffset=Seq.AQPhaseOffset;
-    end
+  if isempty(Seq.AQPhaseOffset)
+    Seq.AQPhaseOffset=zeros(1,AQSlice.nPhase*AQSlice.PhaseOS);
+  end
+  if isempty(Seq.TXPhaseOffset)
+    Seq.TXPhaseOffset=Seq.AQPhaseOffset;
+  end
 end
 % pn=rand(1,AQSlice.nPhase*AQSlice.PhaseOS)*2*pi;
 % AQ

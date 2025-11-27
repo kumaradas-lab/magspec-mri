@@ -3,7 +3,7 @@ function pulseData = Pulse_Rect(HW, Center, Pulse, varargin)
 %
 %   pulseData = Pulse_Rect(HW, Center, Pulse)
 % or:
-%   pulseData = Pulse_Rect(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments,  maxLength, Frequency, Phase)
+%   pulseData = Pulse_Rect(HW, Center, Bandwidth, FlipAngle, MaxNumberOfSegments, MaxLength, Frequency, Phase)
 % additionally:
 %   excitationAngleFactor = Pulse_Rect(HW, 'Amp')
 %   bandwidthFactor = Pulse_Rect(HW, 'Time')
@@ -56,9 +56,10 @@ function pulseData = Pulse_Rect(HW, Center, Pulse, varargin)
 % the duration of the pulse to have the same bandwidth (FWHM) as a rect pulse.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2020 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
-%-------------------------------------------------------------------------------
+% ------------------------------------------------------------------------------
+
 
 %% check input
 if nargin == 2
@@ -73,6 +74,7 @@ if nargin == 2
   return;
 end
 
+
 %% Convert from syntax (2) to syntax (1)
 if nargin < 3, Pulse = []; end
 if ~isstruct(Pulse), Pulse = struct('Bandwidth', Pulse); end
@@ -81,6 +83,7 @@ if nargin > 4, Pulse.MaxNumberOfSegments = varargin{2}; end
 if nargin > 5, Pulse.MaxLength = varargin{3}; end
 if nargin > 6, Pulse.Frequency = varargin{4}; end
 if nargin > 7, Pulse.Phase = varargin{5}; end
+
 
 %% default values
 Pulse = set_EmptyField(Pulse, 'FlipAngle', pi/2);
@@ -92,15 +95,26 @@ Pulse = set_EmptyField(Pulse, 'Phase', 0);
 Pulse = set_EmptyField(Pulse, 'Bandwidth', max(1/Pulse.MaxLength, 2e3));  % FIXME: Is this a sensible default?
 Pulse = set_EmptyField(Pulse, 'iDevice', 1);
 
+
 %% rect pulse
-tFlipPi = HW.TX(Pulse.iDevice).Amp2FlipPiIn1Sec / HW.TX(Pulse.iDevice).AmpDef;
+% Use gamma that better matches the frequency of the pulse
+% FIXME: Could this be an issue with (very) off-center slice pulses?
+if abs(Pulse.Frequency - HW.fLarmorX) < abs(Pulse.Frequency - HW.fLarmor)
+  gamma = HW.GammaX;
+else
+  gamma = HW.GammaDef;
+end
 
-BlockLength = 1/Pulse.Bandwidth*0.999;
+% pulse duration in seconds
+BlockLength = 1 ./ Pulse.Bandwidth;
 
-gain = HW.TX(Pulse.iDevice).AmpDef * 2*tFlipPi * (Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / (BlockLength/0.998);
+% amplitude in T
+amp = 2*pi/gamma * (Pulse.FlipAngle/Pulse.FlipAngleFullTurn) ./ BlockLength;
 
-if Pulse.MaxLength < BlockLength
-  error('MaxLength of rf pulse is too short.');
+if any(Pulse.MaxLength + 1/HW.TX(Pulse.iDevice).fSample < BlockLength)
+  error('PD:Pulse_Rect:MaxLengthTooShort', ...
+    'MaxLength of rf pulse is %.3f %cs too short.', ...
+    min(BlockLength - Pulse.MaxLength)*1e6, char(181));
 end
 
 if Pulse.MaxNumberOfSegments < 1
@@ -108,7 +122,7 @@ if Pulse.MaxNumberOfSegments < 1
 end
 
 pulseData.Start = -BlockLength/2 + Center;
-pulseData.Amplitude = gain;
+pulseData.Amplitude = amp;
 pulseData.Duration = BlockLength;
 pulseData.Frequency = Pulse.Frequency;
 pulseData.Phase = Pulse.Phase;

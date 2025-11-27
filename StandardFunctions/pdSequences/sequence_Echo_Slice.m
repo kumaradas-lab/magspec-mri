@@ -3,25 +3,56 @@ function [data,SeqOut,mySave, HW]= sequence_Echo_Slice( HW, mySave, Seq, SliceSe
 % Use sequence_SpinEcho instead.
 
 %----------- Parameter ------------------------------------------------
-if ~isfield(Seq,'WaitSeqenzeTime');Seq.WaitSeqenzeTime=[];end
-if isempty(Seq.WaitSeqenzeTime);Seq.WaitSeqenzeTime=0;end
-if Seq.WaitSeqenzeTime ~= 0; Seq.StartSequenceTime=now*24*3600+Seq.WaitSeqenzeTime;    end
+if isemptyfield(Seq, 'WaitSeqenzeTime')
+  Seq.WaitSeqenzeTime = 0;
+end
+if Seq.WaitSeqenzeTime ~= 0
+  Seq.StartSequenceTime = now*24*3600+Seq.WaitSeqenzeTime;
+end
 
-if ~isfield(Seq,'InvertPulse');   Seq.InvertPulse=[]; end; if isempty(Seq.InvertPulse);                 Seq.InvertPulse    =   @Pulse_Rect;                    end
-if ~isfield(Seq,'SlicePulse');   Seq.SlicePulse=[];  end; if isempty(Seq.SlicePulse);                    Seq.SlicePulse    =   @Pulse_Rect;                    end
-if ~isfield(Seq,'tReadDelay');   Seq.tReadDelay=[];  end; if isempty(Seq.tReadDelay);                    Seq.tReadDelay    =   0;                               end
-if ~isfield(Seq,'plot_k_image');   Seq.plot_k_image=[];  end; if isempty(Seq.plot_k_image);              Seq.plot_k_image    = 0;                               end
-if ~isfield(Seq,'plotPhase');   Seq.plotPhase=[];  end; if isempty(Seq.plotPhase);              Seq.plotPhase    = 1;                               end
-if ~isfield(Seq,'HzPixMin');   Seq.HzPixMin=[];  end; if isempty(Seq.HzPixMin);              Seq.HzPixMin    = 0;                               end
-if ~isfield(Seq,'Find_Frequency_time');   Seq.Find_Frequency_time=[];  end; if isempty(Seq.Find_Frequency_time);              Seq.Find_Frequency_time    = 1000;                               end
-if ~isfield(Seq,'SliceGshift');   Seq.SliceGshift=[];  end; if isempty(Seq.SliceGshift);              Seq.SliceGshift    = 0;                               end
+if isemptyfield(Seq,'InvertPulse')
+  Seq.InvertPulse = @Pulse_Rect;
+end
+if isemptyfield(Seq,'SlicePulse')
+  Seq.SlicePulse = @Pulse_Rect;
+end
+if isemptyfield(Seq,'tReadDelay')
+  Seq.tReadDelay = 0;
+end
+if isemptyfield(Seq,'plot_k_image')
+  Seq.plot_k_image = 0;
+end
+if isemptyfield(Seq,'plotPhase')
+  Seq.plotPhase = 1;
+end
+if isemptyfield(Seq,'HzPixMin')
+  Seq.HzPixMin = 0;
+end
+if isemptyfield(Seq,'Find_Frequency_time')
+  Seq.Find_Frequency_time = 1000;
+end
+if isemptyfield(Seq,'SliceGshift')
+  Seq.SliceGshift = 0;
+end
 
-if nargin<4; SliceSelect=[];end
-if ~isfield(SliceSelect,'thickness');   SliceSelect.thickness=[];  end; if isempty(SliceSelect.thickness);              SliceSelect.thickness    = 1e12;                               end
-if ~isfield(SliceSelect,'CenterRot');   SliceSelect.CenterRot=[];  end; if isempty(SliceSelect.CenterRot);              SliceSelect.CenterRot    =[0.0, 0.0, 0.0];                               end
-if ~isfield(SliceSelect,'alfa');   SliceSelect.alfa=[];  end; if isempty(SliceSelect.alfa);              SliceSelect.alfa    =0;                               end
-if ~isfield(SliceSelect,'phi');   SliceSelect.phi=[];  end; if isempty(SliceSelect.phi);              SliceSelect.phi    =0;                               end
-if ~isfield(SliceSelect,'theta');   SliceSelect.theta=[];  end; if isempty(SliceSelect.theta);              SliceSelect.theta    =0;                               end
+if nargin < 4
+  SliceSelect = [];
+end
+if isemptyfield(SliceSelect,'thickness')
+  SliceSelect.thickness = 1e12;
+end
+if isemptyfield(SliceSelect,'CenterRot')
+  SliceSelect.CenterRot = [0.0, 0.0, 0.0];
+end
+if isemptyfield(SliceSelect,'alfa')
+  SliceSelect.alfa = 0;
+end
+if isemptyfield(SliceSelect,'phi')
+  SliceSelect.phi = 0;
+end
+if isemptyfield(SliceSelect,'theta')
+  SliceSelect.theta = 0;
+end
 
 
 
@@ -47,7 +78,10 @@ end
 
 %  [HW,mySave]  = Find_Frequency( HW, mySave,Seq.Find_Frequency_time);
 
-  if ~isfield(SliceSelect,'Flip');   SliceSelect.Flip=[];  end; if isempty(SliceSelect.Flip);              SliceSelect.Flip    = 90;       end %in Rad
+  if isemptyfield(SliceSelect, 'Flip')
+    %in Rad
+    SliceSelect.Flip = 90;
+  end
 SliceSelect.Flip=SliceSelect.Flip/180*pi;
 % SliceSelect.Flip=pi/2;  %in RAD
 % SliceSelect.thickness=AQSlice.thickness; %Achtung
@@ -67,10 +101,8 @@ Seq.tInvert=Seq.tInvertmax;%+2*HW.Grad.tEC;
 Seq.tSlice=Seq.tTxSlicemax+2*HW.Grad.tRamp+2*HW.Grad.tEC;
 Seq.tGrad=Seq.tEcho/2-Seq.tSlice/2-Seq.tInvert/2-HW.Grad.tEC;
 Seq.tAQmaxt=Seq.tEcho-Seq.tInvert-4*HW.Grad.tRamp*useSpoil-2*HW.Grad.tRamp-Seq.Spoil*Seq.tEcho/2*2*useSpoil-2*2*HW.Grad.tEC;
-if Seq.HzPixMin ~= 0;
-    if 1/Seq.HzPixMin>Seq.tAQmaxt;
-        warning(['Seq.HzPixMin is too low. ' num2str(ceil(1/Seq.tAQmaxt)) ' Hz is used'])
-    end
+if Seq.HzPixMin ~= 0 &&  1/Seq.HzPixMin > Seq.tAQmaxt
+  warning(['Seq.HzPixMin is too low. ' num2str(ceil(1/Seq.tAQmaxt)) ' Hz is used']);
 end
 Seq.tAQmax=min(1/Seq.HzPixMin, Seq.tAQmaxt);
 Seq.tReadGradEmpty=Seq.tAQmaxt-Seq.tAQmax;

@@ -3,17 +3,18 @@ function hIsoCap = DrawLocalIsoCaps(this, hIsoSurface, oldIsoCap)
 
 % Get relevant info from the isosurface.
 if nargin < 3 || ~strcmp(get(oldIsoCap, 'Visible'), 'off')
-  data = getappdata(hIsoSurface, 'isosurfacedata');
   if isnan(this.xmesh)
+    data = getappdata(hIsoSurface, 'isosurfacedata');
     caps = isocaps(data, getappdata(hIsoSurface, 'isosurfacevalue'));
   else
-    caps = isocaps(this.xmesh, this.ymesh, this.zmesh, data, getappdata(hIsoSurface, 'isosurfacevalue'));
+    d = getappdata(this.hParent, 'sliceomatic');
+    caps = isocaps(this.xmesh, this.ymesh, this.zmesh, d.data, getappdata(hIsoSurface, 'isosurfacevalue'));
   end
 end
 
 if nargin > 2
   if ~strcmp(get(oldIsoCap, 'Visible'), 'off')
-    % FIXME: When do we refrresh the data if visible is currently off?
+    % FIXME: When do we refresh the data if visible is currently off?
     set(oldIsoCap, caps);
   end
   hIsoCap = oldIsoCap;

@@ -5,7 +5,7 @@ function [data, SeqOut] = sequence_InversionRecoveryCPMG(HW, Seq)
 % Use sequence_RecoveryCPMG instead.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2015-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2015-2025 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -48,8 +48,9 @@ iDevice = 1;  % FIXME: Support multiple MMRT devices
 % AQ
 AQ.fSample = 1/(round(HW.RX(iDevice).fSample/Seq.fSample)/HW.RX(iDevice).fSample);
 AQ.nSamples = round(Seq.tAQEcho*AQ.fSample);
-if AQ.nSamples==0, AQ.nSamples=1; end
+if AQ.nSamples==0,  AQ.nSamples = 1;  end
 AQ.Frequency = HW.fLarmor;
+AQ.Start = repmat([NaN, NaN, repmat(Seq.tEcho/2-AQ.nSamples/AQ.fSample/2, 1, Seq.nEcho), NaN], 1, Seq.nTau1);
 
 
 %TX
@@ -63,7 +64,17 @@ pulseInvert =   Seq.InvertPulse(HW, 0, 1/Seq.tInvert*Seq.InvertPulse(HW,'Time'),
 pulse90 =       Seq.FlipPulse(  HW, 0, Seq.t90BW,                                   pi*HW.tFlip90Def/(HW.TX(iDevice).Amp2FlipPiIn1Sec/HW.TX(iDevice).AmpDef),      51, Seq.t90,        AQ.Frequency(1), 0);
 pulseInvert2 =  Seq.InvertPulse2(HW, 0, 1/Seq.tInvert2*Seq.InvertPulse2(HW,'Time'),  pi*HW.tFlip180Def/(HW.TX(iDevice).Amp2FlipPiIn1Sec/HW.TX(iDevice).AmpDef),    51, Seq.tInvert2,   AQ.Frequency(1), 90);
 
-Seq.tRep=repmat([0,Seq.tEcho/2,repmat(Seq.tEcho,1,Seq.nEcho),Seq.tRelax],1,Seq.nTau1)+reshape([Seq.Tau1(:).';zeros(1+Seq.nEcho+1,length(Seq.Tau1))],1,(Seq.nEcho+3)*length(Seq.Tau1));
+tRepEchoTrain = [0, Seq.tEcho/2, repmat(Seq.tEcho, 1, Seq.nEcho), Seq.tRelax];
+if HW.RX(iDevice).ClampCoil.Enable
+  % extent last tRep of echo train for coil blank signal if necessary
+  tRepLast = max(tRepEchoTrain(end-1), ...
+    Seq.tEcho/2 + AQ.nSamples/AQ.fSample/2 + HW.RX(iDevice).ClampCoil.tPostset + 0.1e-3);
+  tRepEchoTrain(end) = tRepEchoTrain(end) - (tRepLast - tRepEchoTrain(end-1));
+  tRepEchoTrain(end-1) = tRepLast;
+end
+Seq.tRep = ...
+  repmat(tRepEchoTrain, 1, Seq.nTau1) + ...
+  reshape([Seq.Tau1(:).'; zeros(1+Seq.nEcho+1, length(Seq.Tau1))], 1, (Seq.nEcho+3)*length(Seq.Tau1));
 
 TX.Start=nan(max([length(pulseInvert.Start),length(pulse90.Start),length(pulseInvert2.Start)]),Seq.nEcho+3);
 TX.Duration=TX.Start;
@@ -97,7 +108,6 @@ TX.Phase=repmat(TX.Phase,1,Seq.nTau1);
 
 
 % AQ
-AQ.Start    =   repmat(  ([nan,nan,repmat(Seq.tEcho/2-AQ.nSamples/AQ.fSample/2,1,Seq.nEcho),nan])  ,1,Seq.nTau1);
 AQ.ResetPhases=[1,zeros(1,length(Seq.tRep)-1)];
 
 
@@ -177,46 +187,46 @@ shading interp
 
 %% T1
 if SeqOut.FitT1
-  t1=nan;
-  T1=nan;
-  if SeqOut.nTau1>3;
+  t1 = NaN;
+  T1 = NaN;
+  if SeqOut.nTau1 > 3
     T1 = fit_exp(real(data.MeanEchoTau1PhaseCorrected(1,:)),data.Tau1Time(1,:),SeqOut.PlotT1,0,0,1);
     t1=T1.tau;
     T1.half=log(2)*T1.tau;
     T1.half1=log(2)*T1.tau1;
     T1.half2=log(2)*T1.tau2;
-    data.T1=T1;
+    data.T1 = T1;
   else
-    disp('nTau1 too low')
+    disp('nTau1 too low');
   end
 end
 
 %% T2
 if SeqOut.FitT2
-  fh=figure(82);
+  fh = figure(82);
   clf(fh)
-  ax(1)=subplot(1,1,1, 'Parent',fh);
-  if SeqOut.nEcho>3;
+  ax(1) = subplot(1,1,1, 'Parent', fh);
+  if SeqOut.nEcho > 3
     for t=1:SeqOut.nTau1
       % fitting exponential functions to the data
       T2(t) = fit_exp(real(data.MeanEchoTau1PhaseCorrected(:,t)),data.EchoTime(:,t),SeqOut.PlotT2,0,0,0);
       figure(82)
-      hold(ax(1), 'all');
+      hold(ax(1), 'on');
       plot(ax(1),T2(t).timeCorrected,T2(t).dataPhaseCorrectedReal,'b');
       % legend(ax(1),'real');
-      xlabel(ax(1),'time / s')
-      ylabel(ax(1),'amplitude')
-      title(ax(1),{[' ', ' ', ' ']})
+      xlabel(ax(1), 'time / s')
+      ylabel(ax(1), 'amplitude')
+      title(ax(1), {[' ', ' ', ' ']})
 
       plot(ax(1),T2(t).functionTime,T2(t).functionAmpDouble,'b-.');
-      legend(ax(1),'real','fit double');
+      legend(ax(1), 'real', 'fit double');
 
       hold(ax(1), 'off')
     end
 
-    data.T2=T2;
+    data.T2 = T2;
   else
-    disp('nEcho too low')
+    disp('nEcho too low');
   end
 end
 SeqOut.iLaplace2D.T1Start=SeqOut.Tau1Start*2;

@@ -22,7 +22,7 @@ function Grad = add_Grad(Grad1, Grad2)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2013-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2013-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -32,18 +32,38 @@ function Grad = add_Grad(Grad1, Grad2)
 
 % loop over common gradient elements
 for t = min(numel(Grad1), numel(Grad2)):-1:1
-  if all(abs(Grad1(t).Amp(~isnan(Grad1(t).Time)))<1e-12)
+  if ~isfield(Grad1(t), 'Time') || all(abs(Grad1(t).Amp(~isnan(Grad1(t).Time)))<1e-12)
     % no pulses in Grad1
-    Grad(t).Time = Grad2(t).Time;
-    Grad(t).Amp = Grad2(t).Amp;
-    Grad(t).Shim = sum([Grad1(t).Shim, Grad2(t).Shim]);
+    if isfield(Grad2(t), 'Time')
+      Grad(t).Time = Grad2(t).Time;
+      Grad(t).Amp = Grad2(t).Amp;
+      if isfield(Grad1(t), 'Shim')
+        Grad(t).Shim = sum([Grad1(t).Shim, Grad2(t).Shim]);
+      else
+        Grad(t).Shim = Grad2(t).Shim;
+      end
+    else
+      Grad(t).Time = [];
+      Grad(t).Amp = [];
+      Grad(t).Shim = [];
+    end
     continue;
   end
-  if all(abs(Grad2(t).Amp(~isnan(Grad2(t).Time)))<1e-12)
+  if ~isfield(Grad2(t), 'Time') || all(abs(Grad2(t).Amp(~isnan(Grad2(t).Time)))<1e-12)
     % no pulses in Grad2
-    Grad(t).Time = Grad1(t).Time;
-    Grad(t).Amp = Grad1(t).Amp;
-    Grad(t).Shim = sum([Grad1(t).Shim, Grad2(t).Shim]);
+    if isfield(Grad1(t), 'Time')
+      Grad(t).Time = Grad1(t).Time;
+      Grad(t).Amp = Grad1(t).Amp;
+      if isfield(Grad2(t), 'Shim')
+        Grad(t).Shim = sum([Grad1(t).Shim, Grad2(t).Shim]);
+      else
+        Grad(t).Shim = Grad1(t).Shim;
+      end
+    else
+      Grad(t).Time = [];
+      Grad(t).Amp = [];
+      Grad(t).Shim = [];
+    end
     continue;
   end
 
@@ -68,9 +88,30 @@ for t = min(numel(Grad1), numel(Grad2)):-1:1
     continue;
   end
 
-  % create timeline with all tReps (each tRep separated by 1000 seconds)
-  Grad1(t).Time = bsxfun(@plus, Grad1(t).Time, (1:numtRep)*1000);
-  Grad2(t).Time = bsxfun(@plus, Grad2(t).Time, (1:numtRep)*1000);
+  % try to account for small time differences between the two input Grad
+  % structures
+  timeAll = reshape([Grad1(t).Time; Grad2(t).Time], [], 1);
+  % Timing differences larger than 1 ns are likely not due to double precision
+  % errors. If larger differences occur in the input and that wasn't
+  % intentional, it should be fixed in the calling function.
+  [timeCommon, ~, IC] = uniquetol(timeAll, 1e-9/max(abs(timeAll(:)), [], 'omitnan'));
+  timeAll = reshape(timeCommon(IC), size(Grad1(t).Time,1) + size(Grad2(t).Time,1), numtRep);
+  Grad1(t).Time = timeAll(1:size(Grad1(t).Time,1),:);
+  Grad2(t).Time = timeAll(size(Grad1(t).Time,1)+1:end,:);
+  clear timeCommon timeAll
+
+  % get "extend" of gradient pulses in each tRep
+  firstGradTime = min([Grad1(t).Time; Grad2(t).Time], [], 1, 'omitnan');
+  firstGradTime(isnan(firstGradTime)) = 0;
+  lastGradTime = max([Grad1(t).Time; Grad2(t).Time], [], 1, 'omitnan');
+  lastGradTime(isnan(lastGradTime)) = 0;
+
+  % create timeline with all tReps (gradient activity separated by 1e-6 seconds)
+  tRepStart = cumsum(lastGradTime-firstGradTime+1e-6, 2);
+  maxTime = tRepStart(end) + 1e-6;
+  tRepStart = [0, tRepStart(1:end-1)] - firstGradTime;
+  Grad1(t).Time = bsxfun(@plus, Grad1(t).Time, tRepStart);
+  Grad2(t).Time = bsxfun(@plus, Grad2(t).Time, tRepStart);
 
   % indices for tRep of each data point
   temp1_tRep = cumsum(ones(size(Grad1(t).Time)), 2);
@@ -96,12 +137,15 @@ for t = min(numel(Grad1), numel(Grad2)):-1:1
     Time1 = Grad1(t).Time(~isnan(Grad1(t).Time(:)));
     Time2 = Grad2(t).Time(~isnan(Grad2(t).Time(:)));
     % linearly interpolate Grad1 at times from Grad2 and vice versa
-    % (copy first and last amplitude value to very large times for extrapolation)
-    Amp1at2 = interp1([-1e12;Time1;1e12], [Amp1(1);Amp1;Amp1(end)], Time2, 'linear');
-    Amp2at1 = interp1([-1e12;Time2;1e12], [Amp2(1);Amp2;Amp2(end)], Time1, 'linear');
+    % (copy first and last amplitude value to times before and after pulse program for extrapolation)
+    Amp1at2 = interp1([-1e-6;Time1;maxTime], [Amp1(1);Amp1;Amp1(end)], Time2, 'linear');
+    Amp2at1 = interp1([-1e-6;Time2;maxTime], [Amp2(1);Amp2;Amp2(end)], Time1, 'linear');
     % calculate sum on both timelines respectively
     Amp22 = Amp1at2 + Amp2;
     Amp11 = Amp2at1 + Amp1;
+    % check for floating point accuracy where gradients should cancel out
+    Amp11(abs(Amp11)<4*eps) = 0;
+    Amp22(abs(Amp22)<4*eps) = 0;
     % combine data from both inputs
     AmpAll = [Amp11; Amp22];
     TimeAll = [Time1; Time2];
@@ -109,12 +153,13 @@ for t = min(numel(Grad1), numel(Grad2)):-1:1
   end
 
   % remove duplicate times
-  [Time12, IT12] = unique(TimeAll);  % FIXME: Do we need to check if amplitude in both inputs matches?
+  % FIXME: The tolerance should probably depend on the system frequency
+  [Time12, IT12] = uniquetol(TimeAll, 4e-9 / max(abs(TimeAll(:))));  % FIXME: Do we need to check if amplitude in both inputs matches?
   Amp12 = AmpAll(IT12);
   temp_tRep = temp_tRepAll(IT12);
 
   % convert back to times of tRep
-  Time12 = Time12 - temp_tRep*1000;
+  Time12 = Time12 - reshape(tRepStart(temp_tRep), size(Time12));
 
   % count number of (valid) data points in each tRep
   count_tRep = histc(temp_tRep, 1:numtRep);
@@ -135,7 +180,7 @@ for t = min(numel(Grad1), numel(Grad2)):-1:1
   % remove unnecessary steps
   % duplicate amplitude at start of each tRep
   % (necessary for detection of unnecessary steps at beginning)
-  Grad(t).Time = [Grad(t).Time(1,:)-1000; Grad(t).Time; NaN(2, numtRep)];
+  Grad(t).Time = [Grad(t).Time(1,:)-0.75; Grad(t).Time; NaN(2, numtRep)];
   Grad(t).Amp = [Grad(t).Amp(1,:); Grad(t).Amp; NaN(2, numtRep)];
 
   dummy_values = false(size(Grad(t).Time));
@@ -147,7 +192,7 @@ for t = min(numel(Grad1), numel(Grad2)):-1:1
   tRepIdx = 1:numtRep;
   lastValidIdx(lastValidIdx==0) = 1;
   linIdxLastValid = sub2ind(size(Grad(t).Time), lastValidIdx, tRepIdx);
-  Grad(t).Time(linIdxLastValid+1) = Grad(t).Time(linIdxLastValid)+1000;
+  Grad(t).Time(linIdxLastValid+1) = Grad(t).Time(linIdxLastValid)+0.75;
   Grad(t).Amp(linIdxLastValid+1) = Grad(t).Amp(linIdxLastValid);
   dummy_values(linIdxLastValid+1) = true;
 

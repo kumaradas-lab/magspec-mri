@@ -11,7 +11,7 @@ classdef SampleLift < handle
 %
 %
 % ----------------------------------------------------------------------------
-% (C) Copyright 2018-2020 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2018-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ----------------------------------------------------------------------------
 

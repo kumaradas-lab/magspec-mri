@@ -33,7 +33,9 @@ HW.Piezo.Samples=                       1000;
 
 HW.Grad.LoadIin2Amp(HW.Piezo.Channel) = 1;
 HW.Grad.LoadRin(HW.Piezo.Channel) = 1;
-if numel(HW.Grad.SystemTimeDelay)==1, HW.Grad.SystemTimeDelay = ones(HW.Grad.n,1)*HW.Grad.SystemTimeDelay; end
+if isscalar(HW.Grad.SystemTimeDelay)
+  HW.Grad.SystemTimeDelay = ones(HW.Grad.n, 1) * HW.Grad.SystemTimeDelay;
+end
 HW.Grad.SystemTimeDelay(HW.Piezo.Channel) = 1e-06;         % time delay of grad amp at piezo channel
 HW.Grad.CoilMaxDcCurrent(HW.Piezo.Channel) = 1*0.9;        % fuse DC current in A
 HW.Grad.CoilCurrentSquareTime(HW.Piezo.Channel) = 0.9*0.9;  % fuse delay in A^2*sec

@@ -109,7 +109,7 @@ function [t2, T2, data, SeqOut] = get_T2(HW, SeqIn)
 %           the Echo train and potentially for the separate FID measurement).
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2015-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2015-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -256,8 +256,10 @@ function [data, SeqOut, T2] = fitT2(data, SeqOut)
   SeqOut.fitExp);
 if SeqOut.ConsoleOut
   fprintf('T2   = %10.1f ms\n', T2.tau*1000);
-  fprintf('T2_1 = %10.1f ms; weighting factor = %5.1f%%\n', T2.xminDouble(3)*1000, T2.tau1w*100);
-  fprintf('T2_2 = %10.1f ms; weighting factor = %5.1f%%\n', T2.xminDouble(5)*1000, T2.tau2w*100);
+  if SeqOut.fitExp.DoubleExp
+    fprintf('T2_1 = %10.1f ms; weighting factor = %5.1f%%\n', T2.xminDouble(3)*1000, T2.tau1w*100);
+    fprintf('T2_2 = %10.1f ms; weighting factor = %5.1f%%\n', T2.xminDouble(5)*1000, T2.tau2w*100);
+  end
 end
 data.DataAmplitude = T2.dataPhaseCorrected;
 data.DataTime = T2.timeCorrected;

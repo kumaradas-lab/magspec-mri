@@ -32,11 +32,15 @@ function shimopt = sequence_shim(HW, Seq)
 %
 %     ShimStart
 %           Start the optimization process with these values (see
-%           HW.MagnetShim).
+%           HW.MagnetShim). This can be either a row vector with values for each
+%           gradient channel, or a scalar in which case it applies to all
+%           gradient channels.
 %           (Default: HW.FindShim.ShimStart or if that is empty HW.MagnetShim)
 %
 %     ShimStep
-%           Initial step size used in optimization.
+%           Initial step size used in optimization. This can be either a row
+%           vector with values for each gradient channel, or a scalar in which
+%           case it applies to all gradient channels.
 %           (Default: If Seq.ShimStart is non-zero, [0.001, 0.001, 0.001, 0.0000002].
 %                     Otherwise, [0.005, 0.005, 0.005, 0.000001])
 %
@@ -73,6 +77,10 @@ function shimopt = sequence_shim(HW, Seq)
 %           Use the function "Find_Frequency_Sweep" before the optimization
 %           process to detect the Larmor frequency.
 %           (Default: HW.FindShim.use_Find_Frequency_Sweep)
+%
+%     verbose
+%           Show information about each shimming step in command window.
+%           (Default: true).
 %
 %     plot
 %           Plot pulse sequence and measured data of each step.
@@ -115,10 +123,10 @@ function shimopt = sequence_shim(HW, Seq)
 %         Magnet shim values with "best" measurement results
 %
 %
-% -----------------------------------------------------------------------
-% (C) Copyright 2011-2021 Pure Devices GmbH, Wuerzburg, Germany
+% ------------------------------------------------------------------------------
+% (C) Copyright 2011-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
-%------------------------------------------------------------------------
+%-------------------------------------------------------------------------------
 
 %% check input
 if nargin < 2, error('PD:sequence_shim:NoInput', 'Function must be called with two inputs (HW, Seq).'); end
@@ -136,6 +144,7 @@ if isemptyfield(Seq, 'FIDWindowFunction'), Seq.FIDWindowFunction = @RectWin; end
 if isemptyfield(Seq, 'use_nEchos_Frequency'), Seq.use_nEchos_Frequency = HW.FindShim.use_nEchos_Frequency; end   % use frequency of n-th echo for next step
 if isemptyfield(Seq, 'use_Find_Frequency_FID'), Seq.use_Find_Frequency_FID = HW.FindShim.use_Find_Frequency_FID; end   % find frequency between shim steps   use_Find_Frequency_FID
 if isemptyfield(Seq, 'use_Find_Frequency_Sweep'), Seq.use_Find_Frequency_Sweep = HW.FindShim.use_Find_Frequency_Sweep; end   % find frequency between shim steps   use_Find_Frequency_Sweep
+if isemptyfield(Seq, 'verbose'),  Seq.verbose = true;  end
 
 if isemptyfield(Seq, 'plot'), Seq.plot = 0; end  % Plot sequence and data
 if isemptyfield(Seq, 'plotRaiseWindow'), Seq.plotRaiseWindow = false; end  % raise and focus figure window in plot_data_1D
@@ -173,6 +182,9 @@ if isemptyfield(Seq, 'ShimStart')  % start with these shim values
     Seq.ShimStart = HW.FindShim.ShimStart(deviceOffset(Seq.SliceSelect.iDevice) + (1:HW.Grad(Seq.SliceSelect.iDevice).n));
   end
 end
+if isscalar(Seq.ShimStart)
+  Seq.ShimStart = ones(1, HW.Grad(Seq.SliceSelect.iDevice).n) * Seq.ShimStart;
+end
 if isemptyfield(Seq, 'ShimStep')  % stepwidth
   if isempty(HW.FindShim.ShimStep)
     if any(Seq.ShimStart ~= 0)
@@ -187,6 +199,9 @@ if isemptyfield(Seq, 'ShimStep')  % stepwidth
     Seq.ShimStep = HW.FindShim.ShimStep(deviceOffset(Seq.SliceSelect.iDevice) + (1:HW.Grad(Seq.SliceSelect.iDevice).n));
   end
 end
+if isscalar(Seq.ShimStep)
+  Seq.ShimStep = ones(1, HW.Grad(Seq.SliceSelect.iDevice).n) * Seq.ShimStep;
+end
 
 %%
 global fOffsetFIDw
@@ -196,8 +211,11 @@ if Seq.use_nEchos_Frequency == 1
 end
 
 % don't reinitialize the mri device
-if HW.Grad(Seq.SliceSelect.iDevice).HoldShim || Seq.RepetitionTime<=2
-  Seq.TimeToNextSequence = 30;
+if HW.Grad(Seq.SliceSelect.iDevice).HoldShim || (Seq.RepetitionTime <= 2)
+  Seq.TimeToNextSequence = ...
+    floor((2^HW.MMRT(Seq.SliceSelect.iDevice).CLTimeBitWidth-12) ...
+          / HW.MMRT(Seq.SliceSelect.iDevice).fSystem) - 3;
+  Seq.IgnoreTimingError = true;
   if isemptyfield(Seq, 'ShimSequence')
     [data, SeqOut] = sequence_EchoStandard(HW, Seq, Seq.SliceSelect);
     Seq.plotAllHandle = SeqOut.plotAllHandle;
@@ -209,13 +227,13 @@ if HW.Grad(Seq.SliceSelect.iDevice).HoldShim || Seq.RepetitionTime<=2
   Seq.TimeToNextSequence = Seq.TimeFromLastSequence;
   Seq.CLTime = SeqOut.CLTime*0 + 10e-6;
   % Seq.tOffset = HW.Grad(Seq.SliceSelect.iDevice).tEC + HW.Grad(Seq.SliceSelect.iDevice).tRamp;
-  Seq.Reinitialize = 0;
-  Seq.IgnoreTimingError = 0;
+  Seq.Reinitialize = false;
+  Seq.IgnoreTimingError = [];
   Seq.plotSeq = [];
   if Seq.use_nEchos_Frequency == 1
     iAQ = find([SeqOut.AQ(:).Device] == Seq.SliceSelect.iDevice, 1, 'first');  % FIXME: Support multi-channel?
     fOffsetFID = get_MeanPhaseDiffWeighted(data(iAQ).data(1:SeqOut.AQ(iAQ).nSamples(1,SeqOut.nEchos+1),1,SeqOut.nEchos+1)) * ...
-      SeqOut.AQ(iAQ).fSample(1) / 2/pi;
+      SeqOut.AQ(iAQ).fSample(1,SeqOut.nEchos+1) / 2/pi;
     HW.fLarmor = HW.fLarmor - double(fOffsetFID);
   end
 else
@@ -322,36 +340,43 @@ end
 opt_maxtomeanEcho('reset');
 MagnetShimOld = HW.MagnetShim;
 fLarmorOld = HW.fLarmor;
-% only affect one single MMRT device at a time
-HW.Grad(Seq.SliceSelect.iDevice).AmpOffset = zeros(size(HW.Grad(Seq.SliceSelect.iDevice).AmpOffset));
+abort_guard = PD.UnwindProtectGuard(@() AbortMeasurement(HW));
 % optimization using fminsearch
 if Seq.useFminsearch
   warning('on', 'PD:OpenMatlab:UseFindFrequency');
   Dac2Amp_xyzB = HW.Grad(Seq.SliceSelect.iDevice).Dac2Amp(HW.Grad(Seq.SliceSelect.iDevice).xyzB);
 
   uwp = [];
-  if isa(HW, 'PD.HW')
+  if isa(HW, 'PD.HWClass')
     % Unwind protect (for user pressing Ctrl+C during operation)
     uwp = PD.UnwindProtectGuard(@() RestoreHWGuard(HW, fLarmorOld, MagnetShimOld));
   end
 
+  usedShims = HW.Grad(Seq.SliceSelect.iDevice).ShimGradients~=0;
+  if any(abs(Seq.ShimStep(usedShims)./Dac2Amp_xyzB(usedShims)) > 6400)
+    warning('PD:FindShim:HighStep', 'The initial step size is very high (%d DAC)!', ...
+      round(max(abs(Seq.ShimStep(usedShims)./Dac2Amp_xyzB(usedShims)))));
+  end
+
   shimopt_offset = fminsearch(@(Shim) opt_maxtomeanEcho(HW, Seq, Shim), ...
-      Seq.ShimStep(HW.Grad(Seq.SliceSelect.iDevice).ShimGradients~=0)./0.05, ...
+      Seq.ShimStep(usedShims)./0.05, ...
       optimset('MaxFunEvals', Seq.iterations, 'Display', 'off', ...
-               'TolX', min(abs(Dac2Amp_xyzB(HW.Grad(Seq.SliceSelect.iDevice).ShimGradients~=0)))*sqrt(3/2), ...
+               'TolX', min(abs(Dac2Amp_xyzB(usedShims)))*sqrt(3/2), ...
                'TolFun', inf));
   uwp.isUnwindProtect = false;
 
-  shimopt = Seq.ShimStart-Seq.ShimStep./0.05;
-  shimopt(HW.Grad(Seq.SliceSelect.iDevice).ShimGradients~=0) = shimopt(HW.Grad(Seq.SliceSelect.iDevice).ShimGradients~=0)+shimopt_offset;
-  shimopt(HW.Grad(Seq.SliceSelect.iDevice).ShimGradients==0) = 0;
+  shimopt = Seq.ShimStart - Seq.ShimStep./0.05;
+  shimopt(usedShims) = shimopt(usedShims) + shimopt_offset;
+  shimopt(~usedShims) = 0;
 else
   for iLoop = 1:Seq.iterations
     opt_maxtomeanEcho(HW, Seq, Seq.ShimStep./0.05);
   end
   shimopt = Seq.ShimStart;
 end
-if Seq.use_nEchos_Frequency==1;
+abort_guard.isUnwindProtect = false;
+
+if Seq.use_nEchos_Frequency == 1
   clear global fOffsetFIDw
 end
 %--- end sequence_shim

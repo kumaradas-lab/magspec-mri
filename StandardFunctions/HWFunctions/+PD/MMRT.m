@@ -60,7 +60,8 @@ classdef MMRT < handleHidden
 %       Maximum frequency for DC/DC converter in Hertz.
 %
 %   fPowerSyncDist
-%       Unused property.
+%       Relative distance of AQ frequency between peaks from harmonics of
+%       DC/DC converter.
 %
 %   PowerSyncFrequencyList
 %       Vector with a list of possible frequencies for DC/DC converter in
@@ -106,7 +107,8 @@ classdef MMRT < handleHidden
 %       Currently, the following talker types are supported:
 %           0: .NET assembly (default)
 %           1: dummy (no actual connection to an MMRT device)
-%           2: socket connection (experimental)
+%           2: MATLAB socket connection (experimental)
+%           3: .NET socket connection (experimental)
 %
 %   FPGA_Libs
 %       Version number of the currently loaded .NET assembly libraries.
@@ -166,7 +168,7 @@ classdef MMRT < handleHidden
 %
 %
 % ----------------------------------------------------------------------------
-% (C) Copyright 2016-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ----------------------------------------------------------------------------
 

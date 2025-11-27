@@ -38,7 +38,7 @@ function varargout = GUI_SliceSelect(varargin)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2014-2018 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2014-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -87,7 +87,7 @@ elseif evalin('base', 'exist(''HW'', ''var'')')
     HW = evalin('base', 'HW');
 end
 
-if exist('HW', 'var') && isa(HW, 'PD.HW')
+if exist('HW', 'var') && isa(HW, 'PD.HWClass')
     if evalin('base', 'exist(''mySave'', ''var'')')
         mySave = evalin('base', 'mySave');
     end
@@ -185,12 +185,13 @@ set(handles.edit21,'String',[handles.HW.RootPath, '\User\Save']);
 
             figure(handles.figureSliceSelect)
             cla(handles.axes1)
-            set(handles.figureSliceSelect,'Renderer','OpenGL')
-            opengl hardware
+%             set(handles.figureSliceSelect,'Renderer','OpenGL')
+%             opengl hardware
             view(handles.axes1,3)
             xlabel(handles.axes1,'z')
             ylabel(handles.axes1,'x')
-            zlabel(handles.axes1,'y')
+            hzl = zlabel(handles.axes1,'y');
+            set(hzl, 'Visible', 'on');
             grid(handles.axes1,'on')
            guidata(hObject, handles);
 
@@ -205,14 +206,14 @@ set(handles.edit21,'String',[handles.HW.RootPath, '\User\Save']);
             % shading interp
             axis(handles.axes1,'equal')
             axis(handles.axes1,handles.LocaliserImageVol([5,6,1,2,3,4]))
-            if handles.axes1Rot3D==0;
+            if handles.axes1Rot3D==0
                 rotate3d(handles.axes1,'on');
                 handles.axes1Rot3D=1;
             end
 
 
 % Update handles structure
-handles.axes1update=1;
+% handles.axes1update=1;
 guidata(hObject, handles);
 
 % This sets up the initial plot - only do when we are invisible
@@ -274,7 +275,7 @@ function pushbutton_reset3d_Callback(hObject, eventdata, handles)
             handles.lim=[min(handles.v(:)) max(handles.v(:))];
 
 %             end
-            handles.axes1update=1;
+%             handles.axes1update=1;
             handles.refresh3D=1;
             axis(handles.axes1,handles.LocaliserImageVol([5,6,1,2,3,4]))
             guidata(hObject, handles);
@@ -282,7 +283,7 @@ function pushbutton_reset3d_Callback(hObject, eventdata, handles)
              figureSliceSelect_WindowButtonMotionFcn(hObject, eventdata, handles);
 
 
-% if handles.axes1Rot3D==0;
+% if handles.axes1Rot3D==0
 %     rotate3d(handles.axes1,'on');
 %     handles.axes1Rot3D=1;
 % else
@@ -467,15 +468,6 @@ set(hObject, 'String', char(sort(enumeration('PD.SliceSelectType'))));       %%%
 end
 
 
-% --- Executes on mouse press over axes background.
-function axes1_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to axes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-end
-
-
 % --- Executes on slider movement.
 function slider_alfa_Callback(hObject, eventdata, handles)
 % hObject    handle to slider_alfa (see GCBO)
@@ -558,9 +550,11 @@ function figureSliceSelect_WindowButtonMotionFcn(hObject, eventdata, handles)
 % hObject    handle to figureSliceSelect (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-if handles.MotionFcnBusy==0;
+mousexy=get(handles.figureSliceSelect, 'CurrentPoint');
+if (mousexy(1)<=101 ) && handles.MotionFcnBusy==0
   handles.MotionFcnBusy = 1;
   guidata(hObject, handles);
+%   pause(0.001)
   try
     if or(handles.ButtonMeasureSlice,handles.ButtonMeasure3DLocaliser)
       if isfield(handles,'mySave')
@@ -572,7 +566,7 @@ if handles.MotionFcnBusy==0;
         Grad=handles.Grad;
         %talker=handles.talker;
       end
-      if exist('HW', 'var') && isa(HW, 'PD.HW')
+      if exist('HW', 'var') && isa(HW, 'PD.HWClass')
         if evalin('base', 'exist(''mySave'', ''var'')')
           mySave = evalin('base', 'mySave');
         end
@@ -592,7 +586,7 @@ if handles.MotionFcnBusy==0;
 
     if handles.ButtonDim==1
       handles.ButtonDim=0;
-%       if get(handles.radiobutton_2D,'Value') 
+%       if get(handles.radiobutton_2D,'Value')
 %         set(handles.checkbox_Smooth,'Visible','on')
 %       else
 %         set(handles.checkbox_Smooth,'Visible','off')
@@ -635,6 +629,7 @@ if handles.MotionFcnBusy==0;
         set(handles.popupmenu_PhaseOS2,'Enable','on');
         set(handles.popupmenu_PhaseOS2,'Value',2);
         set(handles.popupmenu8,'Enable','off');
+%         set(handles.edit6,'String','5');
         set(handles.edit25,'Enable','on');
         set(handles.edit25,'String','32');
         set(handles.edit26,'Enable','off');
@@ -652,7 +647,7 @@ if handles.MotionFcnBusy==0;
         set(handles.edit25,'Enable','on');
         set(handles.edit25,'String','16');
         set(handles.edit26,'Enable','off');
-        set(handles.edit6,'String','');
+        set(handles.edit6,'String','Inf');
         set(handles.edit20,'String','8');
         if get(handles.popupmenu_sequenceSelect, 'Value') == PD.SliceSelectType.SpinEcho  % Spin-Echo
           set(handles.text18,'String','Turbo Break')
@@ -722,17 +717,19 @@ if handles.MotionFcnBusy==0;
     end
 
     mousexy=get(handles.figureSliceSelect, 'CurrentPoint');
-
-    if mousexy(1)<=45 || handles.axes1update ||mousexy(1)>=170
+% Fixme left or right panel
+    if (mousexy(1)<=101 ) && handles.axes1update
       handles.axes1update=0;
+      guidata(hObject, handles);
+      pause(0.001)
       % axes(handles.axes1);
 
       handles.Seq.AQSlice.sizeRead=get(handles.slider11,'Value')*(max(abs(handles.LocaliserImageVol(2:2:6)-handles.LocaliserImageVol(1:2:6))));
       handles.Seq.AQSlice.sizePhase(1)=get(handles.slider12,'Value')*(max(abs(handles.LocaliserImageVol(2:2:6)-handles.LocaliserImageVol(1:2:6))));
       handles.Seq.AQSlice.sizePhase(2)=get(handles.slider13,'Value')*(max(abs(handles.LocaliserImageVol(2:2:6)-handles.LocaliserImageVol(1:2:6))));
       handles.Seq.AQSlice.sizePhase(3)=get(handles.slider14,'Value')*(max(abs(handles.LocaliserImageVol(2:2:6)-handles.LocaliserImageVol(1:2:6))));
-      handles.Seq.AQSlice.thickness=str2double(get(handles.edit6,'String'));
-      if isnan(handles.Seq.AQSlice.thickness); handles.Seq.AQSlice.thickness=[];end;
+      handles.Seq.AQSlice.thickness=str2double(get(handles.edit6,'String'))/1000; % mm -> m
+      if isnan(handles.Seq.AQSlice.thickness); handles.Seq.AQSlice.thickness=inf;end
 
       if str2double(get(handles.edit1,'String'))==1
         handles.Seq.AQSlice.sizeRead=1e12;
@@ -805,7 +802,7 @@ if handles.MotionFcnBusy==0;
         set(handles.slider_theta, 'Value', 0);
       end
 
-      if handles.ButtonCenterXYZ == 1;
+      if handles.ButtonCenterXYZ == 1
         handles.ButtonCenterXYZ=0;
         set(handles.slider_y, 'Value', 0.5);
         set(handles.slider_z, 'Value', 0.5);
@@ -882,17 +879,22 @@ if handles.MotionFcnBusy==0;
       handles.Seq.AQSlice.normXImage=[1,0,0];
       handles.Seq.AQSlice.normYImage=[0,1,0];
       handles.Seq.AQSlice.normZImage=[0,0,1];
-      handles.Seq.AQSlice.normX=aptRotate( handles.Seq.AQSlice.normXImage,handles.Seq.AQSlice.alfa ,handles.Seq.AQSlice.phi, handles.Seq.AQSlice.theta);
-      handles.Seq.AQSlice.normY=aptRotate( handles.Seq.AQSlice.normYImage,handles.Seq.AQSlice.alfa ,handles.Seq.AQSlice.phi, handles.Seq.AQSlice.theta);
-      handles.Seq.AQSlice.normZ=aptRotate( handles.Seq.AQSlice.normZImage,handles.Seq.AQSlice.alfa ,handles.Seq.AQSlice.phi, handles.Seq.AQSlice.theta);
-      handles.Seq.AQSlice.XImage=handles.Seq.AQSlice.Center*handles.Seq.AQSlice.normX.';
-      handles.Seq.AQSlice.ReceivingPoint=handles.Seq.AQSlice.XImage*handles.Seq.AQSlice.normX;
+      Angle2Deg=1/(2*pi)*360;
+      [Rx, Ry, Rz] = get_aptDegRotationMatrix(handles.Seq.AQSlice.alfa*Angle2Deg, handles.Seq.AQSlice.phi*Angle2Deg, handles.Seq.AQSlice.theta*Angle2Deg);
+      handles.Seq.AQSlice.normX = (Rz*(Ry*(Rx*handles.Seq.AQSlice.normXImage.'))).';
+      handles.Seq.AQSlice.normY = (Rz*(Ry*(Rx*handles.Seq.AQSlice.normYImage.'))).';
+      handles.Seq.AQSlice.normZ = (Rz*(Ry*(Rx*handles.Seq.AQSlice.normZImage.'))).';
+
+      handles.Seq.AQSlice.XOriginImage=(-handles.Seq.AQSlice.Center)*handles.Seq.AQSlice.normX.';
+      handles.Seq.AQSlice.YOriginImage=(-handles.Seq.AQSlice.Center)*handles.Seq.AQSlice.normY.';
+      handles.Seq.AQSlice.ZOriginImage=(-handles.Seq.AQSlice.Center)*handles.Seq.AQSlice.normZ.';
+      handles.Seq.AQSlice.ReceivingPoint=(handles.Seq.AQSlice.Center*handles.Seq.AQSlice.normX.').*handles.Seq.AQSlice.normX;
       handles.Seq.AQSlice.ReceivingPoint2Center=handles.Seq.AQSlice.Center-handles.Seq.AQSlice.ReceivingPoint;
 
       % handles.Seq.AQSlice.Center2ReceivingPoint=handles.Seq.AQSlice.ReceivingPoint-handles.Seq.AQSlice.Center;
-      handles.Seq.AQSlice.Center2OriginImage = [ handles.Seq.AQSlice.XImage,...
-                                                 handles.Seq.AQSlice.Center*handles.Seq.AQSlice.normY.',...
-                                                 handles.Seq.AQSlice.Center*handles.Seq.AQSlice.normZ.'];
+      handles.Seq.AQSlice.Center2OriginImage = [ handles.Seq.AQSlice.XOriginImage,...
+                                                 handles.Seq.AQSlice.YOriginImage,...
+                                                 handles.Seq.AQSlice.ZOriginImage];
       % disp(['normX              ' num2str(handles.Seq.AQSlice.normX)])
       % disp(['Center2OriginImage ' num2str(handles.Seq.AQSlice.Center2OriginImage)])
       % disp(['Center             ' num2str(handles.Seq.AQSlice.Center)])
@@ -934,9 +936,9 @@ if handles.MotionFcnBusy==0;
           warning('Please set nPhase(2)>1 to measure a localiser 3D image')
           beep;
         end
-        if ~isempty(handles.Seq.AQSlice.thickness)
+        if ~isinf(handles.Seq.AQSlice.thickness)
           handles.ButtonMeasure3DLocaliser=0;
-          warning('Please set thickness to [] to measure a localiser 3D image')
+          warning('Please set thickness to Inf to measure a localiser 3D image')
           beep;
         end
         if (handles.Seq.AQSlice.alfa)
@@ -961,7 +963,8 @@ if handles.MotionFcnBusy==0;
         % end
 
       end
-
+      handles.axes1update=1;
+      guidata(hObject, handles);
     end
 
     if handles.ButtonMeasureSlice || handles.ButtonMeasure3DLocaliser
@@ -988,18 +991,18 @@ if handles.MotionFcnBusy==0;
       if isnan(str2double(get(handles.edit19,'String')))
         handles.Seq.AQSlice(1).sizePhaseSpoil=[];         %!!!!
       else
-        handles.Seq.AQSlice(1).sizePhaseSpoil=str2double(get(handles.edit19,'String'));         %!!!!
+        handles.Seq.AQSlice(1).sizePhaseSpoil=str2double(get(handles.edit19,'String'))/1000;   % mm -> m      %!!!!
       end
       handles.Seq.AQSlice.HzPerPixMin=str2double(get(handles.edit29,'String'));
-      handles.Seq.AQSlice.thickness=str2double(get(handles.edit6,'String'));
-      if isnan(handles.Seq.AQSlice.thickness); handles.Seq.AQSlice.thickness=[];end;
+      handles.Seq.AQSlice.thickness=str2double(get(handles.edit6,'String'))/1000; % mm -> m
+      if isnan(handles.Seq.AQSlice.thickness); handles.Seq.AQSlice.thickness=inf;end
 
       if isnan(str2double(get(handles.edit18,'String')))
         handles.Seq.tRep=[];
         handles.Seq.AQSlice(1).TurboBreak=[];
       else
-        if strcmp(get(handles.text18,'String'),'T Rep');
-          handles.Seq.tRep=str2double(get(handles.edit18,'String'));
+        if strcmp(get(handles.text18,'String'),'T Rep')
+          handles.Seq.RepetitionTime=str2double(get(handles.edit18,'String'));
           handles.Seq.AQSlice(1).TurboBreak=[];
         else
           handles.Seq.AQSlice(1).TurboBreak=str2double(get(handles.edit18,'String'));
@@ -1043,7 +1046,7 @@ if handles.MotionFcnBusy==0;
         end
       end
 
-      if strcmp(get(handles.text20,'String'),'T1');
+      if strcmp(get(handles.text20,'String'),'T1')
         handles.Seq.T1=str2double(get(handles.edit20,'String'));         % T1 der Probe Flipwinkel ist acos(exp(-Seq.tRep/Seq.T1))/pi*180
         handles.Seq.AQSlice(1).TurboFactor=1;
       else
@@ -1075,28 +1078,28 @@ if handles.MotionFcnBusy==0;
       handles.Seq.AQSlice.plotB0ppm=0;
 
 
-      if get(handles.checkbox_plotTR,'Value');
+      if get(handles.checkbox_plotTR,'Value')
         handles.Seq.plotSeqTR=1:3;
       else
         handles.Seq.plotSeqTR=[];
       end
-      if get(handles.checkbox_PlotSequence,'Value');
+      if get(handles.checkbox_PlotSequence,'Value')
         handles.Seq.plotSeq=1:3;
       else
         handles.Seq.plotSeq=[];
       end
-      if get(handles.checkbox_Plot_kSpace,'Value');
+      if get(handles.checkbox_Plot_kSpace,'Value')
         handles.Seq.AQSlice(1).plotkSpace=1;
       else
         handles.Seq.AQSlice(1).plotkSpace=0;
       end
-      if get(handles.checkbox_image,'Value');
+      if get(handles.checkbox_image,'Value')
         handles.Seq.AQSlice(1).plotImage=1;
       else
         handles.Seq.AQSlice(1).plotImage=0;
       end
 
-      if get(handles.checkbox_Smooth,'Value');
+      if get(handles.checkbox_Smooth,'Value')
         handles.Seq.AQSlice(1).ZeroFillWindowSize=1.4;                     % Zero Fill Window Size (k-Space)
         handles.Seq.AQSlice(1).ZeroFillFactor=2;                           % Zero fill resolution factor
       else
@@ -1104,17 +1107,17 @@ if handles.MotionFcnBusy==0;
         handles.Seq.AQSlice(1).ZeroFillFactor=[];                         % Zero fill resolution factor
       end
 
-      if get(handles.checkbox_PlotPhase,'Value');
+      if get(handles.checkbox_PlotPhase,'Value')
         handles.Seq.AQSlice(1).plotPhase=1;
       else
         handles.Seq.AQSlice(1).plotPhase=0;
       end
-      if get(handles.checkbox_Extra1,'Value');
+      if get(handles.checkbox_Extra1,'Value')
         handles.Seq.AQSlice(1).plotB0ppm=1;
       else
         handles.Seq.AQSlice(1).plotB0ppm=0;
       end
-      if get(handles.checkbox_Extra2,'Value');
+      if get(handles.checkbox_Extra2,'Value')
         handles.Seq.AQSlice(1).plotB0Hz=1;
       else
         handles.Seq.AQSlice(1).plotB0Hz=0;
@@ -1141,12 +1144,12 @@ if handles.MotionFcnBusy==0;
         switch popup_sel_index
           case PD.SliceSelectType.SpinEcho  % Spin-Echo
             [SeqLoop] = sequence_Spin_Echo(handles.HW, handles.Seq, handles.AQ, handles.TX, handles.Grad,  handles.mySave);
-            handles.HW = SeqLoop.HW;
+%             handles.HW = SeqLoop.HW;
 
 
           case PD.SliceSelectType.GradEcho % Grad-Echo
             [SeqLoop]= sequence_Flash(handles.HW, handles.Seq, handles.AQ, handles.TX, handles.Grad,  handles.mySave);
-            handles.HW = SeqLoop.HW;
+%             handles.HW = SeqLoop.HW;
 
           case PD.SliceSelectType.SliceSelect  % Slice Selection
             % write Seq.AQSlice data to file
@@ -1174,7 +1177,7 @@ if handles.MotionFcnBusy==0;
           else
             SeqLoop.saveFilename=[get(handles.edit21,'String') '\' get(handles.edit27,'String') '.mat'];
           end
-          if ~isdir(get(handles.edit21,'String')); mkdir(get(handles.edit21,'String'));end
+          if ~isfolder(get(handles.edit21,'String')); mkdir(get(handles.edit21,'String'));end
           save(SeqLoop.saveFilename,'SeqLoop')
         end
 
@@ -1194,7 +1197,7 @@ if handles.MotionFcnBusy==0;
                       -SeqLoop.AQSlice(1).sizePhase(2)/2+handles.CenterOffsetLocaliser(2),SeqLoop.AQSlice(1).sizePhase(2)/2+handles.CenterOffsetLocaliser(2),...
                       -SeqLoop.AQSlice(1).sizePhase(3)/2+handles.CenterOffsetLocaliser(3),SeqLoop.AQSlice(1).sizePhase(3)/2+handles.CenterOffsetLocaliser(3)];
 
-          if SeqLoop.AQSlice(1).nRead>1;
+          if SeqLoop.AQSlice(1).nRead>1
             % pt(1)=SeqLoop.AQSlice(1).ReadCoordinate;
             handles.LocaliserImageVol(5:6)=[-SeqLoop.AQSlice(1).sizeRead/2+handles.CenterOffsetLocaliser(3),SeqLoop.AQSlice(1).sizeRead/2+handles.CenterOffsetLocaliser(3)];
           end
@@ -1210,7 +1213,7 @@ if handles.MotionFcnBusy==0;
                                                       linspace(handles.LocaliserImageVol(5),handles.LocaliserImageVol(6),handles.nz));
           handles.lim=[min(handles.v(:)) max(handles.v(:))];
           axis(handles.axes1,handles.LocaliserImageVol([5,6,1,2,3,4]))
-          handles.axes1update=1;
+%           handles.axes1update=1;
           handles.refresh3D=1;
           guidata(hObject, handles);
           handles = axes1update(handles);
@@ -1231,7 +1234,7 @@ if handles.MotionFcnBusy==0;
         Grad=handles.Grad;
         %talker=handles.talker;
       end
-      if exist('HW', 'var') && isa(HW, 'PD.HW')
+      if exist('HW', 'var') && isa(HW, 'PD.HWClass')
         if evalin('base', 'exist(''mySave'', ''var'')')
           mySave = evalin('base', 'mySave');
         end
@@ -1250,14 +1253,15 @@ if handles.MotionFcnBusy==0;
     end
   catch ME
     handles.MotionFcnBusy = 0;
+    handles.axes1update=1;
     guidata(hObject, handles);
     rethrow(ME);
   end
 
   handles.MotionFcnBusy = 0;
+  guidata(hObject, handles);
 end
 
-guidata(hObject, handles);
 
 end
 
@@ -1267,196 +1271,243 @@ function handles = axes1update(handles)
 %  handles.Seq.AQSlice.Center
 %  handles.Seq.AQSlice.Center2OriginImage
 %              disp('--------------------------------------------------------------------------')
-             hold(handles.axes1, 'all');
-%              handles.Seq.AQSlice.CenterRaufImage
-             if isfield(handles,'h_ReceivingPoint'); if ishandle(handles.h_ReceivingPoint);delete(handles.h_ReceivingPoint);end;end
-             handles.h_ReceivingPoint=plot3(handles.axes1,[0;handles.Seq.AQSlice.ReceivingPoint(3)],[0;handles.Seq.AQSlice.ReceivingPoint(1)],[0;handles.Seq.AQSlice.ReceivingPoint(2)],'k','LineWidth',4);
-             if isfield(handles,'h_ReceivingPoint2Center');if ishandle(handles.h_ReceivingPoint2Center); delete(handles.h_ReceivingPoint2Center);end;end
-             handles.h_ReceivingPoint2Center=plot3(handles.axes1,[0;handles.Seq.AQSlice.ReceivingPoint2Center(3)]+handles.Seq.AQSlice.ReceivingPoint(3),[0;handles.Seq.AQSlice.ReceivingPoint2Center(1)]+handles.Seq.AQSlice.ReceivingPoint(1),[0;handles.Seq.AQSlice.ReceivingPoint2Center(2)]+handles.Seq.AQSlice.ReceivingPoint(2),'k','LineWidth',4);
-             tempLength=sqrt(sum((handles.LocaliserImageVol(2:2:6)-handles.LocaliserImageVol(1:2:5)).^2))/10;
-             if isfield(handles,'h_normX');if ishandle(handles.h_normX); delete(handles.h_normX);end;end
-             handles.h_normX=plot3(handles.axes1,  [0;handles.Seq.AQSlice.normX(3)*tempLength]+handles.Seq.AQSlice.Center(3),...
-                                                    [0;handles.Seq.AQSlice.normX(1)*tempLength]+handles.Seq.AQSlice.Center(1),...
-                                                    [0;handles.Seq.AQSlice.normX(2)*tempLength]+handles.Seq.AQSlice.Center(2),'r','LineWidth',4);
-             if isfield(handles,'h_normY');if ishandle(handles.h_normY); delete(handles.h_normY);end;end
-             handles.h_normY=plot3(handles.axes1,  [0;handles.Seq.AQSlice.normY(3)*tempLength]+handles.Seq.AQSlice.Center(3),...
-                                                    [0;handles.Seq.AQSlice.normY(1)*tempLength]+handles.Seq.AQSlice.Center(1),...
-                                                    [0;handles.Seq.AQSlice.normY(2)*tempLength]+handles.Seq.AQSlice.Center(2),'g','LineWidth',4);
-             if isfield(handles,'h_normZ');if ishandle(handles.h_normZ); delete(handles.h_normZ);end;end
-             handles.h_normZ=plot3(handles.axes1,  [0;handles.Seq.AQSlice.normZ(3)*tempLength]+handles.Seq.AQSlice.Center(3),...
-                                                    [0;handles.Seq.AQSlice.normZ(1)*tempLength]+handles.Seq.AQSlice.Center(1),...
-                                                    [0;handles.Seq.AQSlice.normZ(2)*tempLength]+handles.Seq.AQSlice.Center(2),'b','LineWidth',4);
-             if isfield(handles,'h_imageBox');if ishandle(handles.h_imageBox); delete(handles.h_imageBox);end;end
+hold(handles.axes1, 'on');
+% handles.Seq.AQSlice.CenterRaufImage
+if isfield(handles, 'h_Center') && ishandle(handles.h_Center)
+  delete(handles.h_Center);
+end
+handles.h_Center = plot3(handles.axes1,[0;handles.Seq.AQSlice.Center(3)],[0;handles.Seq.AQSlice.Center(1)],[0;handles.Seq.AQSlice.Center(2)],'k','LineWidth',4);
+% if isfield(handles, 'h_Center2OriginImageY') && ishandle(handles.h_Center2OriginImageY)
+%   delete(handles.h_Center2OriginImageY);
+% end
+% handles.h_Center2OriginImageY=plot3(handles.axes1,[0;-handles.Seq.AQSlice.Center2OriginImage(3)]-handles.Seq.AQSlice.Center2OriginImage(3),[0;-handles.Seq.AQSlice.Center2OriginImage(1)],[0;-handles.Seq.AQSlice.Center2OriginImage(2)],'--k','LineWidth',4);
+if isfield(handles, 'h_ReceivingPoint') && ishandle(handles.h_ReceivingPoint)
+  delete(handles.h_ReceivingPoint);
+end
+handles.h_ReceivingPoint = plot3(handles.axes1,[0;handles.Seq.AQSlice.ReceivingPoint(3)],[0;handles.Seq.AQSlice.ReceivingPoint(1)],[0;handles.Seq.AQSlice.ReceivingPoint(2)],'-r.','LineWidth',1);
 
-             if handles.Seq.AQSlice.nPhase(1)==1;
-                box.x=handles.Seq.AQSlice.thickness;
-             else
-                box.x=handles.Seq.AQSlice.sizePhase(1);
-             end
+if isfield(handles, 'h_ReceivingPoint2Center') && ishandle(handles.h_ReceivingPoint2Center)
+  delete(handles.h_ReceivingPoint2Center);
+end
+handles.h_ReceivingPoint2Center = plot3(handles.axes1,[0;handles.Seq.AQSlice.ReceivingPoint2Center(3)]+handles.Seq.AQSlice.ReceivingPoint(3),[0;handles.Seq.AQSlice.ReceivingPoint2Center(1)]+handles.Seq.AQSlice.ReceivingPoint(1),[0;handles.Seq.AQSlice.ReceivingPoint2Center(2)]+handles.Seq.AQSlice.ReceivingPoint(2),':k','LineWidth',4);
 
-             box.y=handles.Seq.AQSlice.sizePhase(2);
-             if handles.Seq.AQSlice.nPhase(3)~=1;
-                box.z=handles.Seq.AQSlice.sizePhase(3);
-             else
-                box.z=handles.Seq.AQSlice.sizeRead;
-             end
-             if ~isempty(box.x)
-             box.line=[...
-                 -handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    1 bottom
-                 +handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    2
-                 +handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    3
-                 -handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    4
-                 -handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    1
-                 -handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    5 top
-                 +handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    6
-                 +handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    2
-                 +handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    6
-                 +handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    7
-                 +handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    3
-                 +handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    7
-                 -handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    7
-                 -handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    4
-                 -handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    7
-                 -handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center       %5 top
-                 ];
+tempLength = sqrt(sum((handles.LocaliserImageVol(2:2:6)-handles.LocaliserImageVol(1:2:5)).^2))/10;
+if isfield(handles, 'h_normX') && ishandle(handles.h_normX)
+  delete(handles.h_normX);
+end
+handles.h_normX=plot3(handles.axes1,  [0;handles.Seq.AQSlice.normX(3)*tempLength]+handles.Seq.AQSlice.Center(3),...
+                                      [0;handles.Seq.AQSlice.normX(1)*tempLength]+handles.Seq.AQSlice.Center(1),...
+                                      [0;handles.Seq.AQSlice.normX(2)*tempLength]+handles.Seq.AQSlice.Center(2),'r','LineWidth',4);
+if isfield(handles, 'h_normY') && ishandle(handles.h_normY)
+  delete(handles.h_normY);
+end
+handles.h_normY=plot3(handles.axes1,  [0;handles.Seq.AQSlice.normY(3)*tempLength]+handles.Seq.AQSlice.Center(3),...
+                                      [0;handles.Seq.AQSlice.normY(1)*tempLength]+handles.Seq.AQSlice.Center(1),...
+                                      [0;handles.Seq.AQSlice.normY(2)*tempLength]+handles.Seq.AQSlice.Center(2),'g','LineWidth',4);
+if isfield(handles, 'h_normZ') && ishandle(handles.h_normZ)
+  delete(handles.h_normZ);
+end
+handles.h_normZ=plot3(handles.axes1,  [0;handles.Seq.AQSlice.normZ(3)*tempLength]+handles.Seq.AQSlice.Center(3),...
+                                      [0;handles.Seq.AQSlice.normZ(1)*tempLength]+handles.Seq.AQSlice.Center(1),...
+                                      [0;handles.Seq.AQSlice.normZ(2)*tempLength]+handles.Seq.AQSlice.Center(2),'b','LineWidth',4);
 
-                 handles.h_imageBox=plot3(handles.axes1, box.line(:,3),...
-                                                         box.line(:,1),...
-                                                         box.line(:,2),'m','LineWidth',1);
-             end
-
-%              plot3([0;handles.Seq.AQSlice.CenterRaufImage(1)],[0;handles.Seq.AQSlice.CenterRaufImage(2)],[0;handles.Seq.AQSlice.CenterRaufImage(3)],'LineWidth',4,'Color','c')
-%              plot3([0;handles.Seq.AQSlice.RaufCenter(1)]+handles.Seq.AQSlice.Rauf(1),[0;handles.Seq.AQSlice.RaufCenter(2)]+handles.Seq.AQSlice.Rauf(2),[0;handles.Seq.AQSlice.RaufCenter(3)]+handles.Seq.AQSlice.Rauf(3),'LineWidth',4)
-
-%              handles.Seq.AQSlice.normV
-%              handles.Seq.AQSlice.Rauf
-%              handles.Seq.AQSlice.Center
-%              handles.Seq.AQSlice.RaufCenter
-%              handles.Seq.AQSlice.CenterRauf
+if isfield(handles, 'h_normXImage') && ishandle(handles.h_normXImage)
+  delete(handles.h_normXImage);
+end
+handles.h_normXImage=plot3(handles.axes1,  [0;handles.Seq.AQSlice.normXImage(3)*tempLength],...
+                                      [0;handles.Seq.AQSlice.normXImage(1)*tempLength],...
+                                      [0;handles.Seq.AQSlice.normXImage(2)*tempLength],':r','LineWidth',2);
+if isfield(handles, 'h_normYImage') && ishandle(handles.h_normYImage)
+  delete(handles.h_normYImage);
+end
+handles.h_normYImage=plot3(handles.axes1,  [0;handles.Seq.AQSlice.normYImage(3)*tempLength],...
+                                      [0;handles.Seq.AQSlice.normYImage(1)*tempLength],...
+                                      [0;handles.Seq.AQSlice.normYImage(2)*tempLength],':g','LineWidth',2);
+if isfield(handles, 'h_normZImage') && ishandle(handles.h_normZImage)
+  delete(handles.h_normZImage);
+end
+handles.h_normZImage=plot3(handles.axes1,  [0;handles.Seq.AQSlice.normZImage(3)*tempLength],...
+                                      [0;handles.Seq.AQSlice.normZImage(1)*tempLength],...
+                                      [0;handles.Seq.AQSlice.normZImage(2)*tempLength],':b','LineWidth',2);
 
 
-%              handles.Seq.AQSlice.normV*handles.Seq.AQSlice.CenterRauf'
+if isfield(handles, 'h_imageBox') && ishandle(handles.h_imageBox)
+  delete(handles.h_imageBox);
+end
 
-%             Y=linspace(-0.5,0.5,handles.Seq.AQSlice.nRead)*handles.Seq.AQSlice.sizeRead+handles.CenterOffset(1);
-%             X=linspace(-0.5,0.5,handles.Seq.AQSlice.nPhase)*handles.Seq.AQSlice.sizePhase+handles.CenterOffset(2);
-            if handles.Seq.AQSlice.nPhase(3)>1
-                x=handles.CenterOffset(1);
-%                 y=linspace(-0.5,0.5,handles.Seq.AQSlice.nPhase(1))*handles.Seq.AQSlice.sizePhase(1)+handles.CenterOffset(2);
-%                 z=linspace(-0.5,0.5,handles.Seq.AQSlice.nPhase(2))*handles.Seq.AQSlice.sizePhase(2)+handles.CenterOffset(3);
-                if mod(handles.Seq.AQSlice.nPhase(3),2)
-                    z=linspace(-0.5+0.5/handles.Seq.AQSlice.nPhase(3),0.5-0.5/handles.Seq.AQSlice.nPhase(3),handles.Seq.AQSlice.nPhase(3))*handles.Seq.AQSlice.sizePhase(3)+handles.CenterOffset(3);
-                else
-                    z=linspace(-0.5,0.5-1/handles.Seq.AQSlice.nPhase(3),handles.Seq.AQSlice.nPhase(3))*handles.Seq.AQSlice.sizePhase(3)+handles.CenterOffset(3);
-                end
+if handles.Seq.AQSlice.nPhase(1)==1
+  box.x=handles.Seq.AQSlice.thickness;
+else
+  box.x=handles.Seq.AQSlice.sizePhase(1);
+end
 
-                if mod(handles.Seq.AQSlice.nPhase(2),2)
-                    y=linspace(-0.5+0.5/handles.Seq.AQSlice.nPhase(2),0.5-0.5/handles.Seq.AQSlice.nPhase(2),handles.Seq.AQSlice.nPhase(2))*handles.Seq.AQSlice.sizePhase(2)+handles.CenterOffset(2);
-                else
-                    y=linspace(-0.5,0.5-1/handles.Seq.AQSlice.nPhase(2),handles.Seq.AQSlice.nPhase(2))*handles.Seq.AQSlice.sizePhase(2)+handles.CenterOffset(2);
-                end
+box.y=handles.Seq.AQSlice.sizePhase(2);
+if handles.Seq.AQSlice.nPhase(3)~=1
+  box.z=handles.Seq.AQSlice.sizePhase(3);
+else
+  box.z=handles.Seq.AQSlice.sizeRead;
+end
+if ~isempty(box.x)
+  box.line=[...
+     -handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    1 bottom
+     +handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    2
+     +handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    3
+     -handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    4
+     -handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    1
+     -handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    5 top
+     +handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    6
+     +handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    2
+     +handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    6
+     +handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    7
+     +handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    3
+     +handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    7
+     -handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    7
+     -handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2-handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    4
+     -handles.Seq.AQSlice.normX*box.x/2+handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center;...    7
+     -handles.Seq.AQSlice.normX*box.x/2-handles.Seq.AQSlice.normY*box.y/2+handles.Seq.AQSlice.normZ*box.z/2+handles.Seq.AQSlice.Center       %5 top
+     ];
 
-%                 z=zeros(handles.Seq.AQSlice.nPhase(1),handles.Seq.AQSlice.nPhase(2))+handles.CenterOffset(3);
-            else
-                x=handles.CenterOffset(1);
-                if mod(handles.Seq.AQSlice.nRead,2)
-                    z=linspace(-0.5+0.5/handles.Seq.AQSlice.nRead,0.5-0.5/handles.Seq.AQSlice.nRead,handles.Seq.AQSlice.nRead)*handles.Seq.AQSlice.sizeRead+handles.CenterOffset(3);
-                else
-                    z=linspace(-0.5,0.5-1/handles.Seq.AQSlice.nRead,handles.Seq.AQSlice.nRead)*handles.Seq.AQSlice.sizeRead+handles.CenterOffset(3);
-                end
-                if mod(handles.Seq.AQSlice.nPhase(2),2)
-                    y=linspace(-0.5+0.5/handles.Seq.AQSlice.nPhase(2),0.5-0.5/handles.Seq.AQSlice.nPhase(2),handles.Seq.AQSlice.nPhase(2))*handles.Seq.AQSlice.sizePhase(2)+handles.CenterOffset(2);
-                else
-                    y=linspace(-0.5,0.5-1/handles.Seq.AQSlice.nPhase(2),handles.Seq.AQSlice.nPhase(2))*handles.Seq.AQSlice.sizePhase(2)+handles.CenterOffset(2);
-                end
+     handles.h_imageBox=plot3(handles.axes1, box.line(:,3),...
+                                             box.line(:,1),...
+                                             box.line(:,2),'m','LineWidth',1);
+end
 
-%                 z=linspace(-0.5,0.5,handles.Seq.AQSlice.nPhase(2))*handles.Seq.AQSlice.sizePhase(2)+handles.CenterOffset(3);
-%                 z=zeros(handles.Seq.AQSlice.nRead,handles.Seq.AQSlice.nPhase(2))+handles.CenterOffset(3);
-            end
+% plot3([0;handles.Seq.AQSlice.CenterRaufImage(1)],[0;handles.Seq.AQSlice.CenterRaufImage(2)],[0;handles.Seq.AQSlice.CenterRaufImage(3)],'LineWidth',4,'Color','c')
+% plot3([0;handles.Seq.AQSlice.RaufCenter(1)]+handles.Seq.AQSlice.Rauf(1),[0;handles.Seq.AQSlice.RaufCenter(2)]+handles.Seq.AQSlice.Rauf(2),[0;handles.Seq.AQSlice.RaufCenter(3)]+handles.Seq.AQSlice.Rauf(3),'LineWidth',4)
 
-            if length(y)==1;    y=[y-(abs(z(end)-z(1)))/10,y+(abs(z(end)-z(1)))/10]; end
-            if length(z)==1;    z=[z-(abs(y(end)-y(1)))/10,z+(abs(y(end)-y(1)))/10]; end
-
-            [X,Y,Z]= meshgrid(x,y,z);
-%             h_AqWin1=pcolor(X,Y,abs(AqWin1_image));
-
-%             h_AqWin1=surf(handles.axes1,X,Y,Z,abs(handles.AqWin1_image));
-            h_AqWin1=surf(handles.axes1,squeeze(X),squeeze(Y),squeeze(Z),abs(handles.AqWin1_image),'Clipping','off');
-%             shading(h_AqWin1 flat
-%             colorbar
-%             view(3)
-%             xlabel('x')
-%             ylabel('y')
-%             zlabel('z')
-%             colormap(gray)
-%             shading flat
-%             % shading interp
-%             axis equal
-%             axis(handles.LocaliserImageVol)
+% handles.Seq.AQSlice.normV
+% handles.Seq.AQSlice.Rauf
+% handles.Seq.AQSlice.Center
+% handles.Seq.AQSlice.RaufCenter
+% handles.Seq.AQSlice.CenterRauf
 
 
+% handles.Seq.AQSlice.normV*handles.Seq.AQSlice.CenterRauf'
 
-%         set(h_AqWin1,'XData',get(h_AqWin1,'XData')+0.005);
+% Y=linspace(-0.5,0.5,handles.Seq.AQSlice.nRead)*handles.Seq.AQSlice.sizeRead+handles.CenterOffset(1);
+% X=linspace(-0.5,0.5,handles.Seq.AQSlice.nPhase)*handles.Seq.AQSlice.sizePhase+handles.CenterOffset(2);
+if handles.Seq.AQSlice.nPhase(3)>1
+  x=handles.CenterOffset(1);
+  % y=linspace(-0.5,0.5,handles.Seq.AQSlice.nPhase(1))*handles.Seq.AQSlice.sizePhase(1)+handles.CenterOffset(2);
+  % z=linspace(-0.5,0.5,handles.Seq.AQSlice.nPhase(2))*handles.Seq.AQSlice.sizePhase(2)+handles.CenterOffset(3);
+  if mod(handles.Seq.AQSlice.nPhase(3),2)
+    z=linspace(-0.5+0.5/handles.Seq.AQSlice.nPhase(3),0.5-0.5/handles.Seq.AQSlice.nPhase(3),handles.Seq.AQSlice.nPhase(3))*handles.Seq.AQSlice.sizePhase(3)+handles.CenterOffset(3);
+  else
+    z=linspace(-0.5,0.5-1/handles.Seq.AQSlice.nPhase(3),handles.Seq.AQSlice.nPhase(3))*handles.Seq.AQSlice.sizePhase(3)+handles.CenterOffset(3);
+  end
 
-            rx=0.0*pi;
-            ry=0.0*pi;
-            rz=0.0*pi;
+  if mod(handles.Seq.AQSlice.nPhase(2),2)
+    y=linspace(-0.5+0.5/handles.Seq.AQSlice.nPhase(2),0.5-0.5/handles.Seq.AQSlice.nPhase(2),handles.Seq.AQSlice.nPhase(2))*handles.Seq.AQSlice.sizePhase(2)+handles.CenterOffset(2);
+  else
+    y=linspace(-0.5,0.5-1/handles.Seq.AQSlice.nPhase(2),handles.Seq.AQSlice.nPhase(2))*handles.Seq.AQSlice.sizePhase(2)+handles.CenterOffset(2);
+  end
+
+  % z=zeros(handles.Seq.AQSlice.nPhase(1),handles.Seq.AQSlice.nPhase(2))+handles.CenterOffset(3);
+else
+  x=handles.CenterOffset(1);
+  if mod(handles.Seq.AQSlice.nRead,2)
+    z=linspace(-0.5+0.5/handles.Seq.AQSlice.nRead,0.5-0.5/handles.Seq.AQSlice.nRead,handles.Seq.AQSlice.nRead)*handles.Seq.AQSlice.sizeRead+handles.CenterOffset(3);
+  else
+    z=linspace(-0.5,0.5-1/handles.Seq.AQSlice.nRead,handles.Seq.AQSlice.nRead)*handles.Seq.AQSlice.sizeRead+handles.CenterOffset(3);
+  end
+  if mod(handles.Seq.AQSlice.nPhase(2),2)
+    y=linspace(-0.5+0.5/handles.Seq.AQSlice.nPhase(2),0.5-0.5/handles.Seq.AQSlice.nPhase(2),handles.Seq.AQSlice.nPhase(2))*handles.Seq.AQSlice.sizePhase(2)+handles.CenterOffset(2);
+  else
+    y=linspace(-0.5,0.5-1/handles.Seq.AQSlice.nPhase(2),handles.Seq.AQSlice.nPhase(2))*handles.Seq.AQSlice.sizePhase(2)+handles.CenterOffset(2);
+  end
+
+  % z=linspace(-0.5,0.5,handles.Seq.AQSlice.nPhase(2))*handles.Seq.AQSlice.sizePhase(2)+handles.CenterOffset(3);
+  % z=zeros(handles.Seq.AQSlice.nRead,handles.Seq.AQSlice.nPhase(2))+handles.CenterOffset(3);
+end
+
+if length(y) == 1
+  y = [y-(abs(z(end)-z(1)))/10, y+(abs(z(end)-z(1)))/10];
+end
+if length(z) == 1
+  z = [z-(abs(y(end)-y(1)))/10, z+(abs(y(end)-y(1)))/10];
+end
+
+[X,Y,Z] = meshgrid(x,y,z);
+% h_AqWin1=pcolor(X,Y,abs(AqWin1_image));
+
+% h_AqWin1=surf(handles.axes1,X,Y,Z,abs(handles.AqWin1_image));
+h_AqWin1=surf(handles.axes1,squeeze(X),squeeze(Y),squeeze(Z),abs(handles.AqWin1_image),'Clipping','off');
+% shading(h_AqWin1 flat
+% colorbar
+% view(3)
+% xlabel('x')
+% ylabel('y')
+% zlabel('z')
+% colormap(gray)
+% shading flat
+% % shading interp
+% axis equal
+% axis(handles.LocaliserImageVol)
 
 
-            if rx~=0;
-                rotate(h_AqWin1,[1,0,0],rx*360/2/pi,[0,0,0]);
-            end
-            if ry~=0;
-                rotate(h_AqWin1,[0,1,0],ry*360/2/pi,[0,0,0]);
-            end
-            if rz~=0;
-                rotate(h_AqWin1,[0,0,1],rz*360/2/pi,[0,0,0]);
-            end
-%             if 1;
-%                 rotate(h_AqWin1,[1,0,0],0.5*pi*360/2/pi,[0,0,0]);
-%             end
-%              handles.Seq.AQSlice.normX=tpaRotate( handles.Seq.AQSlice.normXImage',handles.Seq.AQSlice.alfa ,handles.Seq.AQSlice.phi, handles.Seq.AQSlice.theta)';
-%              handles.Seq.AQSlice.normY=tpaRotate( handles.Seq.AQSlice.normYImage',handles.Seq.AQSlice.alfa ,handles.Seq.AQSlice.phi, handles.Seq.AQSlice.theta)';
-%              handles.Seq.AQSlice.normZ=tpaRotate( handles.Seq.AQSlice.normZImage',handles.Seq.AQSlice.alfa ,handles.Seq.AQSlice.phi, handles.Seq.AQSlice.theta)';
+
+% set(h_AqWin1,'XData',get(h_AqWin1,'XData')+0.005);
+
+rx=0.0*pi;
+ry=0.0*pi;
+rz=0.0*pi;
+
+
+if rx~=0
+  rotate(h_AqWin1,[1,0,0],rx*360/2/pi,[0,0,0]);
+end
+if ry~=0
+  rotate(h_AqWin1,[0,1,0],ry*360/2/pi,[0,0,0]);
+end
+if rz~=0
+  rotate(h_AqWin1,[0,0,1],rz*360/2/pi,[0,0,0]);
+end
+% if 1
+%   rotate(h_AqWin1,[1,0,0],0.5*pi*360/2/pi,[0,0,0]);
+% end
+% handles.Seq.AQSlice.normX=tpaRotate( handles.Seq.AQSlice.normXImage',handles.Seq.AQSlice.alfa ,handles.Seq.AQSlice.phi, handles.Seq.AQSlice.theta)';
+% handles.Seq.AQSlice.normY=tpaRotate( handles.Seq.AQSlice.normYImage',handles.Seq.AQSlice.alfa ,handles.Seq.AQSlice.phi, handles.Seq.AQSlice.theta)';
+% handles.Seq.AQSlice.normZ=tpaRotate( handles.Seq.AQSlice.normZImage',handles.Seq.AQSlice.alfa ,handles.Seq.AQSlice.phi, handles.Seq.AQSlice.theta)';
+
+
+if handles.Seq.AQSlice.alfa~=0
+  rotate(h_AqWin1,handles.Seq.AQSlice.normXImage,handles.Seq.AQSlice.alfa*360/2/pi,[handles.CenterOffset(1),handles.CenterOffset(2),handles.CenterOffset(3)]);
+end
+if handles.Seq.AQSlice.phi~=0
+  % normYAlfa=aptRotate( handles.Seq.AQSlice.normYImage,handles.Seq.AQSlice.alfa ,0, 0);
+  % rotate(h_AqWin1,normYAlfa,handles.Seq.AQSlice.phi*360/2/pi,[handles.CenterOffset(1),handles.CenterOffset(2),handles.CenterOffset(3)]);
+  rotate(h_AqWin1,handles.Seq.AQSlice.normYImage,handles.Seq.AQSlice.phi*360/2/pi,[handles.CenterOffset(1),handles.CenterOffset(2),handles.CenterOffset(3)]);
+end
+if handles.Seq.AQSlice.theta~=0
+  % normZAlfaPhi=aptRotate( handles.Seq.AQSlice.normZImage,handles.Seq.AQSlice.alfa ,handles.Seq.AQSlice.phi, 0);
+  % rotate(h_AqWin1,normZAlfaPhi,handles.Seq.AQSlice.theta*360/2/pi,[handles.CenterOffset(1),handles.CenterOffset(2),handles.CenterOffset(3)]);
+  rotate(h_AqWin1,handles.Seq.AQSlice.normZImage,handles.Seq.AQSlice.theta*360/2/pi,[handles.CenterOffset(1),handles.CenterOffset(2),handles.CenterOffset(3)]);
+end
+% offsetData=nRotate([-CenterOfImageOffset(2),-CenterOfImageOffset(1),CenterOfImageOffset(3)]',handles.Seq.AQSlice);
 %
-
-            if handles.Seq.AQSlice.alfa~=0;
-                rotate(h_AqWin1,handles.Seq.AQSlice.normXImage,handles.Seq.AQSlice.alfa*360/2/pi,[handles.CenterOffset(1),handles.CenterOffset(2),handles.CenterOffset(3)]);
-            end
-            if handles.Seq.AQSlice.phi~=0;
-%                 normYAlfa=aptRotate( handles.Seq.AQSlice.normYImage,handles.Seq.AQSlice.alfa ,0, 0);
-%                 rotate(h_AqWin1,normYAlfa,handles.Seq.AQSlice.phi*360/2/pi,[handles.CenterOffset(1),handles.CenterOffset(2),handles.CenterOffset(3)]);
-                rotate(h_AqWin1,handles.Seq.AQSlice.normYImage,handles.Seq.AQSlice.phi*360/2/pi,[handles.CenterOffset(1),handles.CenterOffset(2),handles.CenterOffset(3)]);
-            end
-            if handles.Seq.AQSlice.theta~=0;
-%                 normZAlfaPhi=aptRotate( handles.Seq.AQSlice.normZImage,handles.Seq.AQSlice.alfa ,handles.Seq.AQSlice.phi, 0);
-%                 rotate(h_AqWin1,normZAlfaPhi,handles.Seq.AQSlice.theta*360/2/pi,[handles.CenterOffset(1),handles.CenterOffset(2),handles.CenterOffset(3)]);
-                rotate(h_AqWin1,handles.Seq.AQSlice.normZImage,handles.Seq.AQSlice.theta*360/2/pi,[handles.CenterOffset(1),handles.CenterOffset(2),handles.CenterOffset(3)]);
-            end
-%             offsetData=nRotate([-CenterOfImageOffset(2),-CenterOfImageOffset(1),CenterOfImageOffset(3)]',handles.Seq.AQSlice);
-%
-%             set(h_AqWin1,'XData',get(h_AqWin1,'XData')+offsetData(1));
-%             set(h_AqWin1,'YData',get(h_AqWin1,'YData')+offsetData(2));
-%             set(h_AqWin1,'ZData',get(h_AqWin1,'ZData')+offsetData(3));
+% set(h_AqWin1,'XData',get(h_AqWin1,'XData')+offsetData(1));
+% set(h_AqWin1,'YData',get(h_AqWin1,'YData')+offsetData(2));
+% set(h_AqWin1,'ZData',get(h_AqWin1,'ZData')+offsetData(3));
 
 
- if handles.refresh3D;
-    if  min(size(handles.v))>=64
-         handles.vs=smooth3(abs(handles.v),'gaussian',5);
-    elseif min(size(handles.v))>=32
-         handles.vs=smooth3(abs(handles.v),'gaussian',3);
-    else
-         handles.vs=abs(handles.v);
-    end
-    handles.vsp=permute(handles.vs,handles.Vpermut);
-    handles.xyz(1).p=permute(handles.x,handles.Vpermut);
-    handles.xyz(2).p=permute(handles.y,handles.Vpermut);
-    handles.xyz(3).p=permute(handles.z,handles.Vpermut);
+if handles.refresh3D
+  if  min(size(handles.v))>=64
+    handles.vs=smooth3(abs(handles.v),'gaussian',5);
+  elseif min(size(handles.v))>=32
+    handles.vs=smooth3(abs(handles.v),'gaussian',3);
+  else
+    handles.vs=abs(handles.v);
+  end
+  handles.vsp=permute(handles.vs,handles.Vpermut);
+  handles.xyz(1).p=permute(handles.x,handles.Vpermut);
+  handles.xyz(2).p=permute(handles.y,handles.Vpermut);
+  handles.xyz(3).p=permute(handles.z,handles.Vpermut);
 
-    handles.xp=handles.xyz(handles.VpermutSort(1)).p;
-    handles.yp=handles.xyz(handles.VpermutSort(2)).p;
-    handles.zp=handles.xyz(handles.VpermutSort(3)).p;
+  handles.xp=handles.xyz(handles.VpermutSort(1)).p;
+  handles.yp=handles.xyz(handles.VpermutSort(2)).p;
+  handles.zp=handles.xyz(handles.VpermutSort(3)).p;
 
- end
+end
 
 handles.xyz(1).s=get(h_AqWin1,'XData');
 handles.xyz(2).s=get(h_AqWin1,'YData');
@@ -1468,7 +1519,9 @@ handles.xsp=squeeze( handles.xyz(handles.VpermutSort(1)).s);
 handles.ysp=squeeze( handles.xyz(handles.VpermutSort(2)).s);
 handles.zsp=squeeze( handles.xyz(handles.VpermutSort(3)).s);
 
-if isfield(handles,'h_slice'); if ishandle(handles.h_slice);delete(handles.h_slice ) ;    end;    end
+if isfield(handles, 'h_slice') && ishandle(handles.h_slice)
+  delete(handles.h_slice);
+end
 handles.h_slice=slice(handles.axes1,...
     handles.xp,...
     handles.yp,...
@@ -1487,72 +1540,86 @@ set(handles.h_slice,'FaceLighting','none');
 % set(handles.figureSliceSelect,'WVisual','RGB 16 bits(05 06 05 00) zdepth 24, Hardware Accelerated, OpenGL, Double Buffered, Window')
 % set(handles.figureSliceSelect,'WVisualMode','manual')
 if handles.refresh3D
-  if isfield(handles,'p'); if  ishandle(handles.p); delete(handles.p);end;end
-  if isfield(handles,'pc'); if  ishandle(handles.pc); delete(handles.pc);end;end
-        isosurfval = 0.5*max(reshape(convn(abs(handles.vsp),ones(ceil(size(handles.vsp)./4))./numel(ones(ceil(size(handles.vsp)./4))),'same'),numel(handles.vsp),1));
-        handles.p = patch(isosurface(...
-                handles.xp,...
-                handles.yp,...
-                handles.zp,...
-                abs(handles.vsp),...
-                isosurfval),'Parent',handles.axes1);
-        handles.pc = patch(isocaps(...
-                handles.xp,...
-                handles.yp,...
-                handles.zp,...
-                abs(handles.vsp),...
-                isosurfval),'Parent',handles.axes1);
-        isonormals(...
-                handles.xp,...
-                handles.yp,...
-                handles.zp,...
-                abs(handles.vsp),...
-                handles.p);
-        set(handles.p,'FaceColor','red','EdgeColor','none','FaceLighting','gouraud');
-         set(handles.p,'FaceAlpha',0.3);
-        set(handles.pc,'FaceColor','interp','EdgeColor','none','FaceLighting','gouraud');
-         set(handles.pc,'FaceAlpha',0.3);
-        if isfield(handles,'light_handle'); if  ishandle(handles.light_handle); delete(handles.light_handle);end;end
-        handles.light_handle=camlight;
-        set(handles.light_handle,'Parent',handles.axes1)
-        handles.refresh3D=0;
+  if isfield(handles,'p') && ishandle(handles.p)
+    delete(handles.p);
+  end
+  if isfield(handles,'pc') && ishandle(handles.pc)
+    delete(handles.pc);
+  end
+  isosurfval = 0.5*max(reshape(convn(abs(handles.vsp),ones(ceil(size(handles.vsp)./4))./numel(ones(ceil(size(handles.vsp)./4))),'same'),numel(handles.vsp),1));
+  handles.p = patch(isosurface(...
+          handles.xp,...
+          handles.yp,...
+          handles.zp,...
+          abs(handles.vsp),...
+          isosurfval),'Parent',handles.axes1);
+  handles.pc = patch(isocaps(...
+          handles.xp,...
+          handles.yp,...
+          handles.zp,...
+          abs(handles.vsp),...
+          isosurfval),'Parent',handles.axes1);
+  isonormals(...
+          handles.xp,...
+          handles.yp,...
+          handles.zp,...
+          abs(handles.vsp),...
+          handles.p);
+  set(handles.p,'FaceColor','red','EdgeColor','none','FaceLighting','gouraud');
+  set(handles.p,'FaceAlpha',0.3);
+  set(handles.pc,'FaceColor','interp','EdgeColor','none','FaceLighting','gouraud');
+  set(handles.pc,'FaceAlpha',0.3);
+  if isfield(handles, 'light_handle') && ishandle(handles.light_handle)
+    delete(handles.light_handle);
+  end
+  handles.light_handle=camlight;
+  set(handles.light_handle,'Parent',handles.axes1)
+  handles.refresh3D=0;
 end
-            if isfield(handles,'ht1');if ishandle(handles.ht1); delete(handles.ht1 ) ;    end;    end
-            if isfield(handles,'ht2');if ishandle(handles.ht2); delete(handles.ht2 ) ;    end;    end
-            if isfield(handles,'ht3');if ishandle(handles.ht3); delete(handles.ht3 ) ;    end;    end
-            if isfield(handles,'ht4');if ishandle(handles.ht4); delete(handles.ht4 ) ;    end;    end
-            handles.ht1=text(handles.xsp(round(end/2),1),handles.ysp(round(end/2),1),handles.zsp(round(end/2),1),'  phase(2) left','Color',[0.5,0.5,0.5]);
-            handles.ht2=text(handles.xsp(round(end/2),end),handles.ysp(round(end/2),end),handles.zsp(round(end/2),end),'  phase(2) right','Color',[0.5,0.5,0.5]);
-            if handles.Seq.AQSlice.nPhase(3)>1
-                handles.ht3=text(handles.xsp(1,round(end/2)),handles.ysp(1,round(end/2)),handles.zsp(1,round(end/2)),'  phase(3) bottom','Color',[0.5,0.5,0.5]);
-                handles.ht4=text(handles.xsp(end,round(end/2)),handles.ysp(end,round(end/2)),handles.zsp(end,round(end/2)),'  phase(3) top','Color',[0.5,0.5,0.5]);
-            else
-                handles.ht3=text(handles.xsp(1,round(end/2)),handles.ysp(1,round(end/2)),handles.zsp(1,round(end/2)),'  read bottom','Color',[0.5,0.5,0.5]);
-                handles.ht4=text(handles.xsp(end,round(end/2)),handles.ysp(end,round(end/2)),handles.zsp(end,round(end/2)),'  read top','Color',[0.5,0.5,0.5]);
-            end
-            set(handles.ht1,'Parent',handles.axes1)
-            set(handles.ht2,'Parent',handles.axes1)
-            set(handles.ht3,'Parent',handles.axes1)
-            set(handles.ht4,'Parent',handles.axes1)
-%             handles.Seq.AQSlice.Vphase=([xd(round(end/2),1),yd(round(end/2),1),zd(round(end/2),1)]-[xd(round(end/2),end),yd(round(end/2),end),zd(round(end/2),end)])/sum(([xd(round(end/2),1),yd(round(end/2),1),zd(round(end/2),1)]-[xd(round(end/2),end),yd(round(end/2),end),zd(round(end/2),end)]).^2).^0.5;
+if isfield(handles, 'ht1') && ishandle(handles.ht1)
+  delete(handles.ht1);
+end
+if isfield(handles, 'ht2') && ishandle(handles.ht2)
+  delete(handles.ht2);
+end
+if isfield(handles, 'ht3') && ishandle(handles.ht3)
+  delete(handles.ht3);    
+end
+if isfield(handles, 'ht4') && ishandle(handles.ht4)
+  delete(handles.ht4);
+end
+handles.ht1=text(handles.xsp(round(end/2),1),handles.ysp(round(end/2),1),handles.zsp(round(end/2),1),'  phase(2) left','Color',[0.5,0.5,0.5]);
+handles.ht2=text(handles.xsp(round(end/2),end),handles.ysp(round(end/2),end),handles.zsp(round(end/2),end),'  phase(2) right','Color',[0.5,0.5,0.5]);
+if handles.Seq.AQSlice.nPhase(3)>1
+  handles.ht3=text(handles.xsp(1,round(end/2)),handles.ysp(1,round(end/2)),handles.zsp(1,round(end/2)),'  phase(3) bottom','Color',[0.5,0.5,0.5]);
+  handles.ht4=text(handles.xsp(end,round(end/2)),handles.ysp(end,round(end/2)),handles.zsp(end,round(end/2)),'  phase(3) top','Color',[0.5,0.5,0.5]);
+else
+  handles.ht3=text(handles.xsp(1,round(end/2)),handles.ysp(1,round(end/2)),handles.zsp(1,round(end/2)),'  read bottom','Color',[0.5,0.5,0.5]);
+  handles.ht4=text(handles.xsp(end,round(end/2)),handles.ysp(end,round(end/2)),handles.zsp(end,round(end/2)),'  read top','Color',[0.5,0.5,0.5]);
+end
+set(handles.ht1,'Parent',handles.axes1)
+set(handles.ht2,'Parent',handles.axes1)
+set(handles.ht3,'Parent',handles.axes1)
+set(handles.ht4,'Parent',handles.axes1)
+% handles.Seq.AQSlice.Vphase=([xd(round(end/2),1),yd(round(end/2),1),zd(round(end/2),1)]-[xd(round(end/2),end),yd(round(end/2),end),zd(round(end/2),end)])/sum(([xd(round(end/2),1),yd(round(end/2),1),zd(round(end/2),1)]-[xd(round(end/2),end),yd(round(end/2),end),zd(round(end/2),end)]).^2).^0.5;
 
-%             disp(['normV  = ', num2str(handles.Seq.AQSlice.normV,'% 3.3f')])
-%             disp(['Vread  = ', num2str(handles.Seq.AQSlice.Vread,'% 3.3f')])
-%             disp(['Vphase = ', num2str(handles.Seq.AQSlice.Vphase,'% 3.3f')])
-%
-%             disp(['AmpSlice dif = ', num2str(Seq.AmpSlice.'-handles.Seq.AQSlice.normV,'% 3.3f')])
-%             disp(['AmpRead dif = ', num2str(Seq.AmpRead.'-handles.Seq.AQSlice.Vread,'% 3.3f')])
-%             disp(['AmpPhase dif = ', num2str(Seq.AmpPhase.'-handles.Seq.AQSlice.Vphase,'% 3.3f')])
+% disp(['normV  = ', num2str(handles.Seq.AQSlice.normV,'% 3.3f')])
+% disp(['Vread  = ', num2str(handles.Seq.AQSlice.Vread,'% 3.3f')])
+% disp(['Vphase = ', num2str(handles.Seq.AQSlice.Vphase,'% 3.3f')])
+% 
+% disp(['AmpSlice dif = ', num2str(Seq.AmpSlice.'-handles.Seq.AQSlice.normV,'% 3.3f')])
+% disp(['AmpRead dif = ', num2str(Seq.AmpRead.'-handles.Seq.AQSlice.Vread,'% 3.3f')])
+% disp(['AmpPhase dif = ', num2str(Seq.AmpPhase.'-handles.Seq.AQSlice.Vphase,'% 3.3f')])
 
 
 
 
-%             drawnow
+% drawnow
 
 
-   hold(handles.axes1, 'off')
-%    global SliceSelect
-%    SliceSelect = handles.Seq.AQSlice;
+hold(handles.axes1, 'off')
+% global SliceSelect
+% SliceSelect = handles.Seq.AQSlice;
 % guidata(hObject,handles)
 
 end
@@ -2235,7 +2302,7 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
 end
 
 pulsesmpd=dir('StandardFunctions/pdFunctions/pulse_*.m');
-if isdir('Functions');
+if isdir('Functions')
     pulsesmf=dir('Functions/pulse_*.m');
     pulsesm={'auto',pulsesmpd.name,pulsesmf.name};
 else
@@ -2324,7 +2391,7 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 pulsesmpd=dir('StandardFunctions/pdFunctions/pulse_*.m');
-if isdir('Functions');
+if isdir('Functions')
     pulsesmf=dir('Functions/pulse_*.m');
     pulsesm={'auto',pulsesmpd.name,pulsesmf.name};
 else
@@ -2937,7 +3004,7 @@ fid = fopen(filename, 'w');
 if fid < 0
   warning('PD:AQSlice:FileOpen', 'FILENAME "%s" could not be opened.', filename);
   err = -2;
-  return;
+  return;Origin
 end
 
 try
@@ -2981,7 +3048,7 @@ try
 
   fprintf(fid, '\n\n\n%%!%%!%%!%%!%%!%%!%%!%%!%%!%%!%%!%%!%%\n\n\n');
   fprintf(fid, 'AQSlice = Seq.AQSlice(iSlice);\n\nend\n');
-  
+
   fprintf('AQSlice data saved in file "%s".\n', which(fopen(fid))); % print full path to file in Command Window
 catch ME
   warning(getReport(ME));

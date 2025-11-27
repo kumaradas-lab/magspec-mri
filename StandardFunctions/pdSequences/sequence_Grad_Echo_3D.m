@@ -2,34 +2,88 @@ function  [data,SeqOut,mySave, HW]= sequence_Grad_Echo_3D( HW, mySave, Seq, Slic
 % This function is deprecated and should no longer be used.
 % Use sequence_Flash instead.
 
-if ~isfield(Seq,'get_B0');  Seq.get_B0=[];end;  if isempty(Seq.get_B0);  Seq.get_B0       =   0;                                     end
-if ~isfield(Seq,'ppmLim');  Seq.ppmLim=[]; end;  if isempty(Seq.ppmLim);  Seq.ppmLim       =   [-50,50];                                    end
+if isemptyfield(Seq, 'get_B0')
+  Seq.get_B0 = 0;
+end
+if isemptyfield(Seq, 'ppmLim')
+  Seq.ppmLim = [-50,50];
+end
 
-if ~isfield(Seq,'RandomTXRXPhase') ; Seq.RandomTXRXPhase=[];end; if isempty(Seq.RandomTXRXPhase);   Seq.RandomTXRXPhase       =   1;      end
-if ~isfield(Seq,'AQPhaseOffset') ; Seq.AQPhaseOffset=[];end; if isempty(Seq.AQPhaseOffset);   Seq.AQPhaseOffset       =   [];      end
-if ~isfield(Seq,'TXPhaseOffset') ; Seq.TXPhaseOffset=[];end; if isempty(Seq.TXPhaseOffset);   Seq.TXPhaseOffset       =   [];      end
-if ~isfield(Seq,'HzPixMin');   Seq.HzPixMin=[];  end; if isempty(Seq.HzPixMin);              Seq.HzPixMin    = 0;                               end
-if ~isfield(Seq,'Correct_Phase');   Seq.Correct_Phase=[];  end; if isempty(Seq.Correct_Phase);              Seq.Correct_Phase    = 0;                               end
-if ~isfield(Seq,'Correct_tAQmax');   Seq.Correct_tAQmax=[];  end; if isempty(Seq.Correct_tAQmax);              Seq.Correct_tAQmax    = 1e-3;                               end
-if ~isfield(Seq,'Correct_nSamples');   Seq.Correct_nSamples=[];  end; if isempty(Seq.Correct_nSamples);              Seq.Correct_nSamples    = 20;                               end
-if ~isfield(Seq,'SteadyState_PreShots');   Seq.SteadyState_PreShots=[];  end; if isempty(Seq.SteadyState_PreShots);              Seq.SteadyState_PreShots    = 10;                               end
-if ~isfield(Seq,'SteadyState_PostShots');   Seq.SteadyState_PostShots=[];  end; if isempty(Seq.SteadyState_PostShots);              Seq.SteadyState_PostShots    = 10;                               end
-if ~isfield(Seq,'Correct_Plot');   Seq.Correct_Plot=[];  end; if isempty(Seq.Correct_Plot);              Seq.Correct_Plot    = 0;                               end
-if ~isfield(Seq,'Correct_PlotFrequency');   Seq.Correct_PlotFrequency=[];  end; if isempty(Seq.Correct_PlotFrequency);              Seq.Correct_PlotFrequency    = 0;                               end
-if ~isfield(Seq,'WaitCalibrateTime');   Seq.WaitCalibrateTime=[];  end; if isempty(Seq.WaitCalibrateTime);              Seq.WaitCalibrateTime    = 1;                               end
-if ~isfield(Seq,'CalibrateThanPause');   Seq.CalibrateThanPause=[];  end; if isempty(Seq.CalibrateThanPause);              Seq.CalibrateThanPause    = 0;                               end
-if ~isfield(Seq,'Calibrate');   Seq.Calibrate=[];  end; if isempty(Seq.Calibrate);              Seq.Calibrate    = 0;                               end
-if ~isfield(Seq,'averageBreak');   Seq.averageBreak=[];  end; if isempty(Seq.averageBreak);              Seq.averageBreak    = Seq.tRep(1);                               end
-if ~isfield(Seq,'average');   Seq.average=[];  end; if isempty(Seq.average);              Seq.average    = 1;                               end
-if ~isfield(Seq,'Save_loop_kos_3D');   Seq.Save_loop_kos_3D=[];  end; if isempty(Seq.Save_loop_kos_3D);              Seq.Save_loop_kos_3D    = 0;                               end
-if ~isfield(Seq,'Save_Global');   Seq.Save_Global=[];  end; if isempty(Seq.Save_Global);              Seq.Save_Global    = 0;                               end
-if ~isfield(Seq,'Correct_debug');   Seq.Correct_debug=[];  end; if isempty(Seq.Correct_debug);              Seq.Correct_debug    = 0;                               end
-if ~isfield(Seq,'plotPhase');   Seq.plotPhase=[];  end; if isempty(Seq.plotPhase);              Seq.plotPhase    = 0;                               end
-if ~isfield(SliceSelect,'thickness');   SliceSelect.thickness=[];  end; if isempty(SliceSelect.thickness);              SliceSelect.thickness    = 1000000;                               end
-if ~isfield(SliceSelect,'CenterRot');   SliceSelect.CenterRot=[];  end; if isempty(SliceSelect.CenterRot);              SliceSelect.CenterRot    =[0.0, 0.0, 0.0];                               end
-if ~isfield(SliceSelect,'alfa');   SliceSelect.alfa=[];  end; if isempty(SliceSelect.alfa);              SliceSelect.alfa    =0;                               end
-if ~isfield(SliceSelect,'phi');   SliceSelect.phi=[];  end; if isempty(SliceSelect.phi);              SliceSelect.phi    =0;                               end
-if ~isfield(SliceSelect,'theta');   SliceSelect.theta=[];  end; if isempty(SliceSelect.theta);              SliceSelect.theta    =0;                               end
+if isemptyfield(Seq, 'RandomTXRXPhase')
+  Seq.RandomTXRXPhase = 1;
+end
+if isemptyfield(Seq, 'AQPhaseOffset')
+  Seq.AQPhaseOffset = [];
+end
+if isemptyfield(Seq, 'TXPhaseOffset')
+  Seq.TXPhaseOffset = [];
+end
+if isemptyfield(Seq, 'HzPixMin')
+  Seq.HzPixMin = 0;
+end
+if isemptyfield(Seq, 'Correct_Phase')
+  Seq.Correct_Phase = 0;
+end
+if isemptyfield(Seq, 'Correct_tAQmax')
+  Seq.Correct_tAQmax = 1e-3;
+end
+if isemptyfield(Seq, 'Correct_nSamples')
+  Seq.Correct_nSamples = 20;
+end
+if isemptyfield(Seq, 'SteadyState_PreShots')
+  Seq.SteadyState_PreShots = 10;
+end
+if isemptyfield(Seq, 'SteadyState_PostShots')
+  Seq.SteadyState_PostShots = 10;
+end
+if isemptyfield(Seq, 'Correct_Plot')
+  Seq.Correct_Plot = 0;
+end
+if isemptyfield(Seq, 'Correct_PlotFrequency')
+  Seq.Correct_PlotFrequency = 0;
+end
+if isemptyfield(Seq, 'WaitCalibrateTime')
+  Seq.WaitCalibrateTime = 1;
+end
+if isemptyfield(Seq, 'CalibrateThanPause')
+  Seq.CalibrateThanPause = 0;
+end
+if isemptyfield(Seq, 'Calibrate')
+  Seq.Calibrate = 0;
+end
+if isemptyfield(Seq, 'averageBreak')
+  Seq.averageBreak = Seq.tRep(1);
+end
+if isemptyfield(Seq, 'average')
+  Seq.average = 1;
+end
+if isemptyfield(Seq, 'Save_loop_kos_3D')
+  Seq.Save_loop_kos_3D = 0;
+end
+if isemptyfield(Seq, 'Save_Global')
+  Seq.Save_Global = 0;
+end
+if isemptyfield(Seq, 'Correct_debug')
+  Seq.Correct_debug = 0;
+end
+if isemptyfield(Seq, 'plotPhase')
+  Seq.plotPhase = 0;
+end
+if isemptyfield(SliceSelect, 'thickness')
+  SliceSelect.thickness = 1000000;
+end
+if isemptyfield(SliceSelect, 'CenterRot')
+  SliceSelect.CenterRot = [0.0, 0.0, 0.0];
+end
+if isemptyfield(SliceSelect, 'alfa')
+  SliceSelect.alfa = 0;
+end
+if isemptyfield(SliceSelect, 'phi')
+  SliceSelect.phi = 0;
+end
+if isemptyfield(SliceSelect, 'theta')
+  SliceSelect.theta = 0;
+end
 
 
 
@@ -145,48 +199,54 @@ end
 
 for cal=cal
 
-   switch cal
-       case 0
-       case 1
-           AQSlice.sizePhase=AQSlice.sizePhase+1000;
-           AQSlice.sizePhase3D=AQSlice.sizePhase3D+1000;
-           AQSlice.nPhase3Dtemp=AQSlice.nPhase3D;
-           AQSlice.thickness=AQSlice.thickness+1000;
-           AQSlice.nPhase3D=1;
-           AQSlice.nPhasetemp=AQSlice.nPhase;
-           AQSlice.nPhase=4;
-           Seq.averagetemp=Seq.average;
-           Seq.average=1;
-           mySave.sequence_Echo_3D.GradSystemTimeDelayError=0;
-           AmpCorrReadStart=1;
-%            RelStepAmpPhaseOffset=0;
+  switch cal
+    case 0
+    case 1
+      AQSlice.sizePhase=AQSlice.sizePhase+1000;
+      AQSlice.sizePhase3D=AQSlice.sizePhase3D+1000;
+      AQSlice.nPhase3Dtemp=AQSlice.nPhase3D;
+      AQSlice.thickness=AQSlice.thickness+1000;
+      AQSlice.nPhase3D=1;
+      AQSlice.nPhasetemp=AQSlice.nPhase;
+      AQSlice.nPhase=4;
+      Seq.averagetemp=Seq.average;
+      Seq.average=1;
+      mySave.sequence_Echo_3D.GradSystemTimeDelayError=0;
+      AmpCorrReadStart=1;
+      % RelStepAmpPhaseOffset=0;
 
-       case Seq.Calibrate+1
-           AQSlice.sizePhase=AQSlice.sizePhase-1000;
-           AQSlice.sizePhase3D=AQSlice.sizePhase3D-1000;
-           AQSlice.nPhase3D=AQSlice.nPhase3Dtemp;
-           AQSlice.thickness=AQSlice.thickness-1000;
-           AQSlice.nPhase=AQSlice.nPhasetemp;
-           Seq.Calibrate=0;
-           Seq.average=Seq.averagetemp;
-           if Seq.CalibrateThanPause==1;
-               disp('Exchange sample and hit any key to continue measurement.');
-               pause;
-           end
+    case Seq.Calibrate+1
+      AQSlice.sizePhase=AQSlice.sizePhase-1000;
+      AQSlice.sizePhase3D=AQSlice.sizePhase3D-1000;
+      AQSlice.nPhase3D=AQSlice.nPhase3Dtemp;
+      AQSlice.thickness=AQSlice.thickness-1000;
+      AQSlice.nPhase=AQSlice.nPhasetemp;
+      Seq.Calibrate=0;
+      Seq.average=Seq.averagetemp;
+      if Seq.CalibrateThanPause == 1
+        disp('Exchange sample and hit any key to continue measurement.');
+        pause;
+      end
 
-   end
-%
-%     if ~exist('AmpCorrReadStart','var');AmpCorrReadStart=0;end;
-%     if isnan(AmpCorrReadStart);AmpCorrReadStart=0;end;
-%     AmpCorrReadStart=AmpCorrReadStart(1);
-%     if ~exist('RelStepAmpPhaseOffset','var');RelStepAmpPhaseOffset=0;end;
-%     RelStepAmpPhaseOffset=RelStepAmpPhaseOffset(1);
-%
-    if ~isfield(mySave,'sequence_Echo_3D');mySave.sequence_Echo_3D=[];end
-    if ~isfield(mySave.sequence_Echo_3D,'GradSystemTimeDelayError'); mySave.sequence_Echo_3D.GradSystemTimeDelayError=0;end
-    if isnan(mySave.sequence_Echo_3D.GradSystemTimeDelayError); mySave.sequence_Echo_3D.GradSystemTimeDelayError=0;end
-    mySave.sequence_Echo_3D.GradSystemTimeDelayError=mySave.sequence_Echo_3D.GradSystemTimeDelayError(1);
-    HW.Grad.TimeDelay=HW.Grad.SystemTimeDelay+HW.Grad.MMRTTimeOffset+mySave.sequence_Echo_3D.GradSystemTimeDelayError;
+  end
+
+  % if ~exist('AmpCorrReadStart','var'), AmpCorrReadStart=0;end
+  % if isnan(AmpCorrReadStart), AmpCorrReadStart=0;end
+  % AmpCorrReadStart=AmpCorrReadStart(1);
+  % if ~exist('RelStepAmpPhaseOffset','var'), RelStepAmpPhaseOffset=0;end
+  % RelStepAmpPhaseOffset=RelStepAmpPhaseOffset(1);
+
+  if ~isfield(mySave, 'sequence_Echo_3D')
+    mySave.sequence_Echo_3D = [];
+  end
+  if ~isfield(mySave.sequence_Echo_3D, 'GradSystemTimeDelayError')
+    mySave.sequence_Echo_3D.GradSystemTimeDelayError = 0;
+  end
+  if isnan(mySave.sequence_Echo_3D.GradSystemTimeDelayError)
+    mySave.sequence_Echo_3D.GradSystemTimeDelayError = 0;
+  end
+  mySave.sequence_Echo_3D.GradSystemTimeDelayError=mySave.sequence_Echo_3D.GradSystemTimeDelayError(1);
+  HW.Grad.TimeDelay=HW.Grad.SystemTimeDelay+HW.Grad.MMRTTimeOffset+mySave.sequence_Echo_3D.GradSystemTimeDelayError;
 
 %---------------------------------------------------------------
 
@@ -224,24 +284,24 @@ Seq.CLTime=100e-6;                                                              
 Seq.tInvert=0;%Seq.tInvertmax+2*HW.Grad.tEC;
 Seq.tGrad=Seq.tEcho/2-Seq.tSlice/4;
 if Seq.Correct_Phase
-    if AQSlice.nPhase3D<=1; error('AQSlice.nPhase3D and Seq.Correct_Phase');end
-    Seq.Correct_fSample=HW.RX.fSample/floor((Seq.Correct_tAQmax/(Seq.Correct_nSamples)/(1/HW.RX.fSample))); %Decimierung soll gerade sein, da 2fach oversampling
-    Seq.Correct_tAQ=Seq.Correct_nSamples/Seq.Correct_fSample;
-    Seq.Correct_tGradShift=(Seq.Correct_tAQ+get_DeadTimeTX2RX(HW,Seq.Correct_fSample));
-    Seq.tAQmaxt=Seq.tEcho-2*HW.Grad.tRamp-2*HW.Grad.tEC-Seq.tSlice/2-Seq.Correct_tGradShift*2;
-    Seq.Correct_imageAQWindow=2;
+  if AQSlice.nPhase3D <= 1
+    error('AQSlice.nPhase3D and Seq.Correct_Phase');
+  end
+  Seq.Correct_fSample=HW.RX.fSample/floor((Seq.Correct_tAQmax/(Seq.Correct_nSamples)/(1/HW.RX.fSample))); %Decimierung soll gerade sein, da 2fach oversampling
+  Seq.Correct_tAQ=Seq.Correct_nSamples/Seq.Correct_fSample;
+  Seq.Correct_tGradShift=(Seq.Correct_tAQ+get_DeadTimeTX2RX(HW,Seq.Correct_fSample));
+  Seq.tAQmaxt=Seq.tEcho-2*HW.Grad.tRamp-2*HW.Grad.tEC-Seq.tSlice/2-Seq.Correct_tGradShift*2;
+  Seq.Correct_imageAQWindow=2;
 else
-    Seq.Correct_fSample=[];
-    Seq.Correct_tAQ=0;
-    Seq.Correct_nSamples=[];
-    Seq.tAQmaxt=Seq.tEcho-2*HW.Grad.tRamp-2*HW.Grad.tEC-Seq.tSlice/2;
-    Seq.Correct_tGradShift=0;
-    Seq.Correct_imageAQWindow=1;
+  Seq.Correct_fSample=[];
+  Seq.Correct_tAQ=0;
+  Seq.Correct_nSamples=[];
+  Seq.tAQmaxt=Seq.tEcho-2*HW.Grad.tRamp-2*HW.Grad.tEC-Seq.tSlice/2;
+  Seq.Correct_tGradShift=0;
+  Seq.Correct_imageAQWindow=1;
 end
-if Seq.HzPixMin ~= 0;
-    if 1/Seq.HzPixMin>Seq.tAQmaxt;
-        warning(['Seq.HzPixMin is too low. ' num2str(ceil(1/Seq.tAQmaxt)) ' Hz is used'])
-    end
+if Seq.HzPixMin ~= 0 && 1/Seq.HzPixMin > Seq.tAQmaxt
+  warning(['Seq.HzPixMin is too low. ' num2str(ceil(1/Seq.tAQmaxt)) ' Hz is used']);
 end
 
 Seq.tAQmax=min(1/Seq.HzPixMin, Seq.tAQmaxt);
@@ -251,19 +311,19 @@ Seq.tAQmax=min(1/Seq.HzPixMin, Seq.tAQmaxt);
 [Seq]=createSeq(Seq,AQSlice,HW);
 
 if  Seq.RandomTXRXPhase
-    if isempty( Seq.AQPhaseOffset);
-        Seq.AQPhaseOffset=rand(1,length(Seq.tRep))*360;
-    end
-    if isempty( Seq.TXPhaseOffset);
-        Seq.TXPhaseOffset=Seq.AQPhaseOffset;
-    end
+  if isempty(Seq.AQPhaseOffset)
+    Seq.AQPhaseOffset=rand(1,length(Seq.tRep))*360;
+  end
+  if isempty(Seq.TXPhaseOffset)
+    Seq.TXPhaseOffset=Seq.AQPhaseOffset;
+  end
 else
-    if isempty( Seq.AQPhaseOffset);
-        Seq.AQPhaseOffset=zeros(1,length(Seq.tRep));
-    end
-    if isempty( Seq.TXPhaseOffset);
-        Seq.TXPhaseOffset=Seq.AQPhaseOffset;
-    end
+  if isempty(Seq.AQPhaseOffset)
+    Seq.AQPhaseOffset=zeros(1,length(Seq.tRep));
+  end
+  if isempty(Seq.TXPhaseOffset)
+    Seq.TXPhaseOffset=Seq.AQPhaseOffset;
+  end
 end
 
 
@@ -433,7 +493,7 @@ SeqOut.AQSlice=AQSlice;
 
 if Seq.Calibrate==0
   % % Start next measurement delayed by Seq.WaitSeqenzeTime
-  % Seq.StartSequenceTime=now*24*3600+Seq.WaitSeqenzeTime; 
+  % Seq.StartSequenceTime=now*24*3600+Seq.WaitSeqenzeTime;
 else
   Seq.StartSequenceTime=now*24*3600+Seq.WaitCalibrateTime;
 end
@@ -464,7 +524,7 @@ if SeqOut.Correct_Phase
             plot(squeeze((diff(unwrap(angle(data.data(1:SeqOut.Correct_nSamples,1,SeqOut.SteadyState_PreShots+1:end-SeqOut.SteadyState_PostShots))))))*SeqOut.AQ.fSample(1)/2/pi)
         subplot(4,1,4)
             plot(squeeze(mean(diff(unwrap(angle(data.data(1:SeqOut.Correct_nSamples,1,SeqOut.SteadyState_PreShots+1:end-SeqOut.SteadyState_PostShots))))))*SeqOut.AQ.fSample(1)/2/pi)
-            hold all
+            hold on
             plot(conv2(squeeze(mean(diff(unwrap(angle(data.data(1:SeqOut.Correct_nSamples,1,:))))))*SeqOut.AQ.fSample(1)/2/pi,SeqOut.Correct_mywin,'valid'))
             hold off
     else
@@ -472,7 +532,7 @@ if SeqOut.Correct_Phase
             figure(29)
             clf('reset')
             plot(squeeze(mean(diff(unwrap(angle(data.data(1:SeqOut.Correct_nSamples,1,SeqOut.SteadyState_PreShots+1:end-SeqOut.SteadyState_PostShots))))))*SeqOut.AQ.fSample(1)/2/pi)
-            hold all
+            hold on
             plot(conv2(squeeze(mean(diff(unwrap(angle(data.data(1:SeqOut.Correct_nSamples,1,:))))))*SeqOut.AQ.fSample(1)/2/pi,SeqOut.Correct_mywin,'valid'),'r')
             hold off
         end
@@ -494,7 +554,7 @@ if SeqOut.Correct_Phase
             plot(squeeze((diff(unwrap(angle(data.data(SeqOut.AQ.nSamples(2),2,SeqOut.SteadyState_PreShots+1:end-SeqOut.SteadyState_PostShots))))))*SeqOut.AQ.fSample(2)/2/pi)
         subplot(4,1,4)
             plot(squeeze(mean(diff(unwrap(angle(data.data(1:SeqOut.AQ.nSamples(2),2,SeqOut.SteadyState_PreShots+1:end-SeqOut.SteadyState_PostShots))))))*SeqOut.AQ.fSample(2)/2/pi)
-            hold all
+            hold on
             plot(conv2(squeeze(mean(diff(unwrap(angle(data.data(1:SeqOut.AQ.nSamples(2),2,:))))))*SeqOut.AQ.fSample(2)/2/pi,SeqOut.Correct_mywin,'valid'))
 
             plot(     squeeze(mean(diff(unwrap(angle(squeeze(data.data(1:SeqOut.AQ.nSamples(2),2,SeqOut.SteadyState_PreShots+1:end-SeqOut.SteadyState_PostShots)).*exp(-1i*SeqOut.Correct_poffsetBouth))))))*SeqOut.AQ.fSample(2)/2/pi,'r')
@@ -550,19 +610,17 @@ end
     data.fftos3_3D=fftshift(ifft(fftshift(data.fft12os3_3D,3),[],3),3);
     data.image_3D=data.fftos3_3D(:,:,floor(AQSlice.nPhase3D*AQSlice.PhaseOS3D/2)+   (1-floor(AQSlice.nPhase3D/2):ceil(AQSlice.nPhase3D/2)));
 
-    if Seq.Correct_debug
-    else
-        data=rmfield(data,'fft1os_3D');
-        data=rmfield(data,'fft12os_3D');
-        data=rmfield(data,'fft12os3_3D');
-        data=rmfield(data,'fftos3_3D');
+    if ~Seq.Correct_debug
+      data=rmfield(data,'fft1os_3D');
+      data=rmfield(data,'fft12os_3D');
+      data=rmfield(data,'fft12os3_3D');
+      data=rmfield(data,'fftos3_3D');
     end
 
     %%%%%%%%%%% Kalibrierung der Gradient Offset Zeit und der ersten Read dephase Amplitude
-    if SeqOut.Calibrate>0;
-        if AQSlice.sizePhase>10
-            [mySave.sequence_Echo_3D.GradSystemTimeDelayError, AmpCorrReadStart] = CorrRead(mySave.sequence_Echo_3D.GradSystemTimeDelayError,AmpCorrReadStart,squeeze(data.fft1os_3D),SeqOut,AQ);
-        end
+    if SeqOut.Calibrate > 0 && AQSlice.sizePhase>10
+      [mySave.sequence_Echo_3D.GradSystemTimeDelayError, AmpCorrReadStart] = ...
+        CorrRead(mySave.sequence_Echo_3D.GradSystemTimeDelayError, AmpCorrReadStart, squeeze(data.fft1os_3D), SeqOut, AQ);
     end
 end
 if AQSlice.nPhase3D>1
@@ -593,12 +651,12 @@ if AQSlice.nPhase3D>1
         end
     end
 else
-    if ~isfield(Seq,'plot_k_image');Seq.plot_k_image=1;end
-    if Seq.plot_k_image==1
-        if AQSlice.nPhase3D==1
-        plot_k_image(data.kos_3D,data.image_3D,AQSlice,Seq.plotPhase);
-        end
-    end
+  if ~isfield(Seq, 'plot_k_image')
+    Seq.plot_k_image = 1;
+  end
+  if Seq.plot_k_image == 1 && AQSlice.nPhase3D == 1
+    plot_k_image(data.kos_3D, data.image_3D, AQSlice, Seq.plotPhase);
+  end
 end
 
 end

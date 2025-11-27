@@ -60,7 +60,7 @@ HW.Grad(iDevice).Status2 = 1;                                 % gradient and tem
 % HW.Grad(iDevice).SystemTimeDelay(1:3) = [50e-6, 50e-6, 50e-6];  % time delay of gradient amplifier in s
 % 
 % % magnet_188 - Konsole 35: 
-% HW.Grad.SystemTimeDelay(1:3) = [7.4316e-05   0.00010474  0.000124528]; % Time delay of grad amp
+% HW.Grad(iDevice).SystemTimeDelay(1:3) = [7.4316e-05   0.00010474  0.000124528]; % Time delay of grad amp
 % 
 % HW.Grad(iDevice).MaxAmpSlice = 0.1;                           % maximum gradient amplitude for slice selection in T/m
 % 

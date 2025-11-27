@@ -19,7 +19,7 @@ function hf = plot_Nyquist(HW, Network, hax)
 %           handle to the figure that contains the Nyquist diagrams.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2020 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -115,7 +115,7 @@ text(minReflR + 0.7*arrowMinExtent(3), ...
   'Rotation', 0, 'Parent', hax);
 
 
-% hold(hax, 'all');
+% hold(hax, 'on');
 % plot(hax, double(interp1(Frequency, real(Z), HW.fLarmor, 'nearest')), ...
 %   double(interp1(Frequency, imag(Z), HW.fLarmor, 'nearest')), '-xr');
 % plot(hax, double(interp1(Frequency, real(Z), fMinReflection, 'nearest')), ...

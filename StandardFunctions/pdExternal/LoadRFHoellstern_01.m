@@ -4,11 +4,11 @@ if ~exist('iDevice', 'var'), iDevice = 1; end
 HW.TX(iDevice).ExtRFSN = 1;
 HW.TX(iDevice).ExtRFType = 'RFHoellstern';  % string with type identifier
 
-HW.TX(iDevice).ChannelDef = 1;  % Default TX Channel set to Tx1
+HW.TX(iDevice).ChannelDef = 2;  % default TX channel set to Tx2
 
 
-TX_PaRin = 5e3;  % impetance of rf amplifier at input in Ohm (from datasheet)
-TX_UoutRout = 50;  % impetance of TX2 port of MMRT in Ohm
+TX_PaRin = 5e3;  % impedance of rf amplifier at input in Ohm (from datasheet)
+TX_UoutRout = 50;  % impedance of TX2 port of MMRT in Ohm
 matchFactor = 2 * TX_PaRin/(TX_PaRin+TX_UoutRout);  % factor compared to 50 Ohm termination
 HW.TX(iDevice).MmrtUout2Uout(2) = HW.TX(iDevice).MmrtUout2Uout(2) * matchFactor;
 HW.TX(iDevice).Uout2PaUout(1) = 1;  % amplification factor (gain)

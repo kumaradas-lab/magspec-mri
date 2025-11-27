@@ -1,7 +1,8 @@
 function [raw_data_AQs, Seq, data_S_AQs_TRs, data_1D, data_Cell, averages] = set_sequence(HW, Seq, AQ, TX, Grad)
 %% Send pulse program to MMRT and receive data
 %
-%   [raw_data_AQs, Seq, data_S_AQs_TRs, data_1D, data_Cell, averages] = set_sequence(HW, Seq, AQ, TX, Grad)
+%   [raw_data_AQs, Seq, data_S_AQs_TRs, data_1D, data_Cell, averages] = ...
+%       set_sequence(HW, Seq, AQ, TX, Grad)
 %
 %
 % This function is the main interface between Matlab and the MMRT for sending
@@ -14,7 +15,7 @@ function [raw_data_AQs, Seq, data_S_AQs_TRs, data_1D, data_Cell, averages] = set
 % INPUT:
 %
 %   HW
-%         Structure or PD.HW object as created when executing LoadSystem.
+%         Structure or PD.HWClass object as created when executing LoadSystem.
 %
 %
 %   Seq
@@ -23,7 +24,11 @@ function [raw_data_AQs, Seq, data_S_AQs_TRs, data_1D, data_Cell, averages] = set
 %         empty):
 %
 %     tRep
-%           Row vector with the duration of the tReps in seconds.
+%           Row vector with the duration of repetition blocks in seconds. Pulse
+%           programs can be divided into repetition blocks. The commands for
+%           each repetition block are loaded at the beginning of the repetition
+%           block (see CLTime below). The remainder of the tRep is available for
+%           pulse program activity.
 %
 %     tOffset
 %           Row vector with the offsets of the tReps in seconds. These offsets
@@ -110,6 +115,46 @@ function [raw_data_AQs, Seq, data_S_AQs_TRs, data_1D, data_Cell, averages] = set
 %             2d double matrix with the 6bit value for the digital output. The
 %             size must match Seq.DigitalIO.SetTime.
 %
+%     tRepIsTriggered
+%             Boolean vector the same size as Seq.tRep which indicates which
+%             tReps are waiting for an external trigger (high level at digital
+%             IN1). If this is a vector smaller than Seq.tRep, zeros are
+%             appended. (Default: false(size(Seq.tRep)))
+%
+%     tRepTriggerTimeOut
+%             Row vector the same size as Seq.tRep with the timeout in seconds
+%             for the corresponding trigger. Only those values where
+%             Seq.tRepIsTriggered is true have any effect. If this is a scalar,
+%             the timeout applies to all triggered tReps. (Default: 5)
+%
+%     tRepTriggerDebounceTime
+%             Row vector the same size as Seq.tRep with the debounce time for
+%             the trigger event in seconds. That means the trigger must be in
+%             high state at least for this amount of time before the tRep starts
+%             executing. If this is a scalar, the debounce time applies to all
+%             triggered tReps. (Default: HW.MMRT.TriggerDebounceTime)
+%
+%     SyncMaster
+%             Boolean value to indicate whether the (primary) device will wait
+%             for a trigger signal at digital IN1. The trigger sent at digital
+%             OUT6 at the start of the pulse program can be used for that.
+%             (Default: 0)
+%
+%     SyncDevices
+%             Boolean value to indicate whether secondary devices will be
+%             synchronized. If true, all secondary devices wait for a trigger
+%             at digital IN1 to start their pulse programs at the same time. The
+%             trigger sent (by the primary device) at digital OUT6 at the start
+%             of its pulse program can be used for that. (Default: 0)
+%
+%     PPGStartTimeOut
+%             Maximum time in seconds between sending the start signal for the
+%             pulse program to the device and the actual start of the pulse
+%             program. This time-out might need to be set to a higher value if
+%             it is expected that the time until receiving a trigger signal
+%             might be longer than the default. See, e.g., Seq.SyncMaster.
+%             (Default: 5)
+%
 %     CommandWindowOutput
 %           Boolean value. If false, (most) output to the command window is
 %           suppressed. (Default: true)
@@ -136,10 +181,197 @@ function [raw_data_AQs, Seq, data_S_AQs_TRs, data_1D, data_Cell, averages] = set
 %               Channel, iDevice)
 %           (Default: HW.PostProcessingFcn)
 %
+%     AuxCommands
+%           Optional matrix with the same number of colums as Seq.tRep that
+%           contains FPGA commands (64-bit unsigned integers) that are prepended
+%           to the commands for each respective tRep.
+%           (Default: [])
 %
-%   AQ, TX, Grad
-%         Structures defining the acquisition windows, rf pulses and gradient
-%         pulses in the pulse program. See the manual for further details.
+%     AuxCommandsInit
+%           Optional column vector that contains FPGA commands (64-bit unsigned
+%           integers) that are prepended to the commands for the initialization
+%           package.
+%           (Default: [])
+%
+%
+%   The AQ, TX, and Grad structures contain fields with matrices that act as
+%   "timetables" for defining the pulse program. Each column of these matrices
+%   corresponds to one tRep in the pulse program. If settings are provided for a
+%   single tRep only, they are repeated in all tReps. See the manual for further
+%   details.
+%
+%   AQ
+%       Structure (or array of structures) with settings for the acquisition
+%       windows in the pulse program. Among others, it might have the following
+%       optional fields:
+%
+%     Start
+%         Array with start times of the acquisition window in seconds (relative
+%         to the t=0 time of the corresponding tRep).
+%
+%     nSamples
+%         Array with number of samples in the acquisition windows.
+%
+%     fSample
+%         Array with sample frequencies of the acquisition windows in Hertz.
+%         This frequency might be rounded to the closest possible sample
+%         frequency realizable by the mixer. (I.e., the system frequency
+%         HW.RX.fSample divided by an integer in the range from
+%         HW.RX.CIC_Decimation_Min to HW.RX.CIC_Decimation_Max.) Alternatively,
+%         it can be set to the system frequency to get the raw data (without
+%         mixing).
+%
+%     Frequency
+%         Array with mixer frequencies for the acquisition windows in Hertz.
+%
+%     Phase
+%         Array with phases for mixing the signal in degrees.
+%
+%     SamplingFactor
+%         Array with (software) sampling factors that can be used to reach
+%         sample frequencies that are lower than the one that can be realized
+%         with the firmware mixer (see AQ.fSample). If this value is 1, no
+%         additional (software) downsampling is used. If set to 0, the lowest
+%         possible sampling factor is chosen to come close to the set sample
+%         frequency (AQ.fSample). If set to Inf, a higher sampling factor might
+%         be chosen if it allows to reach the set sample frequency *exactly*. If
+%         that isn't possible, it acts the same as 0. (Default: 0)
+%
+%     ResetPhases
+%         Row vector with Boolean values to indicate tReps for which the phase
+%         reference for TX pulses and RX mixer is re-started.
+%
+%     Gain
+%         Scalar with receiver gain (1/AQ.Gain = max input Amplitude).
+%
+%     Repeat
+%         Row vector with Boolean values to indicate that all actions from the
+%         previous tRep are repeated identically. That might reduce the time
+%         needed for loading the commands between tReps (CLTime).
+%
+%     Device
+%         Scalar with the index identifying the device if multiple devices are
+%         connected simultaneously.
+%
+%     FrequencyX
+%         Array with the secondary mixer frequency for each acquisition window
+%         in Hertz. This can be used to mix the received signal to two different
+%         center frequencies, e.g., when running dual frequency experiments at
+%         1H and at an X nucleus resonance.
+%         NOTE: This feature might not be supported by all configurations.
+%         (Default: [], i.e., only the mixer for the primary frequency is used)
+%
+%     PhaseX
+%         Array with phases for mixing the signal at the secondary frequency in
+%         degrees.
+%         NOTE: This feature might not be supported by all configurations.
+%         (Default: [], i.e., only the mixer for the primary frequency is used)
+%
+%     DataMode
+%         NOTE: This is an experimental feature that is not supported by all
+%               configurations. Use with care!
+%         Select a mode for the bit-width of the data transferred via USB from
+%         the console to the PC. If AQ.FrequencyX is set, DataMode 1 is used
+%         unconditionally. For raw data mode (AQ.fSample == HW.RX.fSample),
+%         DataMode 0 is used unconditionally.
+%         0: 1 AQ channel (mixer) with 48 bits for the real and imaginary parts,
+%            respectively.
+%         1: 2 AQ channels (mixers) with each 24 bits for the real and imaginary
+%            parts, respectively.
+%         2: 1 AQ channel (mixer) with 24 bits for the real and imaginary parts,
+%            respectively. This allows to approximately double the maximum
+%            sampling rate compared to data mode 0.
+%         3: 1 AQ channel (mixer) with 24 bits for the real part (discarding the
+%            imaginary part of the mixer output). This allows to approximately
+%            quadruple the maximum sampling rate compared to data mode 0.
+%         (Default: HW.RX(AQ.Device).DataMode)
+%
+%     GetDigitalInTime
+%         NOTE: This is an experimental feature that is not supported by all
+%               configurations. Use with care!
+%         Get the last three time stamps for the rising and falling edge at the
+%         digital input channels 1, 2, and 3 of the console. (See "get_data" for
+%         more details.)
+%         (Default: 0)
+%
+%
+%   TX
+%       Structure (or array of structures) with settings for rf pulses in the
+%       pulse program. Among others, it might have the following optional
+%       fields:
+%
+%     Channel
+%         Scalar with an index for the output channel (1: TRx, 2: Tx2).
+%
+%     Start
+%         Array with start times of the rf pulses in seconds (relative to the
+%         t=0 time of the corresponding tRep).
+%
+%     Frequency
+%         Array with frequencies of the rf pulse in Hertz.
+%
+%     Duration
+%         Array with durations of the rf pulses in seconds.
+%
+%     Amplitude
+%         Array with rf pulse amplitudes. If calibrated correctly, these
+%         amplitudes are in Tesla by default.
+%
+%     Phase
+%         Array with phases of the rf pulses in degrees.
+%
+%     BlankOffset
+%         Row vector with offset times for unblanking the transmitter before an
+%         rf pulse in seconds.
+%
+%     BlankPostset
+%         Row vector with postset times for unblanking the transmitter after an
+%         rf pulse in seconds.
+%
+%     AmplitudeDC
+%         Vector with amplitudes of DC output during rf pulse per tRep. The same
+%         calibration values as for TX.Amplitude are used. If this has any
+%         non-zero elements, restrictions apply on switching between different
+%         output ports for signals generated by one DDs.
+%         (Default: no DC output during rf pulses)
+%
+%     SkipAmplitudeCheck
+%         Optional array with the same size as TX.Amplitude with Boolean values
+%         that indicate whether any checks on the amplitude should be skipped
+%         for a given pulse (segment).
+%         (Default: [])
+%
+%     Repeat
+%         Row vector with Boolean values to indicate that all actions from the
+%         previous tRep are repeated identically. That might reduce the time
+%         needed for loading the commands between tReps (CLTime).
+%
+%     Device
+%         Scalar with the index identifying the device if multiple devices are
+%         connected simultaneously.
+%
+%
+%   Grad
+%       Array of structures with settings for gradient pulses in the pulse
+%       program. By default, the order of this array corresponds to the x, y,
+%       and z gradient followed by the fourth gradient channel. Among others,
+%       they might have the following optional fields:
+%
+%     Time
+%         Array with times of gradient points in seconds (relative to the
+%         t=0 time of the corresponding tRep).
+%
+%     Amp
+%         Array with amplitudes of the gradient points in T/m. The gradient
+%         amplitude is linearly interpolated between these points.
+%
+%     Shim
+%         Row vector with shim values for each tRep in T/m.
+%
+%     Repeat
+%         Row vector with Boolean values to indicate that all actions from the
+%         previous tRep are repeated identically. That might reduce the time
+%         needed for loading the commands between tReps (CLTime).
 %
 %
 %
@@ -159,6 +391,10 @@ function [raw_data_AQs, Seq, data_S_AQs_TRs, data_1D, data_Cell, averages] = set
 %           Total duration of the sequence in seconds starting at the tOffset of
 %           the first tRep of the first averaging step and ending at the end of
 %           the last tRep of the last averaging step.
+%
+%     HW
+%           Structure that retains the values set in the HW object or structure
+%           as they were used for the measurement.
 %
 %
 %   data_S_AQs_TRs
@@ -367,7 +603,7 @@ function [raw_data_AQs, Seq, data_S_AQs_TRs, data_1D, data_Cell, averages] = set
 %           PowerOk
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %-------------------------------------------------------------------------------
 
@@ -376,6 +612,9 @@ end
 
 %#function CIC_corr
 %#function GetRawData_PPGfast
+%#function PD.IgnoreWarning
+%#function PD.MRISequence
+%#function PD.TXMaxDef
 %#function PD.Talker
 %#function Poll_PPGfast
 %#function Start_PPGfast
@@ -383,6 +622,7 @@ end
 %#function check_CoilTemperature
 %#function check_GradientFuse
 %#function create_PPGfast
+%#function get_PowerSyncFrequency
 %#function hex2uint64
 %#function isemptyfield
 %#function plotSeq

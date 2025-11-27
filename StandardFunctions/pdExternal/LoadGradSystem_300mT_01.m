@@ -36,13 +36,13 @@ HW.Grad(iDevice).LoadIin2Amp = [0.061952, 0.063381/2, 0.071987, 0.065668/2];  % 
 
 % Independently of what was set before, element 2 and 4 must always have the
 % same values for this setup! (Y-connector or just mirror)
-HW.Grad.LoadRin(4) = HW.Grad.LoadRin(2);
-HW.Grad.LoadIin2Amp(4) = HW.Grad.LoadIin2Amp(2);
+HW.Grad(iDevice).LoadRin(4) = HW.Grad(iDevice).LoadRin(2);
+HW.Grad(iDevice).LoadIin2Amp(4) = HW.Grad(iDevice).LoadIin2Amp(2);
 
 if combinedChannels
-  HW.Grad(iDevice).LoadIin2Amp(HW.Grad.CombineCurrentOutputs(1,:)) = 2*HW.Grad(iDevice).LoadIin2Amp(HW.Grad(iDevice).CombineCurrentOutputs(1,:));
-  HW.Grad(iDevice).LoadIin2Amp(HW.Grad.CombineCurrentOutputs(2,:)) = HW.Grad(iDevice).LoadIin2Amp(HW.Grad(iDevice).CombineCurrentOutputs(1,:));
-  HW.Grad(iDevice).LoadRin(HW.Grad.CombineCurrentOutputs(2,:)) = HW.Grad(iDevice).LoadRin(HW.Grad(iDevice).CombineCurrentOutputs(1,:));
+  HW.Grad(iDevice).LoadIin2Amp(HW.Grad(iDevice).CombineCurrentOutputs(1,:)) = 2*HW.Grad(iDevice).LoadIin2Amp(HW.Grad(iDevice).CombineCurrentOutputs(1,:));
+  HW.Grad(iDevice).LoadIin2Amp(HW.Grad(iDevice).CombineCurrentOutputs(2,:)) = HW.Grad(iDevice).LoadIin2Amp(HW.Grad(iDevice).CombineCurrentOutputs(1,:));
+  HW.Grad(iDevice).LoadRin(HW.Grad(iDevice).CombineCurrentOutputs(2,:)) = HW.Grad(iDevice).LoadRin(HW.Grad(iDevice).CombineCurrentOutputs(1,:));
 end
 
 % gradients used for shimming
@@ -65,7 +65,7 @@ HW.Grad(iDevice).SystemTimeDelay(1:3) = [0.000176902, 0.000371194, 0.000185846];
 % HW.Grad(iDevice).SystemTimeDelay = [1020e-6, 730e-6, 750e-6, 202e-6]-0e-6;
 
 % time until gradient is stable after ramp (eddy current time)
-HW.Grad(iDevice).tEC = max(HW.Grad.SystemTimeDelay(1:3))*.5;
+HW.Grad(iDevice).tEC = max(HW.Grad(iDevice).SystemTimeDelay(1:3))*.5;
 % HW.Grad(iDevice).tEC = max(250e-6)*.5;
 
 HW.Grad(iDevice).tRamp = 250e-6;  % minimum ramp time in s
