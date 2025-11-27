@@ -24,8 +24,17 @@ HW.Grad(iDevice).PaRout(1:4) = [15000, 15000, 15000, 15000];  % output impedance
 HW.Grad(iDevice).tRamp = 50e-6;                               % minimum ramp time in s
 HW.Grad(iDevice).tEC = 50e-6;                                 % eddy current time in s
 
-HW.Grad(iDevice).SystemTimeDelay(1:3) = [2.37896e-05, 3.25888e-05, 2.58152e-05];  % Time delay of grad amp
-HW.Grad(iDevice).MaxAmpSlice=0.1;                             % Max Grad Amp ?
+switch HW.UserName
+  case {'m176_probe_1H', 'm176_probe_mod', 'm31', 'teach'}
+    HW.Grad(iDevice).SystemTimeDelay(1:3) = [2.37896e-05, 3.25888e-05, 2.58152e-05];  % Time delay of grad amp
+    HW.Grad(iDevice).MaxAmpSlice = 0.1;
+  case 'm230_probe_1H'
+    HW.Grad(iDevice).SystemTimeDelay(HW.Grad(iDevice).xyzB(1:3)) = [96.396, 108.212, 67.256]*1e-6;  % time delay of gradient amplifier in s
+    HW.Grad(iDevice).MaxAmpSlice = 10e-3;
+  otherwise
+    error('PD:LoadGradAmp:UnknownUser', ...
+      'No settings for user "%s" specified in "%s"', HW.UserName, mfilename());
+end
 
 HW.Grad(iDevice).Status1 = 1;                                 % power supply of DC-600 ok
 HW.Grad(iDevice).Status2 = 1;                                 % gradient and temperature of DC-600 ok

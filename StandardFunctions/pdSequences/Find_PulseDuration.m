@@ -190,37 +190,41 @@ end
 
 newCalLine = sprintf('%s  %% %s\n', newCalLine, comment);
 
-if data.savePulseFile
-  if ~isempty(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath) ...
-      && (isemptyfield(mySave, 'DummySerial') ...
-          || mySave.DummySerial(min(SeqLoop.AQSlice.iDevice, numel(mySave.DummySerial))) <= 0)
-    if ~exist(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath, 'file')
-      newCalLine = ['% factor from voltage amplitude at the coil input to B1+ field strength in T/V', sprintf('\n'), newCalLine];
-    end
-    if ~exist(fileparts(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath), 'dir')
-      mkdir(fileparts(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath));
-    end
-    fid = fopen(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath, 'a+');
+if ~isempty(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath) ...
+    && (isemptyfield(mySave, 'DummySerial') ...
+        || mySave.DummySerial(min(SeqLoop.AQSlice.iDevice, numel(mySave.DummySerial))) <= 0)
+  addFirstLine = ~exist(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath, 'file');
+  if ~exist(fileparts(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath), 'dir')
+    mkdir(fileparts(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath));
+  end
+  fid = fopen(HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath, 'a+');
+  fid_protect = onCleanup(@() fclose(fid));
+  if addFirstLine
+    fwrite(fid, ['% factor from voltage amplitude at the coil input to B1+ field strength in T/V', sprintf('\n')]);
+  end
+  if data.savePulseFile
     fwrite(fid, newCalLine);
-    [~, name, ~] = fileparts(fopen(fid));
-    fclose(fid);
-    clear(name);clear('name')
     fprintf('\nA new line was added to the following file:\n%s\n%s\n', ...
       HW.TX(SeqLoop.AQSlice.iDevice).PaUout2AmplitudePath, newCalLine);
   else
-    fprintf('\n');
-    fprintf('\nPlease add the following line to your LoadMySystem.m file:\n%s\n', ...
-      newCalLine);
+    fwrite(fid, ['% ', newCalLine]);  % add line as comment
   end
+  delete(fid_protect);
+  [~, name, ~] = fileparts(fopen(fid));
+  clear(name);clear('name')
 
   % save the time of the last RF pulse duration search
   mySave.lastTime_PulseDuration = now*24*3600;
-
-else
+elseif data.savePulseFile
+  fprintf('\n');
+  fprintf('\nPlease add the following line to your LoadMySystem.m file:\n%s\n', ...
+    newCalLine);
+end
+if ~data.savePulseFile
   fprintf('\n');
   warnStr = ['Determination of pulse length unsuccessful!\n', ...
     'If you want to use the uncertain best guess value anyway, ', ...
-    'please manually add the following line to your LoadMySystem.m file:\n%s\n'];
+    'please manually append or un-comment the following line in your PaUout2AmplitudeCal.m file:\n%s\n'];
   warning('PD:sequence_PulseDuration', warnStr, newCalLine);
 end
 

@@ -7,8 +7,8 @@ HW.TX(iDevice).ExtRFType = 'RFDC600';  % string with type identifier
 HW.TX(iDevice).ChannelDef = 2;  % default TX channel
 
 HW.TX(iDevice).Uout2PaUout(1) = 1;  % active gradiometer
-TX_UoutRout = 50;  % impetance of TX2 port of MMRT in Ohm
-TX_PaRin = 5e3;  % impetance of differential converter at input in Ohm
+TX_UoutRout = 50;  % impedance of TX2 port of MMRT in Ohm
+TX_PaRin = 5e3;  % impedance of differential converter at input in Ohm
 matchFactor = 2 * TX_PaRin/(TX_PaRin+TX_UoutRout);  % factor compared to 50 Ohm termination
 HW.TX(iDevice).MmrtUout2Uout(2) = HW.TX(iDevice).MmrtUout2Uout(2) * matchFactor;
 

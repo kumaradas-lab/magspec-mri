@@ -107,7 +107,7 @@ classdef smith < handle
 %                                         group.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2017-2019 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2017-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -570,7 +570,7 @@ classdef smith < handle
 
       % add listener for redrawing if overwritten
       set(this.hGroup, 'DeleteFcn', @(src,evt)this.onDelete);
-      hold(ca, 'all');
+      hold(ca, 'on');
 
       this.drawPending = false;
     end

@@ -68,9 +68,13 @@ if strcmp(HW.UserName, 'teach')
 
   end
 
-  % reload calibration settings
-  HW.LoadMySystemConfig();
-  HW.LoadMagnetShimCal();
+  if isa(HW, 'PD.HWClass')
+    % reload calibration settings
+    % This won't work (and is not needed) when this is called while creating the
+    % LoadMySystem files for all users. So, skip this block.
+    HW.LoadMySystemConfig();
+    HW.LoadMagnetShimCal();
+  end
 
 else
   if isempty(HW.UserName) || ...

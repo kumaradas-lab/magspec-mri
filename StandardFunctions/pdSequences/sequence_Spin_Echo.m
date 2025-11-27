@@ -62,6 +62,14 @@ function [SeqLoop, mySave] = sequence_Spin_Echo(HW, Seq, AQ, TX, Grad, mySave)
 %               time. Otherwise, the computer clock is used for timing.
 %               (default: 0, i.e. computer clock).
 %
+%       PrepareCombinedLoops
+%               Boolean value to indicate whether a pulse program should be
+%               prepared that consists of all loop (instead of running separate
+%               pulse programs per loop). This value only applies if being
+%               called for preparation only (i.e., with Seq.StartSequence set to
+%               false).
+%               (Default: false)
+%
 %       SteadyState_PreShots90
 %               Scalar number of excitations (including refocusing pulses or
 %               echo trains) before starting to acquire data.
@@ -92,9 +100,41 @@ function [SeqLoop, mySave] = sequence_Spin_Echo(HW, Seq, AQ, TX, Grad, mySave)
 %               Seq.SteadyState_PreShots180SpoilerGrad is set to 0.
 %               (Default: Seq.SteadyState_PreShots180SpoilerGrad)
 %
+%       SteadyState_PreShotsLoops
+%               Number of "image measurements" that are done without collecting
+%               any measurement data before acquiring the actual measurement
+%               data for the image(s).
+%               (Default: 0)
+%
 %       SingletRep
 %               Boolean value to indicate whether the pulse program for each
 %               echo train should be realized as single tReps. (default: 0)
+%
+%       InterferenceFrequency
+%               Frequency of a potential interference source in Hz. If this is
+%               set to a finite value, the echo time is extended such that an
+%               integer number of interference periods is between the centers of
+%               the excitation and the inversion. That way a phase offset of the
+%               spin system due to the interference should have cancelled out at
+%               the time of inversion.
+%               Additionally, the repetition time is extended to an odd number
+%               of half interference periods. That way the phase of the
+%               interference should be opposite at each time of excitation,
+%               hence moving any potentially remaining ghost to the edge of the
+%               (over-sampled) image (if the k-lines are acquired in the default
+%               order).
+%               (Default: NaN)
+%
+%       InterferenceFrequencyTEcho
+%               Frequency of a potential interference source in Hz. The same as
+%               Seq.InterferenceFrequency but only applies to the echo time.
+%               (Default: Seq.InterferenceFrequency)
+%
+%       InterferenceFrequencyRepetitionTime
+%               Frequency of a potential interference source in Hz. The same as
+%               Seq.InterferenceFrequency but only applies to the repetition
+%               time.
+%               (Default: Seq.InterferenceFrequency)
 %
 %       plotSeq
 %               control plotting the pulse program. See function "plotSeq" for
@@ -104,7 +144,7 @@ function [SeqLoop, mySave] = sequence_Spin_Echo(HW, Seq, AQ, TX, Grad, mySave)
 %               The same as before, but wrap the pulse program at the end of
 %               each tRep. See also function "plotSeqTR".
 %
-%       plotSeqAQ
+%       plotSeqEchoTrain
 %               The same as before, but the function tries to wrap the pulse
 %               program at sensible points and to display just the crucial part.
 %               See also function "plotSeq".
@@ -236,6 +276,17 @@ function [SeqLoop, mySave] = sequence_Spin_Echo(HW, Seq, AQ, TX, Grad, mySave)
 %               prepare functions are executed in the order as they appear in
 %               the cell array.
 %               (Default: [])
+%
+%       Function_Find_Frequency
+%               A function handle to a function that adjusts the frequency
+%               with the following signature:
+%                     [HW, mySave] = @(HW, mySave, minTime)
+%               It is executed at the start of every loop if the duration set
+%               with Seq.Find_Frequency_interval is exceeded since the last time
+%               the frequency was adjusted.
+%               This could be set, e.g., to @Find_Frequency_Sweep or
+%               Find_Frequency_FID.
+%               (Default: @Find_Frequency_Sweep)
 %
 %       CorrectB0Read
 %               structure with settings for B0 measurement and read correction.
@@ -431,7 +482,7 @@ function [SeqLoop, mySave] = sequence_Spin_Echo(HW, Seq, AQ, TX, Grad, mySave)
 %                   Boolean value to acquire separate images with the inversion
 %                   pulses rotated. This is helpful to reduce the signal of
 %                   spins excited by the refocusing (inversion) pulse. This
-%                   effectively multiplies the number of echo trains (i.e. also
+%                   effectively multiplies the number of echo trains (i.e., also
 %                   the number of echoes acquired per k-line).
 %
 %           phaseCycleSteps
@@ -464,14 +515,16 @@ function [SeqLoop, mySave] = sequence_Spin_Echo(HW, Seq, AQ, TX, Grad, mySave)
 %                   Permutation or selection vector for the k-space lines (1
 %                   being the lowest k-space line index). If this field exists
 %                   and is not empty, it takes precedence over
-%                   Seq.AQSlice.kLineOrderType (Default: []).
+%                   Seq.AQSlice.kLineOrderType.
+%                   (Default: [])
 %
 %           excitationFlipAngle
-%                   Flip angle of the excitation pulse in degrees (default: 90).
+%                   Flip angle of the excitation pulse in degrees.
+%                   (Default: 90)
 %
 %           inversionFlipAngle
-%                   Flip angle of the refocusing (inversion) pulse in degrees
-%                   (default: 180).
+%                   Flip angle of the refocusing (inversion) pulse in degrees.
+%                   (Default: 180)
 %
 %           readoutPhaseInversion
 %                   Boolean value to indicate that the phase of the read out
@@ -482,23 +535,36 @@ function [SeqLoop, mySave] = sequence_Spin_Echo(HW, Seq, AQ, TX, Grad, mySave)
 %
 %           DephaseLengthFactor
 %                   scalar value with a factor for the duration of the dephase
-%                   pulses (default: Seq.AQSlice.SpoilLengthFactor). A factor of
-%                   1 means that the dephase pulse amplitude is equal to the
-%                   read-out gradient amplitude (i.e. the duration is
-%                   approximately half the acquisition time).
+%                   pulses. A factor of 1 means that the read dephase pulse
+%                   amplitude is equal to the read-out gradient amplitude (i.e.,
+%                   the duration is approximately half the acquisition time).
+%                   (Default: Seq.AQSlice(1).SpoilLengthFactor)
 %
 %           DephaseTimeOffset
 %                   scalar value for the time offset of the dephase pulses in
-%                   seconds (default: Seq.AQSlice.SpoilTimeOffset). A value of 0
-%                   means that the dephase pulses are immediately before the
-%                   read out gradient pulse (both ramps overlap). Positive
-%                   values move the dephase pulse away from the read out pulse.
+%                   seconds. A value of 0 means that the dephase pulses are
+%                   immediately before the read out gradient pulse (both ramps
+%                   overlap). Positive values move the dephase pulse away from
+%                   the read out pulse.
+%                   (Default: Seq.AQSlice(1).SpoilTimeOffset)
 %
 %           RephaseLengthFactor
 %           RephaseTimeOffset
 %                   Same as before but for the rephase gradient pulses. If
 %                   RephaseLengthFactor is set to 0, the corresponding gradient
 %                   pulses are omitted.
+%                   (Default:
+%                   RephaseLengthFactor = Seq.AQSlice(1).SpoilLengthFactor
+%                   and RephaseTimeOffset = Seq.AQSlice(1).SpoilTimeOffset)
+%
+%           RephaseLengthFactorEnd
+%                   scalar value with a factor for the duration of the gradient
+%                   pulses that are used to rephase the spin system at the end
+%                   of each spin echo train. A factor of 1 means that the read
+%                   dephase pulse amplitude is equal to the read-out gradient
+%                   amplitude (i.e., the duration is approximately half the
+%                   acquisition time).
+%                   (Default: Seq.AQSlice(1).RephaseLengthFactor)
 %
 %           SpoilFactor
 %                   1x3 vector with spoil factors in slice/phase1, phase2, and
@@ -522,54 +588,70 @@ function [SeqLoop, mySave] = sequence_Spin_Echo(HW, Seq, AQ, TX, Grad, mySave)
 %
 %           SpoilLengthFactor
 %                   scalar value with a factor for the duration of the spoiler
-%                   pulses (default: 1). A factor of 1 means that the spoiler
-%                   has the same duration as the phase gradient pulses (i.e.
-%                   approximately half the duration of the readout gradients).
-%                   This only applies if Seq.AQSlice.sizePhaseSpoil(3) is 0.
+%                   pulses. A factor of 1 means that the spoiler has
+%                   approximately half the duration of the readout gradients
+%                   (see Seq.AQSlice(1).DephaseLengthFactor).
+%                   (Default: 1)
 %
 %           SpoilFactorEnd
 %                   1x3 vector with spoil factors in slice/phase1, phase2, and
 %                   read/phase3 direction after the last read-out window in an
 %                   echo train. The definition is the same as for
 %                   Seq.AQSlice.SpoilFactor.
-%                   (Default: Seq.AQSlice.SpoilFactor)
+%                   (Default: Seq.AQSlice(1).SpoilFactor)
 %
 %           sizePhaseSpoilEnd
 %                   1x3 vector with spoil sizes in slice/phase1, phase2, and
-%                   read/phase3 direction in m after the last read-out window in
-%                   an echo train. The definition is the same as for
+%                   read/phase3 direction in meters after the last read-out
+%                   window in an echo train. The definition is the same as for
 %                   Seq.AQSlice.sizePhaseSpoil.
-%                   (Default: Seq.AQSlice.sizePhaseSpoil)
+%                   (Default: Seq.AQSlice(1).sizePhaseSpoil)
 %
 %           SpoilTimeOffset
 %                   scalar value for the time offset of the spoiler pulses in
-%                   seconds (default: 0). A value of 0 means that the spoiler
-%                   pulses start immediately after the read out pulse. Positive
-%                   values move the spoilers away from the read out pulse.
+%                   seconds. A value of 0 means that the spoiler pulses start
+%                   immediately after the read out pulse. Positive values move
+%                   the spoilers away from the read out pulse.
+%                   (Default: 0)
 %
 %           SpoilDephaseLengthFactor
 %           SpoilDephaseTimeOffset
-%                   The same as immediately before but only applies to the
-%                   dephase spoilers (i.e. the ones before the refocusing
-%                   pulse). By default, the dephase spoilers move with the read
-%                   rephase gradients.
+%                   The same as Seq.AQSlice.SpoilLengthFactor and
+%                   Seq.AQSlice.SpoilTimeOffset, but only applies to the dephase
+%                   spoilers (i.e. the ones before the refocusing pulse).
+%                   By default, the dephase spoilers move with the read rephase
+%                   gradients. The SpoilDephaseLengthFactor applies on top of
+%                   the RephaseLengthFactor.
+%                   (Default: SpoilDephaseLengthFactor = 1 and
+%                   SpoilDephaseTimeOffset = Seq.AQSlice(1).RephaseTimeOffset)
 %
 %           SpoilRephaseLengthFactor
 %           SpoilRephaseTimeOffset
 %                   The same as immediately before but only applies to the
 %                   rephase spoilers (i.e. the ones after the refocusing pulse).
 %                   By default, the rephase spoilers move with the read dephase
-%                   gradients.
+%                   gradients. The SpoilRephaseLengthFactor applies on top of
+%                   the DephaseLengthFactor.
+%                   (Default: SpoilRephaseLengthFactor = 1 and
+%                   SpoilRephaseTimeOffset = Seq.AQSlice(1).DephaseTimeOffset)
+%
+%           SpoilDephaseLengthFactorEnd
+%                   scalar value with a factor for the duration of the gradient
+%                   pulses that are used to spoil the spin system at the end of
+%                   each spin echo train. The SpoilDephaseLengthFactorEnd
+%                   applies on top of the RephaseLengthFactorEnd.
+%                   (Default: 1)
 %
 %           SliceRephaseLengthFactor
 %                   scalar value with a factor to adjust the duration of the
 %                   excitation slice rephase pulse. By default, this pulse has
 %                   the same duration as the read dephase pulse.
-%                   (Default: Seq.AQSlice.DephaseLengthFactor)
+%                   (Default: Seq.AQSlice(1).DephaseLengthFactor)
 %
 %           SliceRephaseTimeOffset
 %                   time offset of the excitation slice rephase gradient pulse
-%                   in seconds (default: Seq.AQSlice.SpoilTimeOffset).
+%                   in seconds.
+%                   (Default: Seq.AQSlice(1).SpoilTimeOffset)
 %
 %           dualNuclearImage
 %                   Boolean value to indicate whether the image should be
@@ -586,7 +668,7 @@ function [SeqLoop, mySave] = sequence_Spin_Echo(HW, Seq, AQ, TX, Grad, mySave)
 %           GammaX
 %                   Gyromagnetic ratio of the secondary nucleus in rad/T/s. Only
 %                   used if Seq.AQSlice(1).dualNuclearImage is set to true.
-%                   (Default: HW.GammaDef)
+%                   (Default: HW.GammaX)
 %
 %   AQ
 %           structure with settings for the acquisition windows. It is not
@@ -712,7 +794,7 @@ function [SeqLoop, mySave] = sequence_Spin_Echo(HW, Seq, AQ, TX, Grad, mySave)
 %     Seq.Slice(3)
 %       dummy slice used to move the slice dephase pulse of the refocussing
 %       pulse to the slice rephase pulse of the excitation pulse for the first
-%       inverion.
+%       inversion.
 %     Seq.Phase(1)
 %       Phase encoding in phase(1) direction. By default, the slice direction is
 %       parallel to phase(1).
@@ -759,7 +841,7 @@ function [SeqLoop, mySave] = sequence_Spin_Echo(HW, Seq, AQ, TX, Grad, mySave)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2013-2024 Toni Driessle, Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2013-2025 Toni Driessle, Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %-------------------------------------------------------------------------------
 %
@@ -871,13 +953,21 @@ if isemptyfield(Seq, 'PostProcessSequence'),Seq.PostProcessSequence = 1;  end
 if Seq.PreProcessSequence
   if ~isfield(Seq, 'AQSlice'),  Seq.AQSlice = struct(); end
   if isemptyfield(Seq, 'Loops'),              Seq.Loops               = 1;  end
-  if isemptyfield(Seq, 'SteadyState_PreShotsLoops'), Seq.SteadyState_PreShotsLoops = 0;  end
-  if isemptyfield(Seq, 'SteadyState_PreShotsLoopsName'), Seq.SteadyState_PreShotsLoopsName = 'normal_PreShots';  end
+  if isemptyfield(Seq, 'SteadyState_PreShotsLoops')
+    Seq.SteadyState_PreShotsLoops = 0;
+  end
+  if isemptyfield(Seq, 'SteadyState_PreShotsLoopsName')
+    % FIXME: Why is this an input parameter? Does anyone use this?
+    Seq.SteadyState_PreShotsLoopsName = 'normal_PreShots';
+  end
   if ~isfield(Seq, 'T1Estimated'),            Seq.T1Estimated         = []; end % estimated T1 in seconds, e.g. oil T1 ~150e-3 sec and water ~2000e-3 sec
   if ~isfield(Seq, 'T2Estimated'),            Seq.T2Estimated         = []; end % estimated T2 in seconds, e.g. oil T2 ~100e-3 sec and water ~2000e-3 sec
   if ~isfield(Seq, 'LoopsBreak'),             Seq.LoopsBreak          = []; end % break between loops in seconds
   if ~isfield(Seq, 'LoopsRepetitionTime'),    Seq.LoopsRepetitionTime = []; end % repetition time of loops in seconds
   if isemptyfield(Seq, 'LoopsBreakExactly'),  Seq.LoopsBreakExactly   = 0;  end
+  if isemptyfield(Seq, 'PrepareCombinedLoops')
+    Seq.PrepareCombinedLoops = false;
+  end
   if ~isfield(Seq, 'StartSequenceTime'),      Seq.StartSequenceTime   = []; end
   if ~isfield(Seq, 'RepetitionTime'),         Seq.RepetitionTime      = []; end % repetition time of excitations in seconds
   if ~isfield(Seq.AQSlice(1), 'TurboBreak'),  Seq.AQSlice(1).TurboBreak = []; end % repetition time in seconds reduced by number of Echoes in train + 1
@@ -885,21 +975,90 @@ if Seq.PreProcessSequence
   if isemptyfield(Seq, 'CorrectSliceRephasePlot'), Seq.CorrectSliceRephasePlot = 0; end
   if isemptyfield(Seq, 'CorrectPhaseRephasePlot'), Seq.CorrectPhaseRephasePlot = 0; end
   if isemptyfield(Seq, 'CorrectReadRephasePlot'),  Seq.CorrectReadRephasePlot  = 0; end
-  if isemptyfield(Seq, 'LoopPlot'),           Seq.LoopPlot            = 1;  end
-  if isemptyfield(Seq, 'LoopPlotAverages'),   Seq.LoopPlotAverages    = 1;  end
-  if isemptyfield(Seq, 'LoopSeqPlot'),        Seq.LoopSeqPlot         = 0;  end
-  if isemptyfield(Seq, 'LoopSaveAllData'),    Seq.LoopSaveAllData     = ~Seq.LoopPlotAverages; end % Save data of each loop
-  if isemptyfield(Seq, 'LoopSaveAllSeq'),     Seq.LoopSaveAllSeq      = 0;  end % Save Seq structure used at each loop in field "SeqLoop"
-  if isemptyfield(Seq, 'LoopPlotAll'),        Seq.LoopPlotAll         = Seq.LoopSaveAllData; end % plot data of each loop (must set Seq.LoopPlot = 1;)
-  if isemptyfield(Seq, 'LoopPlotLastAverage'),Seq.LoopPlotLastAverage = 1;  end % plot average in last loop instead of single measurement
-  if isemptyfield(Seq, 'CorrectAQWindowPhase'), Seq.CorrectAQWindowPhase = 1; end  % Correct phase of AQ Window if the AQ.Frequency is not HW.fLarmor
-  if isemptyfield(Seq, 'tEcho'),              Seq.tEcho               = 5e-3; end
+
+  % select what to display in each loop
+  if isemptyfield(Seq, 'LoopPlot')
+    % plot at every loop
+    Seq.LoopPlot = true;
+  end
+  if isemptyfield(Seq, 'LoopPlotAverages')
+    % calculate and plot the average image at each step
+    Seq.LoopPlotAverages = true;
+  end
+  if isemptyfield(Seq, 'LoopSeqPlot')
+    % plot the pulse program at each step
+    Seq.LoopSeqPlot = false;
+  end
+  if isemptyfield(Seq, 'LoopSaveAllData')
+    % save data of each loop
+    Seq.LoopSaveAllData = ~Seq.LoopPlotAverages;
+  end
+  if isemptyfield(Seq, 'LoopSaveAllSeq')
+    % Save Seq structure used at each loop in field "SeqLoop"
+    Seq.LoopSaveAllSeq = false;
+  end
+  if isemptyfield(Seq, 'LoopPlotAll')
+    % plot data of each loop (requires that Seq.LoopPlot is true)
+    Seq.LoopPlotAll = Seq.LoopSaveAllData;
+  end
+  if isemptyfield(Seq, 'LoopPlotLastAverage')
+    % plot average in last loop instead of single measurement
+    Seq.LoopPlotLastAverage = true;
+  end
+
+  if isemptyfield(Seq, 'CorrectAQWindowPhase')
+    % Correct phase of AQ Window if the AQ.Frequency is not HW.fLarmor
+    Seq.CorrectAQWindowPhase = true;
+  end
+  if isemptyfield(Seq, 'tEcho')
+    % echo time in seconds
+    Seq.tEcho = 5e-3;
+  end
+
+  if isemptyfield(Seq.AQSlice(1), 'iDevice')
+    % index of the device on which the pulse sequence is (primarily) run
+    % in case multiple MRT devices are connected simultaneously
+    Seq.AQSlice(1).iDevice = 1;
+  end
+
+  if isemptyfield(Seq, 'InterferenceFrequency')
+    % frequency of interference source that should be suppressed by selecting
+    % the echo time and repetition time in Hz (e.g., 50 Hz mains)
+    Seq.InterferenceFrequency = NaN;
+  end
+  if isemptyfield(Seq, 'InterferenceFrequencyTEcho')
+    % frequency of interference source that should be suppressed by selecting
+    % the echo time in Hz (e.g., 50 Hz mains)
+    Seq.InterferenceFrequencyTEcho = Seq.InterferenceFrequency;
+  end
+  if isemptyfield(Seq, 'InterferenceFrequencyRepetitionTime')
+    % frequency of interference source that should be suppressed by selecting
+    % the repetition time in Hz (e.g., 50 Hz mains)
+    Seq.InterferenceFrequencyRepetitionTime = Seq.InterferenceFrequency;
+  end
+  if isfinite(Seq.InterferenceFrequencyTEcho)
+    % extend echo time to have an integer number of interference periods before
+    % and after the inversion pulse
+    Seq.tEcho = ...
+      ceil((Seq.tEcho - 2/HW.MMRT(Seq.AQSlice(1).iDevice).fSystem) ...
+           / 2 * Seq.InterferenceFrequencyTEcho) ...
+      * 2 / Seq.InterferenceFrequencyTEcho;
+  end
   Seq.AQSlice(1).tEcho = Seq.tEcho;
 
-  if isemptyfield(Seq.AQSlice(1), 'iDevice'), Seq.AQSlice(1).iDevice  = 1;    end
+  if isemptyfield(Seq, 'average')
+    % number of average (performed outside of MATLAB)
+    Seq.average = 1;
+  end
+  if isemptyfield(Seq, 'T1')
+    % FIXME: Is this used anywhere?
+    Seq.T1 = 100e-3;
+  end
 
-  if isemptyfield(Seq, 'average'),            Seq.average             = 1;    end
-  if isemptyfield(Seq, 'T1'),                 Seq.T1                  = 100e-3; end  % FIXME: Is this used anywhere?
+  if isemptyfield(Seq, 'Function_Find_Frequency')
+    % function handle for frequency adjustments, e.g, between loops
+    Seq.Function_Find_Frequency = @Find_Frequency_Sweep;
+  end
 
   if isemptyfield(Seq, 'CorrectPhase')
     % use (un-encoded) acquisitions to track magnet frequency
@@ -986,7 +1145,19 @@ if Seq.PreProcessSequence
   if isemptyfield(Seq.AQSlice(1), 'GradSign'),  Seq.AQSlice(1).GradSign = 1;    end
 
   % fields for plot_kSpaceAndImage
-  if isemptyfield(Seq.AQSlice(1), 'plotImageHandle'),  Seq.AQSlice(1).plotImageHandle = 110; end
+  if isemptyfield(Seq.AQSlice(1), 'plotImageHandle')
+    if ~isemptyfield(Seq.AQSlice(1), 'plotImage') ...
+        && ((isnumeric(Seq.AQSlice(1).plotImage) && Seq.AQSlice(1).plotImage ~= 1) ...  % numeric "figure handle"
+            || (~isnumeric(Seq.AQSlice(1).plotImage) ...
+                && (ishghandle(Seq.AQSlice(1).plotImage, 'figure') ...
+                    || ishghandle(Seq.AQSlice(1).plotImage, 'uipanel')) ...
+                && isvalid(Seq.AQSlice(1).plotImage)))  % valid handle for an axes parent
+      % if appropriate, use the value of Seq.AQSlice(1).plotImage
+      Seq.AQSlice(1).plotImageHandle = Seq.AQSlice(1).plotImage;
+    else
+      Seq.AQSlice(1).plotImageHandle = 110;
+    end
+  end
   if ~isfield(Seq.AQSlice(1), 'iSlice'),             Seq.AQSlice(1).iSlice         = [];   end
   if ~isfield(Seq.AQSlice(1), 'plotImage'),          Seq.AQSlice(1).plotImage      = [];   end
   if ~isfield(Seq.AQSlice(1), 'plotImagePhase'),     Seq.AQSlice(1).plotImagePhase = [];   end
@@ -1123,7 +1294,7 @@ if Seq.PreProcessSequence
   if Seq.AQSlice(1).sizePhase(1) == 0
     Seq.AQSlice(1).sizePhase(1) = HW.Grad(Seq.AQSlice(1).iDevice).ImageVol(2) - HW.Grad(Seq.AQSlice(1).iDevice).ImageVol(1);
   end
-  if numel(Seq.AQSlice(1).sizePhase) == 1 || Seq.AQSlice(1).sizePhase(2) == 0
+  if isscalar(Seq.AQSlice(1).sizePhase) || Seq.AQSlice(1).sizePhase(2) == 0
     Seq.AQSlice(1).sizePhase(2) = HW.Grad(Seq.AQSlice(1).iDevice).ImageVol(4) - HW.Grad(Seq.AQSlice(1).iDevice).ImageVol(3);
   end
   if numel(Seq.AQSlice(1).sizePhase) == 2 || Seq.AQSlice(1).sizePhase(3) == 0
@@ -1140,48 +1311,71 @@ if Seq.PreProcessSequence
     switch numel(Seq.AQSlice(1).Resolution)
       case 1
         if ~isemptyfield(Seq.AQSlice(1), 'thickness') && Seq.AQSlice(1).thickness < 1000
-          Seq.AQSlice(1).Resolution=[inf, repmat(Seq.AQSlice(1).Resolution(1), 1, 2)];      % 2D iso
+          % 2D iso
+          Seq.AQSlice(1).Resolution = [Inf, repmat(Seq.AQSlice(1).Resolution(1), 1, 2)];
         else
-          Seq.AQSlice(1).Resolution=repmat(Seq.AQSlice(1).Resolution(1), 1, 3);             % 1D 2D 3D CSI iso
+          % 1D 2D 3D CSI iso
+          Seq.AQSlice(1).Resolution = repmat(Seq.AQSlice(1).Resolution(1), 1, 3);
         end
       case 2
-          Seq.AQSlice(1).Resolution=[inf, Seq.AQSlice(1).Resolution(1),Seq.AQSlice(1).Resolution(2)]; % 2D
+        % 2D
+        Seq.AQSlice(1).Resolution = [Inf, Seq.AQSlice(1).Resolution(1), Seq.AQSlice(1).Resolution(2)];
     end
-    if Seq.AQSlice(1).sizePhase(1)<1000;
-      Seq.AQSlice(1).nPhase(1)=round(Seq.AQSlice(1).sizePhase(1)/Seq.AQSlice(1).Resolution(1));
-      Seq.AQSlice(1).sizePhase(1)=Seq.AQSlice(1).nPhase(1)*Seq.AQSlice(1).Resolution(1);
+    if Seq.AQSlice(1).sizePhase(1) < 1000
+      Seq.AQSlice(1).nPhase(1) = round(Seq.AQSlice(1).sizePhase(1) / Seq.AQSlice(1).Resolution(1));
+      Seq.AQSlice(1).sizePhase(1) = Seq.AQSlice(1).nPhase(1) * Seq.AQSlice(1).Resolution(1);
     else
-      if isemptyfield(Seq.AQSlice(1), 'thickness');Seq.AQSlice(1).thickness=Seq.AQSlice(1).Resolution(1); end
-      Seq.AQSlice(1).nPhase(1)=1;
+      if isemptyfield(Seq.AQSlice(1), 'thickness')
+        Seq.AQSlice(1).thickness = Seq.AQSlice(1).Resolution(1);
+      end
+      Seq.AQSlice(1).nPhase(1) = 1;
     end
-    Seq.AQSlice(1).nPhase(2)=round(Seq.AQSlice(1).sizePhase(2)/Seq.AQSlice(1).Resolution(2));
-    Seq.AQSlice(1).sizePhase(2)=Seq.AQSlice(1).nPhase(2)*Seq.AQSlice(1).Resolution(2);
-    if Seq.AQSlice(1).sizePhase(3)<Seq.AQSlice(1).sizeRead;
-      Seq.AQSlice(1).nPhase(3)=round(Seq.AQSlice(1).sizePhase(3)/Seq.AQSlice(1).Resolution(3));
-      Seq.AQSlice(1).sizePhase(3)=Seq.AQSlice(1).nPhase(3)*Seq.AQSlice(1).Resolution(3);
-      Seq.AQSlice(1).nRead=1;
+    Seq.AQSlice(1).nPhase(2) = round(Seq.AQSlice(1).sizePhase(2) / Seq.AQSlice(1).Resolution(2));
+    Seq.AQSlice(1).sizePhase(2) = Seq.AQSlice(1).nPhase(2) * Seq.AQSlice(1).Resolution(2);
+    if Seq.AQSlice(1).sizePhase(3) < Seq.AQSlice(1).sizeRead
+      Seq.AQSlice(1).nPhase(3) = round(Seq.AQSlice(1).sizePhase(3) / Seq.AQSlice(1).Resolution(3));
+      Seq.AQSlice(1).sizePhase(3) = Seq.AQSlice(1).nPhase(3) * Seq.AQSlice(1).Resolution(3);
+      Seq.AQSlice(1).nRead = 1;
     else
-      Seq.AQSlice(1).nRead=round(Seq.AQSlice(1).sizeRead/Seq.AQSlice(1).Resolution(3));
-      Seq.AQSlice(1).sizeRead=Seq.AQSlice(1).nRead*Seq.AQSlice(1).Resolution(3);
-      Seq.AQSlice(1).nPhase(3)=1;
+      Seq.AQSlice(1).nRead = round(Seq.AQSlice(1).sizeRead / Seq.AQSlice(1).Resolution(3));
+      Seq.AQSlice(1).sizeRead = Seq.AQSlice(1).nRead * Seq.AQSlice(1).Resolution(3);
+      Seq.AQSlice(1).nPhase(3) = 1;
     end
-    Seq.AQSlice(1).nPhase(isinf(Seq.AQSlice(1).nPhase)|isnan(Seq.AQSlice(1).nPhase)|(Seq.AQSlice(1).nPhase)==0)=1;
-    Seq.AQSlice(1).nRead(isinf(Seq.AQSlice(1).nRead)|isnan(Seq.AQSlice(1).nRead)|(Seq.AQSlice(1).nRead)==0)=1;
-    Seq.AQSlice(1).sizePhase(isinf(Seq.AQSlice(1).sizePhase)|isnan(Seq.AQSlice(1).sizePhase)|(Seq.AQSlice(1).sizePhase)==0)=inf;
-    Seq.AQSlice(1).sizeRead(isinf(Seq.AQSlice(1).sizeRead)|isnan(Seq.AQSlice(1).sizeRead)|(Seq.AQSlice(1).sizeRead)==0)=inf;
+    Seq.AQSlice(1).nPhase(isinf(Seq.AQSlice(1).nPhase)|isnan(Seq.AQSlice(1).nPhase)|(Seq.AQSlice(1).nPhase)==0) = 1;
+    Seq.AQSlice(1).nRead(isinf(Seq.AQSlice(1).nRead)|isnan(Seq.AQSlice(1).nRead)|(Seq.AQSlice(1).nRead)==0) = 1;
+    Seq.AQSlice(1).sizePhase(isinf(Seq.AQSlice(1).sizePhase)|isnan(Seq.AQSlice(1).sizePhase)|(Seq.AQSlice(1).sizePhase)==0) = Inf;
+    Seq.AQSlice(1).sizeRead(isinf(Seq.AQSlice(1).sizeRead)|isnan(Seq.AQSlice(1).sizeRead)|(Seq.AQSlice(1).sizeRead)==0) = Inf;
   end
 
-  if isemptyfield(Seq.AQSlice(1), 'nRead'), Seq.AQSlice(1).nRead = 32; end
-  if isemptyfield(Seq.AQSlice(1), 'nPhase'), Seq.AQSlice(1).nPhase = [1 32 1]; end
+  if isemptyfield(Seq.AQSlice(1), 'nRead')
+    Seq.AQSlice(1).nRead = 32;
+  end
+  if isemptyfield(Seq.AQSlice(1), 'nPhase')
+    Seq.AQSlice(1).nPhase = [1 32 1];
+  end
   % dimensions of AQSlice.nPhase
-  if Seq.AQSlice(1).nPhase(1)==0,                                    Seq.AQSlice(1).nPhase(1) = 1; end
-  if numel(Seq.AQSlice(1).nPhase)==1 || Seq.AQSlice(1).nPhase(2)==0, Seq.AQSlice(1).nPhase(2) = 1; end
-  if numel(Seq.AQSlice(1).nPhase)==2 || Seq.AQSlice(1).nPhase(3)==0, Seq.AQSlice(1).nPhase(3) = 1; end
+  if Seq.AQSlice(1).nPhase(1) == 0
+    Seq.AQSlice(1).nPhase(1) = 1;
+  end
+  if isscalar(Seq.AQSlice(1).nPhase) || Seq.AQSlice(1).nPhase(2)==0
+    Seq.AQSlice(1).nPhase(2) = 1;
+  end
+  if numel(Seq.AQSlice(1).nPhase)==2 || Seq.AQSlice(1).nPhase(3)==0
+    Seq.AQSlice(1).nPhase(3) = 1;
+  end
   % dimensions of AQSlice.PhaseOS
-  if isemptyfield(Seq.AQSlice(1), 'PhaseOS'), Seq.AQSlice(1).PhaseOS = [1 1 1]; end
-  if Seq.AQSlice(1).PhaseOS(1)==0, Seq.AQSlice(1).PhaseOS(1) = 1; end
-  if numel(Seq.AQSlice(1).PhaseOS)==1 || Seq.AQSlice(1).PhaseOS(2)==0, Seq.AQSlice(1).PhaseOS(2) = 1; end
-  if numel(Seq.AQSlice(1).PhaseOS)==2 || Seq.AQSlice(1).PhaseOS(3)==0, Seq.AQSlice(1).PhaseOS(3) = 1; end
+  if isemptyfield(Seq.AQSlice(1), 'PhaseOS')
+    Seq.AQSlice(1).PhaseOS = [1 1 1];
+  end
+  if Seq.AQSlice(1).PhaseOS(1)==0
+    Seq.AQSlice(1).PhaseOS(1) = 1;
+  end
+  if isscalar(Seq.AQSlice(1).PhaseOS) || Seq.AQSlice(1).PhaseOS(2)==0
+    Seq.AQSlice(1).PhaseOS(2) = 1;
+  end
+  if numel(Seq.AQSlice(1).PhaseOS)==2 || Seq.AQSlice(1).PhaseOS(3)==0
+    Seq.AQSlice(1).PhaseOS(3) = 1;
+  end
 
   Seq.AQSlice(1).sizePhase(Seq.AQSlice(1).nPhase==1) = Inf;
   Seq.AQSlice(1).sizeRead(Seq.AQSlice(1).nRead==1) = Inf;
@@ -1293,13 +1487,16 @@ if Seq.PreProcessSequence
                                        2 / mean(abs(HW.Grad(Seq.AQSlice(1).iDevice).ImageVol))), ...
                                    0, Seq.AQSlice(1).nRead/Seq.AQSlice(1).sizeRead*2]) ...
       ./ Seq.AQSlice(1).SpoilFactor;
-  elseif numel(Seq.AQSlice(1).sizePhaseSpoil) == 1
+  elseif isscalar(Seq.AQSlice(1).sizePhaseSpoil)
     Seq.AQSlice(1).sizePhaseSpoil(1:3) = Seq.AQSlice(1).sizePhaseSpoil;
     Seq.AQSlice(1).SpoilFactor = NaN(1, 3);
   else
     Seq.AQSlice(1).SpoilFactor = NaN(1, 3);
   end
-  if isemptyfield(Seq.AQSlice(1), 'SpoilLengthFactor'), Seq.AQSlice(1).SpoilLengthFactor = 1; end
+  if isemptyfield(Seq.AQSlice(1), 'SpoilLengthFactor')
+    % factor for the spoiler in each (spatially encoded) direction
+    Seq.AQSlice(1).SpoilLengthFactor = 1;
+  end
 
   % Optionally differing values for the spoiler after the last read-out window
   % in each echo train.
@@ -1322,14 +1519,19 @@ if Seq.PreProcessSequence
                                      0, Seq.AQSlice(1).nRead/Seq.AQSlice(1).sizeRead*2]) ...
         ./ Seq.AQSlice(1).SpoilFactorEnd;
     end
-  elseif numel(Seq.AQSlice(1).sizePhaseSpoilEnd) == 1
+  elseif isscalar(Seq.AQSlice(1).sizePhaseSpoilEnd)
     Seq.AQSlice(1).sizePhaseSpoilEnd(1:3) = Seq.AQSlice(1).sizePhaseSpoilEnd;
     Seq.AQSlice(1).SpoilFactorEnd = NaN(1, 3);
   else
     Seq.AQSlice(1).SpoilFactorEnd = NaN(1, 3);
   end
 
-  if isemptyfield(Seq.AQSlice(1), 'SpoilTimeOffset'), Seq.AQSlice(1).SpoilTimeOffset = 0; end
+  if isemptyfield(Seq.AQSlice(1), 'SpoilTimeOffset')
+    % time offset of the spoiler pulses in seconds
+    % A value of 0 means that the spoiler pulses start immediately after the read
+    % out pulse. Positive values move the spoilers away from the read out pulse.
+    Seq.AQSlice(1).SpoilTimeOffset = 0;
+  end
   % read, phase and slice rephase and dephase pulses adapt to SpoilLengthFactor
   % and SpoilTimeOffset by default
   if isemptyfield(Seq.AQSlice(1), 'DephaseLengthFactor')
@@ -1340,6 +1542,9 @@ if Seq.PreProcessSequence
   end
   if isemptyfield(Seq.AQSlice(1), 'RephaseLengthFactor')
     Seq.AQSlice(1).RephaseLengthFactor = Seq.AQSlice(1).SpoilLengthFactor;
+  end
+  if isemptyfield(Seq.AQSlice(1), 'RephaseLengthFactorEnd')
+    Seq.AQSlice(1).RephaseLengthFactorEnd = Seq.AQSlice(1).RephaseLengthFactor;
   end
   if isemptyfield(Seq.AQSlice(1), 'RephaseTimeOffset')
     Seq.AQSlice(1).RephaseTimeOffset = Seq.AQSlice(1).SpoilTimeOffset;
@@ -1352,26 +1557,26 @@ if Seq.PreProcessSequence
   end
   % spoiler pulses move with rephase and dephase pulses by default
   if isemptyfield(Seq.AQSlice(1), 'SpoilDephaseLengthFactor')
-    Seq.AQSlice(1).SpoilDephaseLengthFactor = Seq.AQSlice(1).SpoilLengthFactor/Seq.AQSlice(1).RephaseLengthFactor;
+    Seq.AQSlice(1).SpoilDephaseLengthFactor = 1;
   end
   if isemptyfield(Seq.AQSlice(1), 'SpoilDephaseTimeOffset')
     Seq.AQSlice(1).SpoilDephaseTimeOffset = Seq.AQSlice(1).RephaseTimeOffset;
   end
   if isemptyfield(Seq.AQSlice(1), 'SpoilRephaseLengthFactor')
-    Seq.AQSlice(1).SpoilRephaseLengthFactor = Seq.AQSlice(1).SpoilLengthFactor/Seq.AQSlice(1).DephaseLengthFactor;
+    Seq.AQSlice(1).SpoilRephaseLengthFactor = 1;
   end
   if isemptyfield(Seq.AQSlice(1), 'SpoilRephaseTimeOffset')
     Seq.AQSlice(1).SpoilRephaseTimeOffset = Seq.AQSlice(1).DephaseTimeOffset;
   end
   if isemptyfield(Seq.AQSlice(1), 'SpoilDephaseLengthFactorEnd')
-    Seq.AQSlice(1).SpoilDephaseLengthFactorEnd = Seq.AQSlice(1).SpoilLengthFactor/Seq.AQSlice(1).RephaseLengthFactor;
+    Seq.AQSlice(1).SpoilDephaseLengthFactorEnd = 1;
   end
 
 
   if isemptyfield(Seq, 'DephaseBefore180'), Seq.DephaseBefore180 = 0; end
   Seq.DephaseBefore180 = (Seq.DephaseBefore180 > 0);  % convert to logical
   if isemptyfield(Seq.AQSlice(1), 'SpoilFactorInversionBlock'), Seq.AQSlice(1).SpoilFactorInversionBlock = 0; end
-  if isemptyfield(Seq.AQSlice(1), 'sizeSpoilInversionBlock')
+  if isemptyfield(Seq.AQSlice(1), 'sizeSpoilInversionBlock') || (Seq.AQSlice(1).SpoilFactorInversionBlock == 0)
     Seq.AQSlice(1).sizeSpoilInversionBlock = Seq.AQSlice(1).thicknessInversion/Seq.AQSlice(1).SpoilFactorInversionBlock;
   else
     Seq.AQSlice(1).SpoilFactorInversionBlock = Seq.AQSlice(1).thicknessInversion/Seq.AQSlice(1).sizeSpoilInversionBlock;
@@ -1447,6 +1652,12 @@ if Seq.PreProcessSequence
   Seq.AQSlice(1).TurboBlocks = numel(Seq.AQSlice(1).kLineOrder) / Seq.AQSlice(1).TurboFactor;
   Seq.AQSlice(1).TurboBlocksAll = nPhase / Seq.AQSlice(1).TurboFactorAll;
 
+  if Seq.AQSlice(1).TurboBlocksAll ~= round(Seq.AQSlice(1).TurboBlocksAll)
+    error('PD:sequence_Spin_Echo:InconsistentTurboBlocks', ...
+      ['Number of acquired k-spaces lines must be evenly distributable to number of turbo blocks. ', ...
+      'Check the value for the number of turbo blocks or the turbo factor.']);
+  end
+
   if (Seq.AQSlice(1).TurboFactor ~= 1 || Seq.AQSlice(1).nImages ~= 1 || Seq.AQSlice(1).oddEvenEchoes) && ...
       Seq.DephaseBefore180
     error('PD:sequence_SpinEcho:TurboPreventsDephaseBefore180', ...
@@ -1483,28 +1694,37 @@ if Seq.PreProcessSequence
   end
 
   % settings for sequence plot
-  if isemptyfield(Seq, 'plotSeqAQ'), Seq.plotSeqAQ = []; end
-  if isemptyfield(Seq, 'plotSeqEchoTrain'), Seq.plotSeqEchoTrain = Seq.plotSeqAQ; end
+  if ~isfield(Seq, 'plotSeqAQ')
+     Seq.plotSeqAQ = [];
+  end
+  if isemptyfield(Seq, 'plotSeqEchoTrain')
+    Seq.plotSeqEchoTrain = Seq.plotSeqAQ;
+  end
   if ~isempty(Seq.plotSeqEchoTrain)
     Seq.plotSeq = Seq.plotSeqEchoTrain;
-    if isemptyfield(Seq,'plotSeqStart')
+    if isemptyfield(Seq, 'plotSeqStart')
       Seq.plotSeqStart = 1 + Seq.SteadyState_PreShots90 * ...
         (1 + Seq.SteadyState_PreShots180 + Seq.SteadyState_PostShots180 + ...
         (prod(Seq.AQSlice(1).nPhase)*prod(Seq.AQSlice(1).PhaseOS)*(Seq.AQSlice(1).oddEvenEchoes+1))*Seq.AQSlice(1).nImages/Seq.AQSlice(1).TurboBlocks);
     end
-    if isemptyfield(Seq,'plotSeqEnd')
+    if isemptyfield(Seq, 'plotSeqEnd')
       Seq.plotSeqEnd = Seq.plotSeqStart + ...
         (1 + Seq.SteadyState_PreShots180 + Seq.SteadyState_PostShots180 + ...
         (prod(Seq.AQSlice(1).nPhase)*prod(Seq.AQSlice(1).PhaseOS)*(Seq.AQSlice(1).oddEvenEchoes+1))*Seq.AQSlice(1).nImages/Seq.AQSlice(1).TurboBlocks) * ...
         Seq.AQSlice(1).TurboBlocks * Seq.AQSlice(1).phaseCycleSteps - 1;
     end
-    if ~isfield(Seq, 'plotSequence'), Seq.plotSequence = struct(); end
+    if ~isfield(Seq, 'plotSequence')
+      Seq.plotSequence = struct();
+    end
     if isemptyfield(Seq.plotSequence, 'xLim')
       Seq.plotSequence.xLim = [-Inf, ...
-        Seq.tEcho * (1 + Seq.SteadyState_PreShots180 + Seq.SteadyState_PostShots180 + ...
-        (prod(Seq.AQSlice(1).nPhase)*prod(Seq.AQSlice(1).PhaseOS)*(Seq.AQSlice(1).oddEvenEchoes+1))*Seq.AQSlice(1).nImages/Seq.AQSlice(1).TurboBlocks )];
+        Seq.tEcho * (1 + Seq.SteadyState_PreShots180 + Seq.SteadyState_PostShots180 ...
+        + (prod(Seq.AQSlice(1).nPhase)*prod(Seq.AQSlice(1).PhaseOS)*(Seq.AQSlice(1).oddEvenEchoes+1))*Seq.AQSlice(1).nImages/Seq.AQSlice(1).TurboBlocks) ...
+        + Seq.AQSlice(1).AcquisitionTime/2 * Seq.AQSlice(1).RephaseLengthFactorEnd];
     end
-    if isemptyfield(Seq.plotSequence, 'wraps'), Seq.plotSequence.wraps = Seq.AQSlice(1).TurboBlocks*Seq.AQSlice(1).phaseCycleSteps;end
+    if isemptyfield(Seq.plotSequence, 'wraps')
+      Seq.plotSequence.wraps = Seq.AQSlice(1).TurboBlocks * Seq.AQSlice(1).phaseCycleSteps;
+    end
   end
 
   % repetition time (of excitations)
@@ -1531,8 +1751,22 @@ if Seq.PreProcessSequence
     end
   end
   if ~isempty(Seq.AQSlice(1).TurboBreak)
+    if isfinite(Seq.InterferenceFrequencyRepetitionTime)
+      % extend repetition time to odd number of half interference periods
+      Seq.AQSlice(1).TurboBreak = ...
+        (ceil((Seq.AQSlice(1).TurboBreak + tTurboBlock - 2/HW.MMRT(Seq.AQSlice(1).iDevice).fSystem) ...
+              * Seq.InterferenceFrequencyRepetitionTime + 0.5) - 0.5) ...
+        / Seq.InterferenceFrequencyRepetitionTime - tTurboBlock;
+    end
     Seq.RepetitionTime = Seq.AQSlice(1).TurboBreak + tTurboBlock;
   elseif ~isempty(Seq.RepetitionTime)
+    if isfinite(Seq.InterferenceFrequencyRepetitionTime)
+      % extend to odd number of half interference periods
+      Seq.RepetitionTime = ...
+        (ceil((Seq.RepetitionTime - 2/HW.MMRT(Seq.AQSlice(1).iDevice).fSystem) ...
+              * Seq.InterferenceFrequencyRepetitionTime + 0.5) - 0.5) ...
+        / Seq.InterferenceFrequencyRepetitionTime;
+    end
     Seq.AQSlice(1).TurboBreak = Seq.RepetitionTime - tTurboBlock;
   end
   if Seq.AQSlice(1).TurboBreak < 1e-3
@@ -1569,18 +1803,24 @@ if Seq.PreProcessSequence
   end
 end
 
-if Seq.AQSlice(1).sizeRead>=1;Seq.CorrectRemanence=0;end
+if Seq.AQSlice(1).sizeRead >= 1
+  Seq.CorrectRemanence = 0;
+end
 CRLoops = ones(1, Seq.CorrectRemanence);
 Seq.LoopName = repmat({'CRLoop'}, 1, Seq.CorrectRemanence);
 
-if min(Seq.AQSlice(1).thickness,Seq.AQSlice(1).thicknessInversion)>=1;Seq.CorrectSliceRephase=0;end
+if min(Seq.AQSlice(1).thickness, Seq.AQSlice(1).thicknessInversion) >= 1
+  Seq.CorrectSliceRephase = 0;
+end
 CSRLoops = repmat([1,2], 1, Seq.CorrectSliceRephase);
 Seq.LoopName = [Seq.LoopName, repmat({'CSRLoopPlus', 'CSRLoopMinus'}, 1, Seq.CorrectSliceRephase)];
 
 CPRLoops = repmat([1,2], 1, Seq.CorrectPhaseRephase);
 Seq.LoopName = [Seq.LoopName, repmat({'CPRLoopPlus', 'CPRLoopMinus'}, 1, Seq.CorrectPhaseRephase)];
 
-if Seq.AQSlice(1).sizeRead>=1;Seq.CorrectReadRephase=0;end
+if Seq.AQSlice(1).sizeRead >= 1
+  Seq.CorrectReadRephase = 0;
+end
 CRRLoops = ones(1, Seq.CorrectReadRephase);
 Seq.LoopName = [Seq.LoopName, repmat({'CRRLoop'}, 1, Seq.CorrectReadRephase)];
 
@@ -1592,7 +1832,7 @@ Seq.LoopName = [Seq.LoopName, repmat({Seq.SteadyState_PreShotsLoopsName}, 1, Seq
 
 Seq.LoopName = [Seq.LoopName, repmat({'normal'}, 1, Seq.Loops)];
 
-if isempty(Grad)
+if nargin < 5 || isempty(Grad)
   %% Gradient parameters
   % Grad(1) x
   % Grad(2) y
@@ -1617,6 +1857,7 @@ init.TX = TX;
 init.Seq = Seq;
 init.Grad = Grad;
 LoopCount = 0;
+PreShotsLoop = 0;
 dataB0 = Seq.dataB0;
 for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Seq.Loops]
   LoopCount = LoopCount+1;
@@ -1676,10 +1917,10 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
       if ~Seq.LoopSeqPlot
         Seq.plotSeqTR = [];     % plot sequence, all tReps are starting at origin, plot RF, AQ and Grad (1==x, 2==y, 3==z, 0 no Grad)
         Seq.plotSeq = [];       % plot sequence on real timeline, plot RF, AQ and Grad (1==x, 2==y, 3==z, 0 no Grad)
-        Seq.plotSeqStart = [];
-        Seq.plotSeqEnd = [];
         Seq.plotSequence = [];
       end
+      Seq.plotSeqStart = [];
+      Seq.plotSeqEnd = [];
 
     case 'CSRLoopPlus'
       % correct slice rephase
@@ -1741,10 +1982,10 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
       if ~Seq.LoopSeqPlot
         Seq.plotSeqTR = [];     % plot sequence, all tReps are starting at origin, plot RF, AQ and Grad (1==x, 2==y, 3==z, 0 no Grad)
         Seq.plotSeq = [];       % plot sequence on real timeline, plot RF, AQ and Grad (1==x, 2==y, 3==z, 0 no Grad)
-        Seq.plotSeqStart = [];
-        Seq.plotSeqEnd = [];
         Seq.plotSequence = [];
       end
+      Seq.plotSeqStart = [];
+      Seq.plotSeqEnd = [];
 
     case 'CSRLoopMinus'
       % correct slice rephase
@@ -1793,10 +2034,10 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
       if ~Seq.LoopSeqPlot
         Seq.plotSeqTR = [];     % plot sequence, all tReps are starting at origin, plot RF, AQ and Grad (1==x, 2==y, 3==z, 0 no Grad)
         Seq.plotSeq = [];       % plot sequence on real timeline, plot RF, AQ and Grad (1==x, 2==y, 3==z, 0 no Grad)
-        Seq.plotSeqStart = [];
-        Seq.plotSeqEnd = [];
         Seq.plotSequence = [];
       end
+      Seq.plotSeqStart = [];
+      Seq.plotSeqEnd = [];
 
     case 'CPRLoopPlus'
       % correct phase rephase
@@ -1854,10 +2095,10 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
       if ~Seq.LoopSeqPlot
         Seq.plotSeqTR = [];     % plot sequence, all tReps are starting at origin, plot RF, AQ and Grad (1==x, 2==y, 3==z, 0 no Grad)
         Seq.plotSeq = [];       % plot sequence on real timeline, plot RF, AQ and Grad (1==x, 2==y, 3==z, 0 no Grad)
-        Seq.plotSeqStart = [];
-        Seq.plotSeqEnd = [];
         Seq.plotSequence = [];
       end
+      Seq.plotSeqStart = [];
+      Seq.plotSeqEnd = [];
 
     case 'CPRLoopMinus'
       % correct phase rephase
@@ -1900,10 +2141,10 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
       if ~Seq.LoopSeqPlot
         Seq.plotSeqTR = [];     % plot sequence, all tReps are starting at origin, plot RF, AQ and Grad (1==x, 2==y, 3==z, 0 no Grad)
         Seq.plotSeq = [];       % plot sequence on real timeline, plot RF, AQ and Grad (1==x, 2==y, 3==z, 0 no Grad)
-        Seq.plotSeqStart = [];
-        Seq.plotSeqEnd = [];
         Seq.plotSequence = [];
       end
+      Seq.plotSeqStart = [];
+      Seq.plotSeqEnd = [];
 
     case 'CRRLoop'
       % correct read rephase
@@ -1944,10 +2185,10 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
       if ~Seq.LoopSeqPlot
         Seq.plotSeqTR = [];     % plot sequence, all tReps are starting at origin, plot RF, AQ and Grad (1==x, 2==y, 3==z, 0 no Grad)
         Seq.plotSeq = [];       % plot sequence on real timeline, plot RF, AQ and Grad (1==x, 2==y, 3==z, 0 no Grad)
-        Seq.plotSeqStart = [];
-        Seq.plotSeqEnd = [];
         Seq.plotSequence = [];
       end
+      Seq.plotSeqStart = [];
+      Seq.plotSeqEnd = [];
 
     case 'B0map_tEcho1'
       if Seq.AQSlice(1).nRead < 2
@@ -1972,7 +2213,7 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
       Seq.AQSlice(1).ZeroFillWindowSize = Seq.CorrectB0Read.ZeroFillWindowSize;
       Seq.CorrectB0Read.Use = false;
 
-    case 'normal'
+    case {'normal', Seq.SteadyState_PreShotsLoopsName}
       % Seq.AQSlice(1).ReadGradTimeIntegralOffset=0;
       if exist('SeqLoop', 'var') && isfield(SeqLoop, 'AQSlice') && isfield(SeqLoop, 'data')
         if isfield(SeqLoop.data, 'SliceReadGradTimeIntegralOffset') || ...
@@ -1992,6 +2233,10 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
         end
       end
 
+      if strcmp(Seq.LoopName{Seq.LoopNameCount}, Seq.SteadyState_PreShotsLoopsName)
+        PreShotsLoop = PreShotsLoop + 1;
+      end
+
     otherwise
       % do nothing
 
@@ -2003,17 +2248,22 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
     if isinf(Seq.Find_Frequency_interval) || ...
         (now*24*3600-mySave.lastTime < Seq.Find_Frequency_interval-0.01)
       % Use last results of frequency sweep (i.e. mySave.HW.B0)
-      [HW, mySave] = Find_Frequency_Sweep(HW, mySave, Inf);
+      [HW, mySave] = Seq.Function_Find_Frequency(HW, mySave, Inf);
     else
       if ~isempty(Seq.StartSequenceTime)
         % delay execution for timed loops
-        sleep(max(0, Seq.StartSequenceTime - now*24*3600));
+        if ~isempty(HW.Dummy) && all(HW.Dummy ~= 0)
+          % optionally, speed up execution in dummy mode
+          sleep(max(0, (Seq.StartSequenceTime - now*24*3600)/HW.DummyFastForwardFactor));
+        else
+          sleep(max(0, Seq.StartSequenceTime - now*24*3600));
+        end
       end
 
       oldFindFrequencyPause = HW.FindFrequencyPause;
-      hwGuard = onCleanup(@() setfield(HW, 'FindFrequencyPause', oldFindFrequencyPause)); %#ok<SFLD>
+      hwGuard = onCleanup(@() setfield(HW, 'FindFrequencyPause', oldFindFrequencyPause));  %#ok<SFLD>
       HW.FindFrequencyPause = 0;
-      [HW, mySave] = Find_Frequency_Sweep(HW, mySave, 0);  % Find magnet frequency
+      [HW, mySave] = Seq.Function_Find_Frequency(HW, mySave, 0);  % Find magnet frequency
       delete(hwGuard);
 
       % Update start time for sequence to account for the magnetization lost due
@@ -2059,7 +2309,8 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
   kLinesDim = reshape(1:numImages*numKLines, ...
     Seq.AQSlice(1).nImages, (Seq.AQSlice(1).oddEvenEchoes+1), ...
     Seq.AQSlice(1).TurboBlocksAll, Seq.AQSlice(1).TurboFactorAll, Seq.AQSlice(1).phaseCycleSteps);
-  if any(strcmp(Seq.LoopName{Seq.LoopNameCount}, {'normal', 'B0map_tEcho1', 'B0map_tEcho2'}))
+  if any(strcmp(Seq.LoopName{Seq.LoopNameCount}, ...
+                {'normal', Seq.SteadyState_PreShotsLoopsName, 'B0map_tEcho1', 'B0map_tEcho2'}))
     % reshape such that Turbo-Blocks and echo trains share the same dimension
     kLinesDimTemp = reshape(kLinesDim, ...
       Seq.AQSlice(1).nImages, (Seq.AQSlice(1).oddEvenEchoes+1), ...
@@ -2107,7 +2358,7 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
   Seq.kLinestReps = repmat(Seq.P90tReps(1,Seq.SteadyState_PreShots90+1:end-Seq.SteadyState_PostShots90), size(Seq.kLines,1), 1) + ...
     repmat((1:size(Seq.kLines,1)).', 1, size(Seq.kLines,2)) + Seq.SteadyState_PreShots180;
   % tReps with inversion pulses without acquisition
-  Seq.P180tRepsPrePost = setdiff(Seq.P180tReps(:), Seq.kLinestReps(:));
+  Seq.P180tRepsPrePost = setdiff(Seq.P180tReps.', Seq.kLinestReps.', 'rows').';
   % tReps with refocusing pre-shots (i.e. without actual acquisition at the end of the echo train)
   Seq.PostShotstReps = repmat(Seq.P90tReps, Seq.SteadyState_PostShots180, 1) + ...
     repmat((1:Seq.SteadyState_PostShots180).', 1, size(Seq.P90tReps,2)) + Seq.SteadyState_PreShots180 + size(Seq.kLines,1);
@@ -2198,7 +2449,7 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
   Seq.Read(1).UseCoordinate = Seq.AQSlice(1).ReadCoordinate;
   Seq.Read(1).GradTimeDelay = Seq.AQSlice(1).ReadTimeDelay;
   Seq.Read(1).GradTimeIntegralOffset = Seq.AQSlice(1).ReadGradTimeIntegralOffset;
-  Seq.Read(1).UseAtRepetitionTime = Seq.kLinestReps;
+  Seq.Read(1).UseAtRepetitionTime = Seq.AQSlice(1).UsetRep;
   Seq.Read(1).UseAtRepetitionTimeDephase = Seq.Read(1).UseAtRepetitionTime;
   % optionally, move dephase pulse of first echo in train to front
   Seq.Read(1).UseAtRepetitionTimeDephase(1,:) = ...
@@ -2217,6 +2468,12 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
   Seq.Read(1).GradRephaseLengthFactor = Seq.AQSlice(1).RephaseLengthFactor;
   if Seq.AQSlice(1).dualNuclearImage
     Seq.Read(1).GammaX = Seq.AQSlice(1).GammaX;
+  end
+  if isemptyfield(Seq.Read(1), 'GradSamplesExtra')
+    Seq.Read(1).GradSamplesExtra = HW.RX(Seq.AQSlice(1).iDevice).GradSamplesExtra;
+  end
+  if isemptyfield(Seq.Read(1), 'GradSamplesExtraWarning')
+    Seq.Read(1).GradSamplesExtraWarning = HW.RX(Seq.AQSlice(1).iDevice).GradSamplesExtraWarning;
   end
 
   % dummy Readouts at tEcho of 180 degrees pre and post shots
@@ -2238,6 +2495,8 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
   if Seq.AQSlice(1).dualNuclearImage
     Seq.Read(2).GammaX = Seq.AQSlice(1).GammaX;
   end
+  Seq.Read(2).GradSamplesExtra = Seq.Read(1).GradSamplesExtra;
+  Seq.Read(2).GradSamplesExtraWarning = Seq.Read(1).GradSamplesExtraWarning;
 
   % dummy Readouts at 90 degrees pre and post shots
   Seq.Read(3).HzPerPixelMin = Seq.Read(1).HzPerPixelMin;
@@ -2259,54 +2518,85 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
   if Seq.AQSlice(1).dualNuclearImage
     Seq.Read(3).GammaX = Seq.AQSlice(1).GammaX;
   end
+  Seq.Read(3).GradSamplesExtra = Seq.Read(1).GradSamplesExtra;
+  Seq.Read(3).GradSamplesExtraWarning = Seq.Read(1).GradSamplesExtraWarning;
 
 
   % generate readout timings
-  Seq = get_ReadParameter(Seq, HW);
+  Seq = get_ReadParameter(Seq, HW, 1:3);
 
   Seq.AQSlice(1).AcquisitionTime = Seq.Read(1).AcquisitionTime;
   Seq.AQSlice(1).AcquisitionFrequency = Seq.Read(1).AcquisitionFrequency;
   Seq.Read(2).GradTimeDelayOffset = Seq.Read(1).GradTimeDelayOffset;
   Seq.Read(3).GradTimeDelayOffset = Seq.Read(1).GradTimeDelayOffset;
 
-  % multiplicate the length of the spoil at end
-  Spoil.CenterOfDephaseEnd = Seq.Read(1).CenterOfRephase + ...
-    (Seq.Read(1).GradRephaseLength-Seq.Read(1).tRamp) .* (Seq.AQSlice(1).SpoilDephaseLengthFactorEnd-1) / 2 + ...
-    Seq.AQSlice(1).SpoilDephaseTimeOffset;
-  Spoil.GradDephaseLengthEnd = (Seq.Read(1).GradRephaseLength-Seq.Read(1).tRamp) .* Seq.AQSlice(1).SpoilDephaseLengthFactorEnd + Seq.Read(1).tRamp;
-  if Seq.AQSlice(1).SpoilDephaseLengthFactorEnd == 0
+  % multiply the length of the spoiler at the end of the echo trains
+  Spoil.CenterOfDephaseEnd = Seq.Read(1).CenterOfRephase ...
+    + (Seq.Read(1).GradRephaseLength-Seq.Read(1).tRamp) * (Seq.AQSlice(1).RephaseLengthFactorEnd * Seq.AQSlice(1).SpoilDephaseLengthFactorEnd - 1) / 2 ...
+    + Seq.AQSlice(1).SpoilDephaseTimeOffset;
+  Spoil.GradDephaseLengthEnd = (Seq.Read(1).GradRephaseLength-Seq.Read(1).tRamp) * Seq.AQSlice(1).RephaseLengthFactorEnd * Seq.AQSlice(1).SpoilDephaseLengthFactorEnd ...
+    + Seq.Read(1).tRamp;
+  if Seq.AQSlice(1).RephaseLengthFactorEnd == 0
     % set minimum gradient length
     Spoil.GradDephaseLengthEnd = 2*Seq.Read(1).tRamp + 2/HW.RX(Seq.AQSlice(1).iDevice).fSample;
   end
-   % multiplicate the length of the spoil and rephase pulse to achieve shorter tEcho with reduced grad amplitudes
-  Spoil.CenterOfDephase = Seq.Read(1).CenterOfRephase + ...
-    (Seq.Read(1).GradRephaseLength-Seq.Read(1).tRamp) .* (Seq.AQSlice(1).SpoilDephaseLengthFactor-1) / 2 + ...
-    Seq.AQSlice(1).SpoilDephaseTimeOffset;
-  Spoil.GradDephaseLength = (Seq.Read(1).GradRephaseLength-Seq.Read(1).tRamp) .* Seq.AQSlice(1).SpoilDephaseLengthFactor + Seq.Read(1).tRamp;
+   % multiply the length of the spoil and rephase pulse to achieve shorter tEcho with reduced grad amplitudes
+  Spoil.CenterOfDephase = Seq.Read(1).CenterOfRephase ...
+    + (Seq.Read(1).GradRephaseLength-Seq.Read(1).tRamp) * (Seq.AQSlice(1).SpoilDephaseLengthFactor-1) / 2 ...
+    + Seq.AQSlice(1).SpoilDephaseTimeOffset;
+  Spoil.GradDephaseLength = (Seq.Read(1).GradRephaseLength-Seq.Read(1).tRamp) * Seq.AQSlice(1).SpoilDephaseLengthFactor ...
+    + Seq.Read(1).tRamp;
   if Seq.AQSlice(1).SpoilDephaseLengthFactor == 0
     % set minimum gradient length
     Spoil.GradDephaseLength = 2*Seq.Read(1).tRamp + 2/HW.RX(Seq.AQSlice(1).iDevice).fSample;
   end
+
+  if Seq.AQSlice(1).RephaseLengthFactor ~= Seq.AQSlice(1).RephaseLengthFactorEnd * Seq.AQSlice(1).SpoilDephaseLengthFactorEnd
+    if size(Seq.kLines, 1) == 1
+      % only one echo in the "echo train"
+      Seq.Read(1).CenterOfRephase = Spoil.CenterOfDephaseEnd;
+      Seq.Read(1).GradRephaseLength = Spoil.GradDephaseLengthEnd;
+
+      Seq.Read(3).CenterOfRephase = Spoil.CenterOfDephaseEnd;
+      Seq.Read(3).GradRephaseLength = Spoil.GradDephaseLengthEnd;
+    else
+      % different rephase length at end of echo train
+      Seq.Read(1).CenterOfRephase = Seq.Read(1).CenterOfRephase * ones(1, numel(Seq.AQSlice(1).UsetRep));
+      Seq.Read(1).GradRephaseLength = Seq.Read(1).GradRephaseLength * ones(1, numel(Seq.AQSlice(1).UsetRep));
+      Seq.Read(1).CenterOfRephase(Seq.kLines(end,:)) = Spoil.CenterOfDephaseEnd;
+      Seq.Read(1).GradRephaseLength(Seq.kLines(end,:)) = Spoil.GradDephaseLengthEnd;
+
+      Seq.Read(3).CenterOfRephase = Seq.Read(3).CenterOfRephase * ones(1, max(1, numel(Seq.P180tRepsPrePost)));
+      Seq.Read(3).GradRephaseLength = Seq.Read(3).GradRephaseLength * ones(1, max(1, numel(Seq.P180tRepsPrePost)));
+      idxLastInEchoTrain = ismember(Seq.Read(3).UseAtRepetitionTime, Seq.P180tRepsPrePost(end,:));
+      Seq.Read(3).CenterOfRephase(idxLastInEchoTrain) = Spoil.CenterOfDephaseEnd;
+      Seq.Read(3).GradRephaseLength(idxLastInEchoTrain) = Spoil.GradDephaseLengthEnd;
+    end
+  end
+
   % center of spoiler in tRep with excitation pulse
   Spoil.CenterOfDephaseExcitation = Spoil.CenterOfDephase;
-  Spoil.CenterOfRephase = Seq.Read(1).CenterOfDephase - ...
-    (Seq.Read(1).GradDephaseLength-Seq.Read(1).tRamp) .* (Seq.AQSlice(1).SpoilRephaseLengthFactor-1) / 2 - ...
-    Seq.AQSlice(1).SpoilRephaseTimeOffset;
-  Spoil.GradRephaseLength = (Seq.Read(1).GradDephaseLength-Seq.Read(1).tRamp) .* Seq.AQSlice(1).SpoilRephaseLengthFactor + Seq.Read(1).tRamp;
+  Spoil.CenterOfRephase = Seq.Read(1).CenterOfDephase ...
+    - (Seq.Read(1).GradDephaseLength-Seq.Read(1).tRamp) .* (Seq.AQSlice(1).SpoilRephaseLengthFactor-1) / 2 ...
+    - Seq.AQSlice(1).SpoilRephaseTimeOffset;
+  Spoil.GradRephaseLength = (Seq.Read(1).GradDephaseLength-Seq.Read(1).tRamp) .* Seq.AQSlice(1).SpoilRephaseLengthFactor ...
+    + Seq.Read(1).tRamp;
   defGradDephaseLength = Seq.Read(1).GradDephaseLength;
   if Seq.AQSlice(1).RephaseTimeOffset ~= 0
     Seq.Read(1).CenterOfRephase = Seq.Read(1).CenterOfRephase + Seq.AQSlice(1).RephaseTimeOffset;
-    Seq.Read(2).CenterOfRephase = Seq.Read(1).CenterOfRephase;
-    Seq.Read(3).CenterOfRephase = Seq.Read(1).CenterOfRephase;
+    Seq.Read(2).CenterOfRephase = Seq.Read(2).CenterOfRephase + Seq.AQSlice(1).RephaseTimeOffset;
+    Seq.Read(3).CenterOfRephase = Seq.Read(3).CenterOfRephase + Seq.AQSlice(1).RephaseTimeOffset;
   end
   if Seq.AQSlice(1).DephaseTimeOffset ~= 0
     Seq.Read(1).CenterOfDephase = Seq.Read(1).CenterOfDephase - Seq.AQSlice(1).DephaseTimeOffset;
-    Seq.Read(2).CenterOfDephase = Seq.Read(1).CenterOfDephase;
-    Seq.Read(3).CenterOfDephase = Seq.Read(1).CenterOfDephase;
+    Seq.Read(2).CenterOfDephase = Seq.Read(2).CenterOfDephase - Seq.AQSlice(1).DephaseTimeOffset;
+    Seq.Read(3).CenterOfDephase = Seq.Read(3).CenterOfDephase - Seq.AQSlice(1).DephaseTimeOffset;
   end
-  if Seq.AQSlice(1).RephaseTimeOffset~=0 || Seq.AQSlice(1).DephaseTimeOffset~=0
+
+  if Seq.AQSlice(1).RephaseTimeOffset ~= 0 || Seq.AQSlice(1).DephaseTimeOffset ~= 0 ...
+      || Seq.AQSlice(1).RephaseLengthFactor ~= Seq.AQSlice(1).SpoilDephaseLengthFactorEnd * Seq.AQSlice(1).SpoilDephaseLengthFactorEnd
       % update readout timings
-      Seq = get_ReadParameter(Seq, HW);
+      Seq = get_ReadParameter(Seq, HW, 1:3);
   end
 
   %% set up structures for get_SliceParameter (i.e. rf pulses with optional slice selection)
@@ -2353,7 +2643,7 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
     Seq.Slice(1).Pulse.FlipAngleX = Seq.CorrectPhaseFlipAngle;
   end
 
-  Seq = get_SliceParameter(Seq, HW);  % generate slice parameters
+  Seq = get_SliceParameter(Seq, HW, 1);  % generate slice parameters
 
   Seq.Slice(1).CenterOfRephase = Seq.Slice(1).CenterOfRephase + Seq.AQSlice(1).SliceRephaseTimeOffset;
 
@@ -2452,7 +2742,7 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
     end
 
     % generate readout timings
-    Seq = get_ReadParameter(Seq, HW);
+    Seq = get_ReadParameter(Seq, HW, 5);
 
     % adjust position of spoiler gradient slot in tRep with excitation if needed
     Spoil.CenterOfDephaseExcitation = Spoil.CenterOfDephaseExcitation + max(0, ...
@@ -2463,18 +2753,20 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
   end
 
   readSpoilCoordinate = (Seq.AQSlice(1).PhaseCoordinate == Seq.AQSlice(1).ReadCoordinate);
-  if Seq.AQSlice(1).sizePhaseSpoil(readSpoilCoordinate) == 0  % set spoiler amp equal to read grad amp
+  if Seq.AQSlice(1).sizePhaseSpoil(readSpoilCoordinate) == 0
+    % Set spoiler amp equal to read grad amp at echoes in echo train apart from
+    % the last echo (see below Seq.AQSlice(1).sizePhaseSpoilEnd)
     % Spoil read direction
     if Seq.Read(1).GradTimeIntegral == 0  % no readout gradient
       Seq.AQSlice(1).SpoilFactor(readSpoilCoordinate) = 0;
     else
       Seq.AQSlice(1).SpoilFactor(readSpoilCoordinate) = ...
-        (~Seq.DephaseBefore180) * Seq.Read(1).GradTimeIntegral/Seq.Read(1).GradTimeIntegralAQ/2 + ...  % compensate read dephase
-        (Seq.Read(1).GradDephaseLength-Seq.Read(1).tRamp)/Seq.Read(1).AcquisitionTime;  % spoil such that effective amplitude equals the read out gradient amplitude
+        (~Seq.DephaseBefore180) * Seq.Read(1).GradTimeIntegral / Seq.Read(1).GradTimeIntegralAQ / 2 ...  % compensate read dephase
+        + (Seq.Read(1).GradDephaseLength - Seq.Read(1).tRamp) / Seq.Read(1).AcquisitionTime;  % spoil such that effective amplitude equals the read out gradient amplitude
     end
 
     Seq.AQSlice(1).sizePhaseSpoil(readSpoilCoordinate) = ...
-      Seq.AQSlice(1).sizeRead ./ Seq.AQSlice(1).nRead ./ Seq.AQSlice(1).SpoilFactor(readSpoilCoordinate)./2;
+      Seq.AQSlice(1).sizeRead ./ Seq.AQSlice(1).nRead ./ Seq.AQSlice(1).SpoilFactor(readSpoilCoordinate) / 2;
   end
   if Seq.AQSlice(1).sizePhaseSpoilEnd(readSpoilCoordinate) == 0
     % Set spoiler amp equal to read grad amp after last read-out window in echo
@@ -2484,12 +2776,12 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
       Seq.AQSlice(1).SpoilFactorEnd(readSpoilCoordinate) = 0;
     else
       Seq.AQSlice(1).SpoilFactorEnd(readSpoilCoordinate) = ...
-        (~Seq.DephaseBefore180) * Seq.Read(1).GradTimeIntegral/Seq.Read(1).GradTimeIntegralAQ/2 + ...  % compensate read dephase
-        (Seq.Read(1).GradDephaseLength-Seq.Read(1).tRamp)/Seq.Read(1).AcquisitionTime;  % spoil such that effective amplitude equals the read out gradient amplitude
+        (~Seq.DephaseBefore180) * Seq.Read(1).GradTimeIntegral / Seq.Read(1).GradTimeIntegralAQ / 2 ...  % compensate read dephase
+        + (Spoil.GradDephaseLengthEnd - Seq.Read(1).tRamp) / Seq.Read(1).AcquisitionTime;  % spoil such that effective amplitude equals the read out gradient amplitude
     end
 
     Seq.AQSlice(1).sizePhaseSpoilEnd(readSpoilCoordinate) = ...
-      Seq.AQSlice(1).sizeRead ./ Seq.AQSlice(1).nRead ./ Seq.AQSlice(1).SpoilFactorEnd(readSpoilCoordinate)./2;
+      Seq.AQSlice(1).sizeRead ./ Seq.AQSlice(1).nRead ./ Seq.AQSlice(1).SpoilFactorEnd(readSpoilCoordinate) / 2;
   end
 
   % 180 degrees (slice) inversion
@@ -2508,8 +2800,8 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
   Seq.Slice(2).Pulse.Phase = Seq.tRepTurboBlockPhaseInversion(Seq.Slice(2).UseAtRepetitionTime) + ...
     Seq.AQSlice(1).inversionPhase;
   Seq.Slice(2).Pulse.PhaseIncrement = 0;
-  Seq.Slice(2).CenterOfDephase = Seq.Read(1).CenterOfRephase;  % Spoil.CenterOfRephase-mean(Seq.Read(1).GradTimeDelayOffset(1));
-  Seq.Slice(2).GradDephaseLength = Seq.Read(1).GradRephaseLength;  % Spoil.GradRephaseLength;
+  Seq.Slice(2).CenterOfDephase = Seq.Read(1).CenterOfRephase(1);  % Spoil.CenterOfRephase-mean(Seq.Read(1).GradTimeDelayOffset(1));
+  Seq.Slice(2).GradDephaseLength = Seq.Read(1).GradRephaseLength(1);  % Spoil.GradRephaseLength;
   Seq.Slice(2).CenterOfRephase = Seq.Read(1).CenterOfDephase;  % Spoil.CenterOfDephase-mean(Seq.Read(1).GradTimeDelayOffset(1));
   Seq.Slice(2).GradRephaseLength = Seq.Read(1).GradDephaseLength;  % Spoil.GradDephaseLength;
   Seq.Slice(2).MaxGradAmp = Seq.MaxGradAmpInversion;
@@ -2518,8 +2810,9 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
   Seq.Slice(2).GradDephaseSign = -Seq.AQSlice(1).SliceGradSign * Seq.AQSlice(1).GradSign;
   Seq.Slice(2).GradRephaseSign = -Seq.AQSlice(1).SliceGradSign * Seq.AQSlice(1).GradSign;
   Seq.Slice(2).iDevice = Seq.AQSlice(1).iDevice;
+  Seq.Slice(2).Gamma = Seq.Slice(1).Gamma;
   if Seq.AQSlice(1).dualNuclearImage
-    Seq.Slice(2).GammaX = Seq.AQSlice(1).GammaX;
+    Seq.Slice(2).GammaX = Seq.Slice(1).GammaX;
     Seq.Slice(2).Pulse.FlipAngleX = Seq.Slice(2).Pulse.FlipAngle;
   end
 
@@ -2542,7 +2835,7 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
 
   if Seq.AQSlice(1).SpoilFactorInversionBlock
     Seq.Slice(2).tEC = 0;
-    Seq = get_SliceParameter(Seq, HW);  % generate slice parameters with tEC = 0
+    Seq = get_SliceParameter(Seq, HW, 2);  % generate slice parameters with tEC = 0
     Seq.Slice(2).tEC = max(HW.Grad(Seq.Slice(2).iDevice).tEC, ...
       ((pi/HW.GammaDef/(Seq.AQSlice(1).sizeSpoilInversionBlock/2)) - Seq.Slice(2).GradTimeIntegral/2) / ...
       abs3D(Seq.Slice(2).GradAmp));
@@ -2553,11 +2846,11 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
         (pi/HW.GammaDef/(Seq.AQSlice(1).sizeSpoilInversionBlock/2)), 3)]);
     end
     % generate slice new parameters
-    Seq = get_SliceParameter(Seq, HW);
+    Seq = get_SliceParameter(Seq, HW, 1:3);
     Seq.AQSlice(1).inversionGradDephase = 0;
     Seq.AQSlice(1).inversionGradRephase = 0;
   else
-    Seq = get_SliceParameter(Seq, HW);  % generate slice parameters
+    Seq = get_SliceParameter(Seq, HW, 1:3);  % generate slice parameters
   end
 
   if ~isfield(Seq.AQSlice(1), 'inversionGradDephase') ...
@@ -2846,7 +3139,7 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
   [Seq.Phase(:).iDevice] = deal(Seq.AQSlice(1).iDevice);
 
   % generate phase parameters
-  Seq = get_PhaseParameter(Seq, HW);
+  Seq = get_PhaseParameter(Seq, HW, 1:15);
 
   % Image shift in phase direction
   [~, b] = sort(Seq.kLines(:));
@@ -2855,7 +3148,7 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
             Seq.Phase(2).AQPhaseShift + ...
             Seq.Phase(3).AQPhaseShift, 1, [])/pi*180;
   % update readout timings
-  Seq = get_ReadParameter(Seq, HW);
+  Seq = get_ReadParameter(Seq, HW, [1, 4]);
 
 
   if Seq.CorrectPhase > 0
@@ -3195,6 +3488,12 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
         AQ(t).GetData = any(AQ(t).GetData, 1);
         AQ(t).ResetPhases = reshape(AQ(t).ResetPhases, [], n90);
         AQ(t).ResetPhases = any(AQ(t).ResetPhases, 1);
+        if Seq.AQSlice(1).dualNuclearImage
+          AQ(t).FrequencyX = reshape(AQ(t).FrequencyX, [], n90);
+          AQ(t).FrequencyX = AQ(t).FrequencyX(I);
+          AQ(t).PhaseX = reshape(AQ(t).PhaseX, [], n90);
+          AQ(t).PhaseX = AQ(t).PhaseX(I);
+        end
       end
     end
     if ~isemptyfield(Seq, 'DigitalIO')
@@ -3311,14 +3610,84 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
     Seq.PollPPGfast = 0;
     Seq.GetRawData = 0;
     Seq.PostProcessSequence = 0;
+    % Seq.CLTime = zeros(size(Seq.tRep));
+    % Seq.CLTime(Seq.P90tReps) = 0.5;
+    % Seq.CLTime(1) = 0;
 
     if tStartSequence
       Seq.Reinitialize = double((Seq.LoopNameCount==1) || ~Seq.LoopsBreakExactly);
-      [ ~, SeqOut] = set_sequence(HW, Seq, AQ, TX, Grad);  % PreProcessSequence sequence
+      [~, SeqOut] = set_sequence(HW, Seq, AQ, TX, Grad);  % PreProcessSequence sequence
     else
-      [ ~, SeqLoop] = set_sequence(HW, Seq, AQ, TX, Grad); % PreProcessSequence sequence only
-      SeqLoop.TimeToNextSequence = SeqLoop.LoopsBreak - (SeqLoop.tRepEnd - SeqLoop.tEcho);
-      return;
+      if ~Seq.PrepareCombinedLoops
+        % prepare pulse program for first loop and return
+        [~, SeqLoop] = set_sequence(HW, Seq, AQ, TX, Grad);  % PreProcessSequence sequence only
+        SeqLoop.TimeToNextSequence = SeqLoop.LoopsBreak - (SeqLoop.tRepEnd - SeqLoop.tEcho);
+        return;
+      end
+      SeqOut = Seq;
+      % combine loops into a single pulse program
+      % FIXME: Do we need to collect more data from each loop?
+      if ~exist('tRepAll', 'var')
+        tRepAll = SeqOut.tRep;
+        tOffsetAll = SeqOut.tOffset;
+        AQAll = AQ;
+        TXAll = TX;
+        GradAll = Grad;
+        DigitalIOAll = Seq.DigitalIO;
+      else
+        % Append fields from current loop
+        tRepAll(end) = SeqOut.LoopsBreak + SeqOut.tEcho;
+        tRepAll = [tRepAll, SeqOut.tRep];  %#ok<AGROW>
+        tOffsetAll = [tOffsetAll, SeqOut.tOffset];  %#ok<AGROW>
+        % FIXME: Is there a good way to decide which fields to append if the
+        %        number of tReps is one? Should we hardcode these lists here?
+        fieldsAQ = fieldnames(AQ(1));
+        for iAQ = 1:numel(AQ)
+          for iField = 1:numel(fieldsAQ)
+            if size(AQ.(fieldsAQ{iField}), 2) == numel(SeqOut.tRep)
+              AQAll(iAQ).(fieldsAQ{iField}) = [AQAll(iAQ).(fieldsAQ{iField}), AQ(iAQ).(fieldsAQ{iField})];
+            end
+          end
+          if ~isemptyfield(AQ(1), 'WindowPhaseCorrection')
+            fieldsAQPhaseCorr = fieldnames(AQ(1).WindowPhaseCorrection);
+            for iField = 1:numel(fieldsAQPhaseCorr)
+              if size(AQ.WindowPhaseCorrection.(fieldsAQPhaseCorr{iField}), 2) == numel(SeqOut.tRep)
+                AQAll(iAQ).WindowPhaseCorrection.(fieldsAQPhaseCorr{iField}) = ...
+                  [AQAll(iAQ).WindowPhaseCorrection.(fieldsAQPhaseCorr{iField}), ...
+                  AQ(iAQ).WindowPhaseCorrection.(fieldsAQPhaseCorr{iField})];
+              end
+            end
+          end
+        end
+        fieldsTX = fieldnames(TX(1));
+        for iTX = 1:numel(TX)
+          for iField = 1:numel(fieldsTX)
+            if size(TX(iTX).(fieldsTX{iField}), 2) == numel(SeqOut.tRep)
+              TXAll(iTX).(fieldsTX{iField}) = [TXAll(iTX).(fieldsTX{iField}), TX(iTX).(fieldsTX{iField})];
+            end
+          end
+        end
+        fieldsGrad = fieldnames(Grad(1));
+        for iGrad = 1:numel(Grad)
+          for iField = 1:numel(fieldsGrad)
+            if size(Grad(iGrad).(fieldsGrad{iField}), 2) == numel(SeqOut.tRep)
+              GradAll(iGrad).(fieldsGrad{iField}) = [GradAll(iGrad).(fieldsGrad{iField}), Grad(iGrad).(fieldsGrad{iField})];
+            end
+          end
+        end
+        if ~isemptyfield(SeqOut, 'DigitalIO')
+          fieldsIO = fieldnames(SeqOut.DigitalIO);
+          for iField = 1:numel(fieldsIO)
+            if size(SeqOut.DigitalIO.(fieldsIO{iField}), 2) == numel(SeqOut.tRep)
+              DigitalIOAll.(fieldsIO{iField}) = [DigitalIOAll.(fieldsIO{iField}), SeqOut.DigitalIO.(fieldsIO{iField})];
+            end
+          end
+        end
+      end
+      % Get measurement data after each "loop"
+      % FIXME: Should this be optional?
+      AQAll.GetData(numel(tRepAll)) = 1;
+      continue;
     end
   else
     SeqOut = Seq;
@@ -3351,14 +3720,22 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
     end
   end
 
-  if isempty(SeqOut.LoopsBreak), tb=1; else tb=SeqOut.LoopsBreak; end
-  if strcmp(SeqOut.LoopName{SeqOut.LoopNameCount}, 'normal') && (SeqOut.Loops > 1)
+  if isempty(SeqOut.LoopsBreak)
+    tb = 1;
+  else
+    tb = SeqOut.LoopsBreak;
+  end
+  if any(strcmp(SeqOut.LoopName{SeqOut.LoopNameCount}, {'normal', Seq.SteadyState_PreShotsLoopsName})) ...
+      && (SeqOut.Loops + SeqOut.SteadyState_PreShotsLoops > 1)
+    % number of remaining preshot and "normal" loops
+    nLoopsRemaining = SeqOut.Loops + SeqOut.SteadyState_PreShotsLoops ...
+      - (strcmp(SeqOut.LoopName{SeqOut.LoopNameCount}, 'normal')*Loop + PreShotsLoop) + 1;
     if isempty(SeqOut.LoopsRepetitionTime)
       fprintf('Time to run remaining loops % 10.1f sec.\n', ...
-        SeqOut.SequenceTime * (SeqOut.Loops-Loop+1) + tb*(SeqOut.Loops-Loop+1));
+        (SeqOut.SequenceTime + tb) * nLoopsRemaining);
     else
       fprintf('Time to run remaining loops % 10.1f sec.\n', ...
-        SeqOut.LoopsRepetitionTime * (SeqOut.Loops-Loop+1) + SeqOut.SequenceTime*double(SeqOut.Loops==Loop));
+        SeqOut.LoopsRepetitionTime * nLoopsRemaining + SeqOut.SequenceTime*double(SeqOut.Loops==Loop));
     end
   end
   clear tb
@@ -3388,11 +3765,11 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
   if Seq.CorrectPhase > 0
     % correct frequency offset in encoded acquisition windows
     try
-      % get data of (un-encoded) FIDs
-      if (SeqOut.LoopPlot || SeqOut.Loops==Loop) && SeqOut.CorrectPlotFrequency
-        [dataFID] = get_kSpaceAndImage(data, SeqOut.AQSlice(2));
-        [dataFID] = plot_kSpaceAndImage(dataFID, SeqOut.AQSlice(2));
-      end
+      % % get data of (un-encoded) FIDs
+      % if (SeqOut.LoopPlot || SeqOut.Loops==Loop) && SeqOut.CorrectPlotFrequency
+      %   [dataFID] = get_kSpaceAndImage(data, SeqOut.AQSlice(2));
+      %   [dataFID] = plot_kSpaceAndImage(dataFID, SeqOut.AQSlice(2));
+      % end
       if Seq.LoopSaveAllData
         for iAQ = 1:numel(data)
           % FIXME: Can an array be transformed to a comma-separated-list without
@@ -3474,12 +3851,12 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
     SeqLoop.AQSlice(1).raiseFigures = 1;
   end
   SeqLoop.data.StartSequenceTime = SeqOut.StartSequenceTime;
-  SeqLoop.data.fCenter = SeqOut.HW.fLarmor;
+  SeqLoop.data.fCenter = SeqOut.AQ(iAQ).Frequency(SeqOut.AQSlice(1).UseAQWindow(1),SeqOut.AQSlice(1).UsetRep(1));
   if SeqLoop.AQSlice(1).dualNuclearImage
     if Loop == 1
       SeqLoop.dataX = data(iSecData);
     end
-    SeqLoop.dataX.fCenter = SeqOut.HW.fLarmorX;
+    SeqLoop.dataX.fCenter = SeqOut.AQ(iAQ).FrequencyX(SeqOut.AQSlice(1).UseAQWindow(1),SeqOut.AQSlice(1).UsetRep(1));
   end
 
 
@@ -3655,12 +4032,13 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
         SeqLoop.data.DiffSlopeAnglePhase / SeqLoop.HW.GammaDef./2 ...
         .* (-1).^SeqLoop.SteadyState_PreShots180;
       % SeqLoop.data.PhaseGradTimeIntegralRephaseOffset
-      if isnan(SeqLoop.data.PhaseGradTimeIntegralRephaseOffset);
+      if isnan(SeqLoop.data.PhaseGradTimeIntegralRephaseOffset)
         warning('isnan(SeqLoop.data.PhaseGradTimeIntegralRephaseOffset) set to 0');
-        SeqLoop.data.PhaseGradTimeIntegralRephaseOffset=0;
+        SeqLoop.data.PhaseGradTimeIntegralRephaseOffset = 0;
       end
       if SeqOut.CorrectPhaseRephasePlot
-        hf = figure(202); clf(hf);
+        hf = figure(202);
+        clf(hf);
         ax(1) = subplot(2,1,1, 'Parent', hf);
         plot(ax(1), SeqLoop.data.Ticks(1).Read(SeqLoop.AQSlice(1).PhaseLimRoi), abs(SeqLoop.dataLoop(1).Image(SeqLoop.AQSlice(1).PhaseLimRoi)), ...
           SeqLoop.data.Ticks(1).Read(SeqLoop.AQSlice(1).PhaseLimRoi), abs(SeqLoop.dataLoop(2).Image(SeqLoop.AQSlice(1).PhaseLimRoi)));
@@ -3734,12 +4112,13 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
       % calculate offset to read encoder to compensate slope
       SeqLoop.data.ReadGradTimeIntegralOffset = SeqLoop.data.SlopeAngleRead / SeqLoop.HW.GammaDef;
       % SeqLoop.data.ReadGradTimeIntegralOffset
-      if isnan(SeqLoop.data.ReadGradTimeIntegralOffset);
+      if isnan(SeqLoop.data.ReadGradTimeIntegralOffset)
         warning('isnan(SeqLoop.data.ReadGradTimeIntegralOffset) set to 0');
-        SeqLoop.data.ReadGradTimeIntegralOffset=0;
+        SeqLoop.data.ReadGradTimeIntegralOffset = 0;
       end
       if SeqOut.CorrectReadRephasePlot
-        hf = figure(202); clf(hf);
+        hf = figure(202);
+        clf(hf);
         ax(1) = subplot(2,1,1, 'Parent', hf);
         plot(ax(1), SeqLoop.data.Ticks(1).Read(SeqLoop.AQSlice(1).ReadLimRoi), ...
           abs(SeqLoop.data.Image(SeqLoop.AQSlice(1).ReadLimRoi)));
@@ -3780,22 +4159,22 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
       end
 
       if SeqOut.LoopSaveAllData
-        % save complete data structure for each averaging step
+        % store complete data structure for each averaging step
         if SeqOut.CorrectB0Read.Use
           [data(iPrimData), SeqOut.AQSlice(1)] = correct_read_B0(data(iPrimData), ...
             SeqOut.AQSlice(1), dataB0, max(sum(SeqOut.Read(1).GradAmp.^2,1).^0.5));
         end
         data(iPrimData).StartSequenceTime = SeqOut.StartSequenceTime;
-        data(iPrimData).fCenter = SeqOut.HW.fLarmor;
+        data(iPrimData).fCenter = SeqOut.AQ(iAQ).Frequency(SeqOut.AQSlice(1).UseAQWindow(1),SeqOut.AQSlice(1).UsetRep(1));
         if SeqOut.CorrectPhase && exist('CorrectPhase', 'var')
           data(iPrimData).CorrectPhase = CorrectPhase;
         end
         SeqLoop.dataLoop(Loop) = deal(data(iPrimData));  % FIXME: Why "deal"?
       else
-        % save only reduced sub-set for each averaging step
+        % store only reduced sub-set for each averaging step
         SeqLoop.dataLoop(Loop).Image = single(data(iPrimData).Image);
         SeqLoop.dataLoop(Loop).StartSequenceTime = SeqOut.StartSequenceTime;
-        SeqLoop.dataLoop(Loop).fCenter = SeqOut.HW.fLarmor;
+        SeqLoop.dataLoop(Loop).fCenter = SeqOut.AQ(iAQ).Frequency(SeqOut.AQSlice(1).UseAQWindow(1),SeqOut.AQSlice(1).UsetRep(1));
 
         if SeqOut.CorrectPhase && exist('CorrectPhase', 'var')
           SeqLoop.dataLoop(Loop).CorrectPhase = CorrectPhase;
@@ -3937,6 +4316,14 @@ for Loop = [CRLoops, CSRLoops, CPRLoops, CRRLoops, CB0Loops, PreShotsLoops, 1:Se
   % ylabel('Amplitude in pT')
   % %%
   % % end
+end
+
+if Seq.PrepareCombinedLoops && Seq.PreProcessSequence && ~SeqOut.StartSequence
+  % prepare the pulse program after all loops have been collected.
+  SeqOut.tRep = tRepAll;
+  SeqOut.tOffset = tOffsetAll;
+  SeqOut.DigitalIO = DigitalIOAll;
+  [~, SeqLoop] = set_sequence(HW, SeqOut, AQAll, TXAll, GradAll);  % PreProcessSequence sequence only
 end
 
 % SeqLoop.AQSlice(1).plotImageHandle=2000;

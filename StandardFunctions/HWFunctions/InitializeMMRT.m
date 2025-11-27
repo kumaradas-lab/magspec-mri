@@ -28,6 +28,7 @@ function HW = InitializeMMRT(HW, iDevice, reInit)
 %
 %   iDevice
 %       Index for the MMRT device
+%       (Default: 1)
 %
 %   reInit
 %       Initialize MMRT even if HW.MMRT.initializeOnLoad is false.
@@ -35,7 +36,7 @@ function HW = InitializeMMRT(HW, iDevice, reInit)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2017-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2017-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -43,9 +44,14 @@ end
 
 
 %#function PD.Commands
+%#function PD.IgnoreWarning
 %#function PD.MagnetBase
 %#function PD.MagnetSampleHeater
+%#function PD.SampleHeaterBase
 %#function PD.Talker
-%#function create_iPPG
+%#function PD.UnwindProtectGuard
+%#function get_COM_PDControl
+%#function get_MagnetMacFromSerial
+%#function get_SampleHeaterMacFromSerial
 %#function isemptyfield
 

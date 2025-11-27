@@ -56,7 +56,7 @@ function pulseData = Pulse_Sinc_3_Hamming(HW, Center, Pulse, varargin)
 % the duration of the pulse to have the same bandwidth (FWHM) as a rect pulse.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2018-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2018-2024 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -114,18 +114,19 @@ else
 end
 
 % timeline rounded to DAC sample times
-tShape = round(linspace(-pulseDuration/2 + pulseDuration/numbersOfSegments, ...
-                        pulseDuration/2 - pulseDuration/numbersOfSegments, ...
-                        numbersOfSegments).' ...
-               * (HW.TX(Pulse.iDevice).fSample/2)) / (HW.TX(Pulse.iDevice).fSample/2);
+tStart = round((linspace(-pulseDuration/2, ...
+                         pulseDuration/2, ...
+                         numbersOfSegments+1).' + Center) ...
+               * HW.TX(Pulse.iDevice).fSample) / HW.TX(Pulse.iDevice).fSample;
 
 % calculate the start time such that the tShape time is centered on the rf pulse
-pulseData.Start = tShape - [diff(tShape); tShape(end)-tShape(end-1)]/2 + Center;
+pulseData.Start = tStart(1:end-1);
 % duration of pulse segments
-pulseData.Duration = [diff(pulseData.Start); pulseData.Start(end)-pulseData.Start(end-1)];
+pulseData.Duration = diff(tStart);
 % frequency of pulse segments
-pulseData.Frequency = zeros(numbersOfSegments,1) + Pulse.Frequency;
-% normalized amplitude at tShape
+pulseData.Frequency = zeros(numbersOfSegments, 1) + Pulse.Frequency;
+% normalized amplitude at center of each segment
+tShape = tStart(1:end-1) + pulseData.Duration/2 - Center;
 HamWin = Hamming(tShape/pulseDuration*2, 'sampled');
 B1Shape = sinc(tShape/pulseDuration*numberOfZeroCrossings) .* HamWin;
 % Amplitude (Tesla) of the B1+ field in the coil

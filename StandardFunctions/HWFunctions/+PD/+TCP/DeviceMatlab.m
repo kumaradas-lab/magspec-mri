@@ -1,0 +1,16 @@
+classdef DeviceMatlab < PD.TCP.DeviceBase
+%% Wrapper class for Matlab socket client for communication with MMRT device
+%
+%   this = PD.TCP.DeviceMatlab(ipAddress, port)
+%
+% ----------------------------------------------------------------------------
+% (C) Copyright 2024-2025 Pure Devices GmbH, Wuerzburg, Germany
+% www.pure-devices.com
+% ----------------------------------------------------------------------------
+
+end
+
+
+%#function PD.TCP.DeviceBase
+%#function PD.UnwindProtectGuard
+

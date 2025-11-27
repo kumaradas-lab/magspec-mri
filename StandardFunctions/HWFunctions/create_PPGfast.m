@@ -51,6 +51,9 @@ function sPPG = create_PPGfast(HW, hfpuls, hfacq, IOs, grad, tRep, CLTime, MixMo
 %           to start
 %     tRepTriggerDebounceTime
 %           row vector with debounce time of trigger in seconds
+%     auxCommands
+%           FPGA commands (64-bit unsigned integers) that are prepended to the
+%           commands for each respective tRep
 %
 %
 % OUTPUT:
@@ -59,7 +62,7 @@ function sPPG = create_PPGfast(HW, hfpuls, hfacq, IOs, grad, tRep, CLTime, MixMo
 %         .NET object with the compiled sequence (inside a Matlab wrapper)
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 

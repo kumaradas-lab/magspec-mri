@@ -417,7 +417,7 @@ while handles.Update || ...
       end
     end
     handles.Seq.fSpan=str2double(get(handles.edit_fSpan, 'String'))*1e6;
-    if isnan(handles.Seq.fSpan);
+    if isnan(handles.Seq.fSpan)
       if isempty(handles.HW.Network.fSpan)
         handles.Seq.fSpan=1e6;
       else
@@ -426,7 +426,7 @@ while handles.Update || ...
       set(handles.edit_fSpan, 'String', num2str(handles.Seq.fSpan/1e6))
     end
     handles.Seq.fSteps=str2double(get(handles.edit_steps, 'String'));
-    if isnan(handles.Seq.fSteps);
+    if isnan(handles.Seq.fSteps)
       if isempty(handles.HW.Network.fSteps)
         handles.Seq.fSteps=101;
       else
@@ -435,7 +435,7 @@ while handles.Update || ...
       set(handles.edit_steps, 'String', num2str(handles.Seq.fSteps))
     end
     handles.Seq.TXPowerdBm=str2double(get(handles.edit_power, 'String'));
-    if isnan(handles.Seq.TXPowerdBm);
+    if isnan(handles.Seq.TXPowerdBm)
       if isempty(handles.HW.Network.TXPowerdBm)
         handles.Seq.TXPowerdBm=0;
       else

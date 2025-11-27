@@ -139,7 +139,7 @@ function [data, SeqOut, data_1D] = sequence_EchoStandard(HW, Seq, SliceSelectUse
 %           for more details.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -600,7 +600,9 @@ if Seq.PreProcessSequence
     end
 
     if any(Seq.EndSpoilAmp)
-      if numel(Seq.EndSpoilAmp)==1, Seq.EndSpoilAmp(1:3)=Seq.EndSpoilAmp(1); end
+      if isscalar(Seq.EndSpoilAmp)
+        Seq.EndSpoilAmp(1:3) = Seq.EndSpoilAmp(1);
+      end
         EndSpoilGradTime=cumsum([...
                             Seq.EndSpoiltStart; ...  % spoil start
                             HW.Grad(SliceSelect.iDevice).tRamp; ...
@@ -695,6 +697,9 @@ if Seq.PreProcessSequence
     end
     if strcmp(Seq.TXPhaseOffset, 'alternate')
       Seq.TXPhaseOffset = [0, 90+90*(-1).^(1:numel(Seq.tRep)-1)];
+    end
+    if strcmp(Seq.TXPhaseOffset, 'alternatingIncrement')
+      Seq.TXPhaseOffset = [0,mod(cumsum( 90+90*(-1).^(2:numel(Seq.tRep)))+180,360)];
     end
   end
 
@@ -1098,11 +1103,15 @@ if Seq.PreProcessSequence
       end
       if Seq.nEchos >= 2
         Seq.CLTime = [3e-6,1.448e-6,0400e-9+zeros(1,Seq.nEchos-1)];
-        if Seq.tEchoFirst~=Seq.tEcho; Seq.CLTime(3) = 872e-9; end
+        if Seq.tEchoFirst ~= Seq.tEcho
+          Seq.CLTime(3) = 872e-9;
+        end
       end
 
     else
-      if numel(Seq.CLTime)==1, Seq.CLTime = Seq.CLTime+zeros(1,numel(Seq.tRep)); end
+      if isscalar(Seq.CLTime)
+        Seq.CLTime = Seq.CLTime+zeros(1,numel(Seq.tRep));
+      end
     end
   end
 
@@ -1299,13 +1308,15 @@ if Seq.PreProcessSequence
     AQ.ResetPhases = repmat(AQ.ResetPhases, 1, Seq.SeqAverage.average);
     %  AQ.ResetPhases(:)=1;
     AQ.nSamples = repmat(AQ.nSamples, 1, Seq.SeqAverage.average);
-    if isfield(AQ,'Repeat'), AQ.Repeat = repmat(AQ.Repeat, 1, Seq.SeqAverage.average); end
+    if isfield(AQ,'Repeat')
+      AQ.Repeat = repmat(AQ.Repeat, 1, Seq.SeqAverage.average);
+    end
     if isfield(Seq,'CLTime')
       if numel(Seq.CLTime)~=numel(Seq.tRep)
         Seq.CLTime=repmat(Seq.CLTime,1,Seq.SeqAverage.average);
       end
     end
-    if size(AQ.Frequency,2) < size(AQ.Start,2);
+    if size(AQ.Frequency, 2) < size(AQ.Start, 2)
       AQ.Frequency = repmat(AQ.Frequency(:,1), 1, size(AQ.Start,2)./Seq.SeqAverage.average);
     end
     AQ.Frequency = repmat(AQ.Frequency, 1, Seq.SeqAverage.average);
@@ -1434,10 +1445,10 @@ if Seq.StartSequence || Seq.PollPPGfast || Seq.GetRawData || Seq.PostProcessSequ
     end
     data.time_all = permute([0,linspace(SeqOut.tEcho,SeqOut.nEchos*SeqOut.tEcho,SeqOut.nEchos)], [1 3 2]);
     data.time_of_tRep = permute([0,SeqOut.tEcho+zeros(1,SeqOut.nEchos)], [1 3 2]);
-    if Seq.nEchos>=2;
-      if Seq.tEchoFirst~=Seq.tEcho;
-        data.time_all(2:end)=data.time_all(2:end)+Seq.tEchoFirst-SeqOut.tEcho;
-        data.time_of_tRep(2)=Seq.tEchoFirst+Seq.tEchoFirstTau2/2;
+    if Seq.nEchos >= 2
+      if Seq.tEchoFirst ~= Seq.tEcho
+        data.time_all(2:end) = data.time_all(2:end) + Seq.tEchoFirst - SeqOut.tEcho;
+        data.time_of_tRep(2) = Seq.tEchoFirst + Seq.tEchoFirstTau2/2;
       end
     end
   end

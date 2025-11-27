@@ -42,32 +42,32 @@ UseExtRFAmpSwitch = 1;  % 1: use switch of RF-100, 0: use active switch of LNA
 LoadExtRFAmp_Cal;
 
 %%
-% if exist('CalibrationPaUout2Amplitude.mat','file');
-%     load('CalibrationPaUout2Amplitude.mat');
-%     HW.TX.CalibrationPaUout2Amplitude=CalibrationTX;
-%     clear CalibrationPaUout2Amplitude
-% end;
-% if exist('CalibrationUout.mat','file');
-%     load('CalibrationUout.mat');
-%     HW.TX.CalibrationUout=CalibrationUout;
-%     clear CalibrationUout
-% end;
-% if exist('CalibrationNorm2MmrtUout.mat','file');
-%     load('CalibrationNorm2MmrtUout.mat');
-%     HW.TX.CalibrationNorm2MmrtUout=CalibrationTX;
-%     clear CalibrationNorm2MmrtUout
-% end;
-%
-% if any(HW.TX.Uout2PaUout~=1)
-%     if exist('CalibrationRfAmp.mat','file');
-%         load('CalibrationRfAmp.mat');
-%         HW.TX.CalibrationRfAmp=CalibrationRfAmp;
-%         clear CalibrationRfAmp
-%     end;
+% if exist('CalibrationPaUout2Amplitude.mat', 'file')
+%   load('CalibrationPaUout2Amplitude.mat');
+%   HW.TX.CalibrationPaUout2Amplitude = CalibrationTX;
+%   clear CalibrationPaUout2Amplitude
+% end
+% if exist('CalibrationUout.mat', 'file')
+%   load('CalibrationUout.mat');
+%   HW.TX.CalibrationUout = CalibrationUout;
+%   clear CalibrationUout
+% end
+% if exist('CalibrationNorm2MmrtUout.mat', 'file')
+%   load('CalibrationNorm2MmrtUout.mat');
+%   HW.TX.CalibrationNorm2MmrtUout = CalibrationTX;
+%   clear CalibrationNorm2MmrtUout
 % end
 %
-% if exist('CalibrationRx.mat','file');
-%     load('CalibrationRx.mat');
-%     HW.RX.Calibration=CalibrationRx;
-%     clear CalibrationRx
-% end;
+% if any(HW.TX.Uout2PaUout~=1)
+%   if exist('CalibrationRfAmp.mat', 'file')
+%     load('CalibrationRfAmp.mat');
+%     HW.TX.CalibrationRfAmp = CalibrationRfAmp;
+%     clear CalibrationRfAmp
+%   end
+% end
+%
+% if exist('CalibrationRx.mat', 'file')
+%   load('CalibrationRx.mat');
+%   HW.RX.Calibration = CalibrationRx;
+%   clear CalibrationRx
+% end

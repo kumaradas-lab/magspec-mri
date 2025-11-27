@@ -118,7 +118,7 @@ function [SpectrumTime, SpectrumAmplitudeOut, Seq] = get_iLaplace1D(DataTime, Da
 %         (In data.axHandle if called with 2 input arguments.)
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2015-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2015-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -344,7 +344,7 @@ for t=1:numel(DataAmplitudeOut)/size(DataAmplitudeOut,1)
     options.TolX = eps() * norm(G{iQF}, 1) * length(G{iQF});
     [SpectrumAmplitude, data.iLaplace1D.resnorm, data.iLaplace1D.FitResidual, ...
       data.iLaplace1D.exitflag, data.iLaplace1D.output, data.iLaplace1D.lambda] = ...
-      lsqnonneg(G{iQF}, d, options);
+      lsqnonneg(G{iQF}, double(d), options);
 
     if iQF == 1 && length(QualityFactor) > 1
       % re-grid DataAmplitude with fitted data on reduced logarithmic timegrid

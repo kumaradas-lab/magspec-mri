@@ -13,7 +13,7 @@ function [talker, HW, mySave] = get_MRDevice(HW, mySave)
 %   mySave    structure
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -23,8 +23,10 @@ end
 %#function PD.GradClass
 %#function PD.MMRT
 %#function PD.RX
-%#function PD.TCP.Device
+%#function PD.TCP.DeviceDotNet
+%#function PD.TCP.DeviceMatlab
 %#function PD.TXClass
 %#function PD.Talker
+%#function StartTcpServer
 %#function isemptyfield
 

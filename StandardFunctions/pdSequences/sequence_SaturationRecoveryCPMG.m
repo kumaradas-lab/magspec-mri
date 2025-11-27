@@ -4,7 +4,7 @@ function [data, SeqOut] = sequence_SaturationRecoveryCPMG(HW, Seq)
 %   [data, SeqOut] = sequence_SaturationRecoveryCPMG(HW, Seq)
 %
 % ------------------------------------------------------------------------
-% (C) Copyright 2012-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %------------------------------------------------------------------------
 
@@ -203,7 +203,7 @@ shading flat
 if SeqOut.FitT1
   t1 = NaN;
   T1 = NaN;
-  if SeqOut.nTau1>3;
+  if SeqOut.nTau1 > 3
     T1 = fit_exp(real(data.MeanEchoTau1PhaseCorrected(1,:)),data.Tau1Time(1,:),SeqOut.PlotT1,0,0,1);
     t1 = T1.tau;
     T1.half = log(2)*T1.tau;
@@ -217,16 +217,17 @@ end
 
 %% T2
 if SeqOut.FitT2
-  fh=figure(82);
-  clf(fh)
-  ax(1)=subplot(1,1,1, 'Parent',fh);
-  if SeqOut.nEcho>3;
-    for t=1:SeqOut.nTau1
-      % fittin exponential functions to the data
-      T2(t) = fit_exp(real(data.MeanEchoTau1PhaseCorrected(:,t)),data.EchoTime(:,t),SeqOut.PlotT2,0,0,0);
+  fh = figure(82);
+  clf(fh);
+  ax(1) = subplot(1,1,1, 'Parent', fh);
+  if SeqOut.nEcho > 3
+    for t = 1:SeqOut.nTau1
+      % fit exponential functions to the data
+      T2(t) = fit_exp(real(data.MeanEchoTau1PhaseCorrected(:,t)), data.EchoTime(:,t), ...
+        SeqOut.PlotT2, 0, 0, 0);
       figure(82)
-      hold(ax(1), 'all');
-      plot(ax(1),T2(t).time,T2(t).dataPhaseCorrectedReal,'b');
+      hold(ax(1), 'on');
+      plot(ax(1), T2(t).time ,T2(t).dataPhaseCorrectedReal, 'b');
       % legend(ax(1),'real');
       xlabel(ax(1), 'time / s');
       ylabel(ax(1), 'amplitude');
@@ -238,7 +239,7 @@ if SeqOut.FitT2
       hold(ax(1), 'off');
     end
 
-    data.T2=T2;
+    data.T2 = T2;
   else
     disp('nEcho too low')
   end

@@ -30,9 +30,10 @@ function plotSequence(HW, Seq, AQ, TX, Grad)
 %                       (Default: HW.PlotSequence.controls.figureModes = false).
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2017-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2017-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
+
 
 %% default input
 Seq = set_EmptyField(Seq, 'plotSeq', 1:3);
@@ -70,6 +71,7 @@ PlotSequence = set_EmptyField(PlotSequence, 'showDuration', false);
 
 hParent = PlotSequence.hParent;
 
+
 %% open (and clear) parent figure if necessary
 isFigure = false;
 if ishghandle(hParent, 'figure') || (isa(hParent, 'double') && mod(hParent, 1) == 0)
@@ -88,6 +90,7 @@ else
 end
 oldPlotSequence = getappdata(hParent, 'plotSequence');
 if isempty(oldPlotSequence), oldPlotSequence = PlotSequence; end
+
 
 %% find uipanels
 hPanels = getappdata(hParent, 'plotSequencePanels');
@@ -115,9 +118,11 @@ else
     newWraps = PlotSequence.wraps;
   end
   newPossibleWraps = PlotSequence.possibleWraps;
+  newPossibleWrapsNames = PlotSequence.possibleWrapsNames;
   PlotSequence = oldPlotSequence;
   PlotSequence.wraps = newWraps;
   PlotSequence.possibleWraps = newPossibleWraps;
+  PlotSequence.possibleWrapsNames = newPossibleWrapsNames;
   % settings in dedicated structure have priority over settings in sequence
   Seq.plotSeq = PlotSequence.Gradients;
 end
@@ -125,11 +130,13 @@ if isFigure
   set(hFigure, 'Name', 'PulseProgram');
 end
 
+
 %% main panel with Pulse Program
 PlotSequence.hParent = hPanels(1);
 Seq.plotSequence = PlotSequence;
 setappdata(hParent, 'plotSequence', PlotSequence);
 plotSeq(HW, Seq, AQ, TX, Grad);
+
 
 %% side panel with controls
 setappdata(hParent, 'plotSequencePanels', hPanels);
@@ -330,6 +337,30 @@ else
   SetIfValid(hControls, 'stackTXRX', 'Value', PlotSequence.stackTXRX);
   SetIfValid(hControls, 'plotSeqStart', 'String', num2str(Seq.plotSeqStart, '%d'));
   SetIfValid(hControls, 'plotSeqEnd', 'String', num2str(Seq.plotSeqEnd, '%d'));
+  if xor(numel(Seq.plotSequence.possibleWraps) > 1, numel(oldPlotSequence.possibleWraps) > 1)
+    % switch between drop-down list and edit field
+    wrapsControlPosition = get(hControls.plotSeqWraps, 'Position');
+    delete(hControls.plotSeqWraps);
+    if numel(Seq.plotSequence.possibleWraps) > 1
+      selectedWrap = find(Seq.plotSequence.wraps == Seq.plotSequence.possibleWraps, 1, 'first');
+      if isempty(selectedWrap), selectedWrap = 1; end
+      wrapsControlPosition(2) = wrapsControlPosition(2) + 0.4*wrapsControlPosition(4);
+      wrapsControlPosition(4) = wrapsControlPosition(4)*0.8;
+      hControls.plotSeqWraps = uicontrol(hPanels(2), 'Units', 'normalized', ...
+        'Position', wrapsControlPosition, ...
+        'Style', 'popupmenu', 'Value', selectedWrap, ...
+        'String', Seq.plotSequence.possibleWrapsNames, ...
+        'Callback', {@CallbackPopupmenu, 'wraps', 'possibleWraps'}, 'Interruptible', 'off');
+    else
+      wrapsControlPosition(4) = wrapsControlPosition(4)/0.8;
+      wrapsControlPosition(2) = wrapsControlPosition(2) - 0.4*wrapsControlPosition(4);
+      hControls.plotSeqWraps = uicontrol(hPanels(2), 'Units', 'normalized', ...
+        'Position', wrapsControlPosition, ...
+        'Style', 'edit', 'String', num2str(Seq.plotSequence.wraps, '%d'), ...
+        'Callback', {@CallbackEdit, 'wraps'}, 'Interruptible', 'off');
+    end
+    setappdata(hPanels(2), 'plotSequenceControls', hControls);
+  end
   if PlotSequence.controls.wraps && numel(Seq.plotSequence.possibleWraps) > 1
     set(hControls.plotSeqWraps, 'String', arrayfun(@num2str, Seq.plotSequence.possibleWraps, 'UniformOutput', false));
     oldIdx = get(hControls.plotSeqWraps, 'Value');
@@ -354,6 +385,7 @@ parentResizeFcn(hParent);
 set(hPanels, 'Visible', 'on');
 
 end
+
 
 function SetIfValid(inStr, field, varargin)
 %% set inStr.(field) if it is valid

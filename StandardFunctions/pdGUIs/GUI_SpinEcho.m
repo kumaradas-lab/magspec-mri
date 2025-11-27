@@ -21,7 +21,7 @@ function varargout = GUI_SpinEcho(varargin)
 % See also: GUIDE, GUIDATA, GUIHANDLES
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -432,7 +432,7 @@ while ((get(handles.checkbox_repetition, 'Value') && get(handles.radiobutton2, '
   handles.Seq.firstTR = 0;
   if ~handles.refreshPlot
     handles.Seq.notCalibrate=double(~get(handles.checkbox_calibrate, 'Value'));
-    if isnan(str2double(get(handles.edit_fLarmor, 'String'))*1e6);
+    if isnan(str2double(get(handles.edit_fLarmor, 'String')))
       if ~isa(handles.HW, 'PD.HWClass')
         % update with current settings from base workspace
         handles.HW = evalin('base', 'HW');
@@ -472,7 +472,7 @@ while ((get(handles.checkbox_repetition, 'Value') && get(handles.radiobutton2, '
   popup_sel_String = get(handles.pushbutton_update, 'String');
   switch popup_sel_String
     case 'B1+'
-      if isnan(str2double(get(handles.edit_p90, 'String'))*1e-6);
+      if isnan(str2double(get(handles.edit_p90, 'String')))
         [handles.HW, handles.mySave] = Find_PulseDuration(handles.HW, handles.mySave, 0, 1);
       else
         [handles.HW, handles.mySave] = Find_PulseDuration(handles.HW, handles.mySave, 0, 1, 3, get(handles.edit_p90, 'String')*1e-6);
@@ -592,7 +592,7 @@ while ((get(handles.checkbox_repetition, 'Value') && get(handles.radiobutton2, '
           set(handles.text_unit_B1, 'String', 'kHz')
         end
 
-        if isnan(str2double(get(handles.edit_B1, 'String')));
+        if isnan(str2double(get(handles.edit_B1, 'String')))
           set(handles.edit_B1, 'String', ['def ', num2str(handles.HW.TX(handles.iDevice).AmpDef*handles.Seq.B1Amp2Str,'%3.6f')])
           handles.Seq.TXAmp = handles.HW.TX(handles.iDevice).AmpDef;
         else
@@ -609,7 +609,7 @@ while ((get(handles.checkbox_repetition, 'Value') && get(handles.radiobutton2, '
 
         handles.Seq.fSample = max((1/(handles.Seq.tEcho*0.1-handles.Seq.p90/2-handles.HW.TX(handles.iDevice).BlankOffset-5e-6)*10), ...
           handles.HW.RX(handles.iDevice).fSample/6250);
-        if (handles.Seq.fSample > handles.HW.RX(handles.iDevice).fSample/125*2) && (handles.Seq.nEchos>100);
+        if (handles.Seq.fSample > handles.HW.RX(handles.iDevice).fSample/125*2) && (handles.Seq.nEchos>100)
           handles.Seq.AQFID = 0.5*(handles.HW.RX(handles.iDevice).fSample/125*2)/handles.Seq.fSample;
           handles.Seq.AQEcho = 0.5*(handles.HW.RX(handles.iDevice).fSample/125*2)/handles.Seq.fSample;
           handles.Seq.fSample = max((1/(handles.Seq.tEcho*0.1-handles.Seq.p90/2-handles.HW.TX(handles.iDevice).BlankOffset-5e-6)*10), ...
@@ -696,7 +696,7 @@ while ((get(handles.checkbox_repetition, 'Value') && get(handles.radiobutton2, '
           else
             colorOrder = get(handles.Seq.plotEchoesHandle, 'ColorOrder');
             plot(handles.Seq.plotEchoesHandle, EchoesTime, abs(EchoesData)/HW.RX(handles.iDevice).AmplitudeUnitScale, 'Color', colorOrder(1,:));
-            hold(handles.Seq.plotEchoesHandle, 'all');
+            hold(handles.Seq.plotEchoesHandle, 'on');
             plot(handles.Seq.plotEchoesHandle, EchoesTime, real(EchoesData)/HW.RX(handles.iDevice).AmplitudeUnitScale, 'Color', colorOrder(2,:));
             plot(handles.Seq.plotEchoesHandle, EchoesTime, imag(EchoesData)/HW.RX(handles.iDevice).AmplitudeUnitScale, 'Color', colorOrder(3,:));
             hold(handles.Seq.plotEchoesHandle, 'off');
@@ -819,10 +819,10 @@ while ((get(handles.checkbox_repetition, 'Value') && get(handles.radiobutton2, '
             get_axisMinMax(handles.mySave.plotMaxEchoesHandleMinNew, handles.mySave.plotMaxEchoesHandleMaxNew);
           if ~isfield(handles.mySave, 'plotMaxEchoesHandleMax')
             handles.mySave.plotMaxEchoesHandleMax = handles.mySave.plotMaxEchoesHandleMaxNew;
-          end;
+          end
           if ~isfield(handles.mySave, 'plotMaxEchoesHandleMin')
             handles.mySave.plotMaxEchoesHandleMin = handles.mySave.plotMaxEchoesHandleMinNew;
-          end;
+          end
           [handles.mySave.plotMaxEchoesHandleMin, handles.mySave.plotMaxEchoesHandleMax] = ...
             get_axisMinMax(handles.mySave.plotMaxEchoesHandleMinNew, handles.mySave.plotMaxEchoesHandleMaxNew, handles.mySave.plotMaxEchoesHandleMin, handles.mySave.plotMaxEchoesHandleMax);
           ylim(handles.Seq.plotMaxEchoesHandle, [handles.mySave.plotMaxEchoesHandleMin, handles.mySave.plotMaxEchoesHandleMax]);
@@ -877,7 +877,7 @@ end
 if isfield(handles,'Seq')
   if isfield(handles.Seq,'TXAmp')
     if isfield(handles.Seq,'B1Amp2Str')
-      if isnan(str2double(get(handles.edit_B1, 'String')));
+      if isnan(str2double(get(handles.edit_B1, 'String')))
         set(handles.edit_B1, 'String', ['def ', num2str(handles.Seq.TXAmp*handles.Seq.B1Amp2Str,'%3.6f')])
       else
         set(handles.edit_B1, 'String', num2str(handles.Seq.TXAmp*handles.Seq.B1Amp2Str,'%3.6f'))

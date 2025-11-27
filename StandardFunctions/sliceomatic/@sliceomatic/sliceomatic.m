@@ -3,7 +3,7 @@ classdef sliceomatic < handle
   % SLICEOMATIC(DATA) - Use 3D double matrix DATA as a volume data.
   % SLICEOMATIC(DATA, X, Y, Z) - X,Y,Z are vectors with mesh.
   % SLICEOMATIC(HPARENT, ...) - HPARENT is the handle to the parent (can be a
-  %                             positive integer double valior or ahandle to a
+  %                             positive integer double value or a handle to a
   %                             figure or to a uipanel).
   % SLICEOMATIC(HAXES, ...) - HAXES is the handle to the main sliceomatic axes
   %                           or a sliceomatic object.
@@ -174,7 +174,7 @@ classdef sliceomatic < handle
   % Fix colormap setting to rand.
   %
   % ----------------------------------------------------------------------------
-  % (C) Copyright 2016-2024 Pure Devices GmbH, Wuerzburg, Germany
+  % (C) Copyright 2016-2025 Pure Devices GmbH, Wuerzburg, Germany
   % www.pure-devices.com
   % ----------------------------------------------------------------------------
 
@@ -313,7 +313,7 @@ classdef sliceomatic < handle
         end
         if ~isempty(varargin) ...
             && (isnumeric(varargin{1}) ...
-                || (numel(varargin{1})==1 && ishghandle(varargin{1})))
+                || (isscalar(varargin{1}) && ishghandle(varargin{1})))
           d.handleFigure = varargin{1};
           varargin(1) = []; % remove argument from varargin
           warning('sliceomatic:FigureHandleLast', ...
@@ -321,12 +321,12 @@ classdef sliceomatic < handle
         end
         if ~isempty(varargin)
           % property value pairs
-          if ~(numel(varargin)==1 && isstruct(varargin{1})) && ...
+          if ~(isscalar(varargin) && isstruct(varargin{1})) && ...
               ~(~mod(numel(varargin), 2) && all(cellfun(@ischar, varargin(1:2:end))))
             error('sliceomatic:InvalidTrailingInput', ...
               'Trailing arguments to sliceomatic must be a structure or property-value-pairs');
           end
-          if (numel(varargin)==1 && isstruct(varargin{1}))
+          if (isscalar(varargin) && isstruct(varargin{1}))
             props = fieldnames(varargin{1});
             vals = struct2cell(varargin{1});
           else
@@ -423,22 +423,33 @@ classdef sliceomatic < handle
           get(get(hZ, axesPropertyObjects{iProp, 2}), 'String'));
       end
       % copy the remainder
-      axesProperties = {...
+      allAxesProperties = {...
         'XLim', 'YLim', 'ZLim', 'CLim', ...
         'XLimMode', 'YLimMode', 'ZLimMode', 'CLimMode', ...
-        'Units', 'Position', 'OuterPosition', 'ActivePositionProperty', ...
+        'Units', ...
+        };
+      if ishghandle(this.hParent, 'figure') && ishghandle(newParent, 'figure')
+        % only copy position properties if old and new parents are figures
+        % (not if any is a panel)
+        allAxesProperties = [allAxesProperties, ...
+          {'Position', 'OuterPosition', 'ActivePositionProperty'}];
+      end
+      mainAxesProperties = {...
         'DataAspectRatio', 'DataAspectRatioMode', ...
         'PlotBoxAspectRatio', 'PlotBoxAspectRatioMode', ...
         'CameraPosition', 'CameraPositionMode', ...
         'CameraTarget', 'CameraTargetMode', ...
         'CameraUpVector', 'CameraUpVectorMode', ...
         'CameraViewAngle', 'CameraViewAngleMode'};  % FIXME: what else?
-      for iProp = 1:numel(axesProperties)
-        set(sl_new.hAxes, axesProperties{iProp}, get(this.hAxes, axesProperties{iProp}));
-        set(hIso_new, axesProperties{iProp}, get(hIso, axesProperties{iProp}));
-        set(hX_new, axesProperties{iProp}, get(hX, axesProperties{iProp}));
-        set(hY_new, axesProperties{iProp}, get(hY, axesProperties{iProp}));
-        set(hZ_new, axesProperties{iProp}, get(hZ, axesProperties{iProp}));
+      for iProp = 1:numel(allAxesProperties)
+        set(sl_new.hAxes, allAxesProperties{iProp}, get(this.hAxes, allAxesProperties{iProp}));
+        set(hIso_new, allAxesProperties{iProp}, get(hIso, allAxesProperties{iProp}));
+        set(hX_new, allAxesProperties{iProp}, get(hX, allAxesProperties{iProp}));
+        set(hY_new, allAxesProperties{iProp}, get(hY, allAxesProperties{iProp}));
+        set(hZ_new, allAxesProperties{iProp}, get(hZ, allAxesProperties{iProp}));
+      end
+      for iProp = 1:numel(mainAxesProperties)
+        set(sl_new.hAxes, mainAxesProperties{iProp}, get(this.hAxes, mainAxesProperties{iProp}));
       end
 
       % copy slices and iso surfaces
@@ -454,10 +465,9 @@ classdef sliceomatic < handle
     function this = saveobj(this)
       %% Save object to file
 
-      warn_state = warning('off', 'MATLAB:structOnObject');
-      reset_warn_state = onCleanup(@() warning(warn_state));
+      protectWarning = PD.IgnoreWarning('MATLAB:structOnObject');
       stru = struct(this);
-      clear reset_warn_state;
+      delete(protectWarning);
 
       % Set property to select different code path when loading from file.
       stru.isSaved = true;
@@ -617,7 +627,7 @@ classdef sliceomatic < handle
       val = ancestor(this.hAxes, varargin{:});
     end
 
-    function AddSliceX(this, X)
+    function hSlice = AddSliceX(this, X)
       %% Add slice at position X
 
       % input check
@@ -628,7 +638,7 @@ classdef sliceomatic < handle
 
       d = getappdata(this.hParent, 'sliceomatic');
 
-      for iSlice = 1:numel(X)
+      for iSlice = numel(X):-1:1
         if X(iSlice) < d.xlim(1) || X(iSlice) > d.xlim(2)
           warning('PD:sliceomatic:AddSliceX:OutOfRange', ...
             'New slice at X = %.4g is out of range.', X(iSlice));
@@ -637,22 +647,22 @@ classdef sliceomatic < handle
 
         % add new arrow and slice
         this.hFigure = ancestor(this.hAxes, 'figure');  % FIXME: Can be removed if nested re-parenting works.
-        newa = arrow(this.hSliderX, 'up', X(iSlice));
+        hArrow = arrow(this.hSliderX, 'up', X(iSlice));
         set(this.hFigure, 'CurrentAxes', this.hAxes);
-        new = this.DrawLocalSlice(d.data, X(iSlice), [], []);
-        setappdata(new, 'controlarrow', newa);
-        setappdata(newa, 'arrowslice', new);
-        set(new, 'AlphaData', get(new, 'CData'), 'AlphaDataMapping', 'scaled');
-        set(newa, 'ButtonDownFcn', @(hObject, eventData) this.callbacks('Xmove'));
-        set([new, newa], 'UIContextMenu', this.sliceContextMenu);
+        hSlice(iSlice) = this.DrawLocalSlice(d.data, X(iSlice), [], []);
+        setappdata(hSlice(iSlice), 'controlarrow', hArrow);
+        setappdata(hArrow, 'arrowslice', hSlice(iSlice));
+        set(hSlice(iSlice), 'AlphaData', get(hSlice(iSlice), 'CData'), 'AlphaDataMapping', 'scaled');
+        set(hArrow, 'ButtonDownFcn', @(hObject, eventData) this.callbacks('Xmove'));
+        set([hSlice(iSlice), hArrow], 'UIContextMenu', this.sliceContextMenu);
 
-        this.draggedArrow = newa;
+        this.draggedArrow = hArrow;
       end
 
     end
 
 
-    function AddSliceY(this, Y)
+    function hSlice = AddSliceY(this, Y)
       %% Add slice at position Y
 
       % input check
@@ -663,7 +673,7 @@ classdef sliceomatic < handle
 
       d = getappdata(this.hParent, 'sliceomatic');
 
-      for iSlice = 1:numel(Y)
+      for iSlice = numel(Y):-1:1
         if Y(iSlice) < d.ylim(1) || Y(iSlice) > d.ylim(2)
           warning('PD:sliceomatic:AddSliceY:OutOfRange', ...
             'New slice at Y = %.4g is out of range.', Y(iSlice));
@@ -672,22 +682,22 @@ classdef sliceomatic < handle
 
         % add new arrow and slice
         this.hFigure = ancestor(this.hAxes, 'figure');  % FIXME: Can be removed if nested re-parenting works.
-        newa = arrow(this.hSliderY, 'left', Y(iSlice));
+        hArrow = arrow(this.hSliderY, 'left', Y(iSlice));
         set(this.hFigure, 'CurrentAxes', this.hAxes);
-        new = this.DrawLocalSlice(d.data, [], Y(iSlice), []);
-        setappdata(new, 'controlarrow', newa);
-        setappdata(newa, 'arrowslice', new);
-        set(new, 'AlphaData', get(new, 'CData'), 'AlphaDataMapping', 'scaled');
-        set(newa, 'ButtonDownFcn', @(hObject, eventData) this.callbacks('Ymove'));
-        set([new, newa], 'UIContextMenu', this.sliceContextMenu);
+        hSlice(iSlice) = this.DrawLocalSlice(d.data, [], Y(iSlice), []);
+        setappdata(hSlice(iSlice), 'controlarrow', hArrow);
+        setappdata(hArrow, 'arrowslice', hSlice(iSlice));
+        set(hSlice(iSlice), 'AlphaData', get(hSlice(iSlice), 'CData'), 'AlphaDataMapping', 'scaled');
+        set(hArrow, 'ButtonDownFcn', @(hObject, eventData) this.callbacks('Ymove'));
+        set([hSlice(iSlice), hArrow], 'UIContextMenu', this.sliceContextMenu);
 
-        this.draggedArrow = newa;
+        this.draggedArrow = hArrow;
       end
 
     end
 
 
-    function AddSliceZ(this, Z)
+    function hSlice = AddSliceZ(this, Z)
       %% Add slice at position Z
 
       % input check
@@ -698,7 +708,7 @@ classdef sliceomatic < handle
 
       d = getappdata(this.hParent, 'sliceomatic');
 
-      for iSlice = 1:numel(Z)
+      for iSlice = numel(Z):-1:1
         if Z(iSlice) < d.zlim(1) || Z(iSlice) > d.zlim(2)
           warning('PD:sliceomatic:AddSliceZ:OutOfRange', ...
             'New slice at Z = %.4g is out of range.', Z(iSlice));
@@ -707,22 +717,22 @@ classdef sliceomatic < handle
 
         % add new arrow and slice
         this.hFigure = ancestor(this.hAxes, 'figure');  % FIXME: Can be removed if nested re-parenting works.
-        newa = arrow(this.hSliderZ, 'right', Z(iSlice));
+        hArrow = arrow(this.hSliderZ, 'right', Z(iSlice));
         set(this.hFigure, 'CurrentAxes', this.hAxes);
-        new = this.DrawLocalSlice(d.data, [], [], Z(iSlice));
-        setappdata(new, 'controlarrow', newa);
-        setappdata(newa, 'arrowslice', new);
-        set(new, 'AlphaData', get(new, 'CData'), 'AlphaDataMapping', 'scaled');
-        set(newa, 'ButtonDownFcn', @(hObject, eventData) this.callbacks('Zmove'));
-        set([new, newa], 'UIContextMenu', this.sliceContextMenu);
+        hSlice(iSlice) = this.DrawLocalSlice(d.data, [], [], Z(iSlice));
+        setappdata(hSlice(iSlice), 'controlarrow', hArrow);
+        setappdata(hArrow, 'arrowslice', hSlice(iSlice));
+        set(hSlice(iSlice), 'AlphaData', get(hSlice(iSlice), 'CData'), 'AlphaDataMapping', 'scaled');
+        set(hArrow, 'ButtonDownFcn', @(hObject, eventData) this.callbacks('Zmove'));
+        set([hSlice(iSlice), hArrow], 'UIContextMenu', this.sliceContextMenu);
 
-        this.draggedArrow = newa;
+        this.draggedArrow = hArrow;
       end
 
     end
 
 
-    function AddIsoSurface(this, V)
+    function hIso = AddIsoSurface(this, V)
       %% Add iso surface at value V
 
       % input check
@@ -734,7 +744,7 @@ classdef sliceomatic < handle
       clim = get(this.hSliderIso, 'XLim');
       d = getappdata(this.hParent, 'sliceomatic');
 
-      for iIso = 1:numel(V)
+      for iIso = numel(V):-1:1
         if V(iIso) < clim(1) || V(iIso) > clim(2)
           warning('PD:sliceomatic:AddIsoSurface:OutOfRange', ...
             'New iso surface at V = %.4g is out of range.', V(iIso));
@@ -743,21 +753,74 @@ classdef sliceomatic < handle
 
         % add new arrow and iso surface
         this.hFigure = ancestor(this.hAxes, 'figure');  % FIXME: Can be removed if nested re-parenting works.
-        newa = arrow(this.hSliderIso, 'down', V(iIso));
+        hArrow = arrow(this.hSliderIso, 'down', V(iIso));
         set(this.hFigure, 'CurrentAxes', this.hAxes);
-        new = this.DrawLocalIsoSurface(d.reducelims, d.reduce, d.reducesmooth, V(iIso));
+        hIso(iIso) = this.DrawLocalIsoSurface(d.reducelims, d.reduce, d.reducesmooth, V(iIso));
         if this.FadeInIso
-          slowset(new, 'FaceAlpha', d.defisoalpha);
+          slowset(hIso(iIso), 'FaceAlpha', d.defisoalpha);
         else
-          set(new, 'FaceAlpha', d.defisoalpha);
+          set(hIso(iIso), 'FaceAlpha', d.defisoalpha);
         end
-        set([newa, new], 'UIContextMenu', this.isoContextMenu);
-        setappdata(new, 'controlarrow', newa);
-        setappdata(new, 'reduced', 1);
-        setappdata(newa, 'arrowiso', new);
-        set(newa, 'ButtonDownFcn', @(hObject, eventData) this.callbacks('ISOmove'));
+        set([hArrow, hIso(iIso)], 'UIContextMenu', this.isoContextMenu);
+        setappdata(hIso(iIso), 'controlarrow', hArrow);
+        setappdata(hIso(iIso), 'reduced', 1);
+        setappdata(hArrow, 'arrowiso', hIso(iIso));
+        set(hArrow, 'ButtonDownFcn', @(hObject, eventData) this.callbacks('ISOmove'));
 
-        this.draggedArrow = newa;
+        this.draggedArrow = hArrow;
+      end
+
+    end
+
+
+    function MoveSlice(this, hSlice, pos)
+      %% Move slices to new position
+
+      if numel(hSlice) ~= numel(pos)
+        error('PD:sliceomatic:MoveSlice:NumMismatch', ...
+          'The number of handles to slices must match the number of new positions.');
+      end
+
+      d = getappdata(this.hParent, 'sliceomatic');
+
+      for iSlice = 1:numel(hSlice)
+        slicetype = getappdata(hSlice(iSlice), 'slicetype');
+        hArrow = getappdata(hSlice(iSlice), 'controlarrow');
+        switch slicetype
+          case 'X'
+            this.DrawLocalSlice(d.data, pos(iSlice), [], [], hSlice(iSlice));
+            arrow(this.hSliderX, 'up', pos(iSlice), hArrow);
+          case 'Y'
+            this.DrawLocalSlice(d.data, [], pos(iSlice), [], hSlice(iSlice));
+            arrow(this.hSliderY, 'left', pos(iSlice), hArrow);
+          case 'Z'
+            this.DrawLocalSlice(d.data, [], [], pos(iSlice), hSlice(iSlice));
+            arrow(this.hSliderZ, 'right', pos(iSlice), hArrow);
+        end
+      end
+
+    end
+
+
+    function MoveIsoSurface(this, hIso, val)
+      %% Move iso surface to new value
+
+      if numel(hIso) ~= numel(val)
+        error('PD:sliceomatic:MoveSlice:MoveIsoSurface', ...
+          'The number of handles to iso surfaces must match the number of new values.');
+      end
+
+      d = getappdata(this.hParent, 'sliceomatic');
+
+      for iIso = 1:numel(hIso)
+        this.DrawLocalIsoSurface(d.reducelims, d.reduce, d.reducesmooth, val(iIso), hIso(iIso));
+        hArrow = getappdata(hIso(iIso), 'controlarrow');
+        arrow(this.hSliderIso, 'down', val(iIso), hArrow);
+
+        hIsoCap = getappdata(hIso(iIso), 'isosurfacecap');
+        if ~isempty(hIsoCap)
+          this.DrawLocalIsoCaps(hIso(iIso), hIsoCap);
+        end
       end
 
     end
@@ -809,7 +872,7 @@ classdef sliceomatic < handle
         hArrows = getappdata(hIso(iIso), 'Arrows');
         hArrows(hArrows == a) = [];
         setappdata(hIso(iIso), 'Arrows', hArrows);
-        cap = getappdata(s, 'sliceomaticisocap');
+        cap = getappdata(s, 'isosurfacecap');
         if ~isempty(cap)
           delete(cap);
         end
@@ -952,6 +1015,28 @@ classdef sliceomatic < handle
     end
 
 
+    % Export video with moving slices or surfaces
+    ExportAvi(this, settings);
+
+
+    % Export to VolView format
+    ExportVolView(this, settings)
+
+
+    function hSlices = GetAllSlices(this)
+      %% Get an array with the handles to all slices
+
+      hSlices = findobj(this.hParent, 'Type', 'surface', 'Tag', 'sliceomaticslice');
+    end
+
+
+    function hIsos = GetAllIsos(this)
+      %% Get an array with the handles to all iso surfaces
+
+      hIsos = findobj(this.hParent, 'Type', 'patch', 'Tag', 'sliceomaticisosurface');
+    end
+
+
     function posX = GetAllSlicesPosX(this)
       %% Get x value of all x slices currently in the axes
 
@@ -1018,8 +1103,15 @@ classdef sliceomatic < handle
 
       % make progress indeterminate
       hwbKids = allchild(hwb);
-      jProgressBar = hwbKids(ishghandle(hwbKids, 'hgjavacomponent')).JavaPeer;
-      jProgressBar.setIndeterminate(1);
+      if verLessThan('matlab', '25.1')
+        jProgressBar = hwbKids(ishghandle(hwbKids, 'hgjavacomponent')).JavaPeer;
+        jProgressBar.setIndeterminate(1);
+      else
+        progressBar = hwbKids(ishghandle(hwbKids, 'matlab.ui.control.internal.ProgressIndicator'));
+        if ~isempty(progressBar)
+          set(progressBar, 'Indeterminate', 'on');
+        end
+      end
 
       % Keep same aspect ratio as currently displayed on screen
       hf = figure('Visible', 'off', ...
@@ -1161,20 +1253,6 @@ classdef sliceomatic < handle
 
     % Finish dragging an arrow. Finalize graphics objects
     ArrowDragFinish(this);
-
-
-    function hSlices = GetAllSlices(this)
-      %% Get an array with the handles to all slices
-
-      hSlices = findobj(this.hParent, 'Type', 'surface', 'Tag', 'sliceomaticslice');
-    end
-
-
-    function hIsos = GetAllIsos(this)
-      %% Get an array with the handles to all iso surfaces
-
-      hIsos = findobj(this.hParent, 'Type', 'patch', 'Tag', 'sliceomaticisosurface');
-    end
 
 
     function hCaps = GetAllCaps(this)

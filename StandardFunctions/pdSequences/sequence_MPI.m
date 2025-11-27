@@ -225,16 +225,45 @@ function [SeqOut, dataOut, data, data_1D] = sequence_MPI(HW, Seq)
 %           border (command load time!). If 0, the gap is as small as possible.
 %           If 1, the last period of the slowest MPS frequency is not acquired.
 %           For values larger than one, additionally the *first* AQmode-1
-%           periods of the slowest MPS frequency are not acquired.
+%           periods of the slowest MPS frequency are not acquired. For a value
+%           <0, the acquisition is omitted.
 %
 %     AQDataMode
 %           Select data mode (bit width) for transmission of received signal
 %           between console and PC.
 %           (Default: 3*(HW.MMRT.FPGA_Firmware >= 20221129) )
 %
+%     GetDataEarly
+%           Add packet end command to each tRep with acquisition to receive data
+%           as soon as it has been acquired.
+%           (Default: false)
+%
 %     Device
 %           Index of the connected MRT device that is used for the experiment.
 %           (Default: 1)
+%
+%     trigger
+%           Structure with settings for an optional trigger signal containing
+%           the following fields:
+%
+%       use
+%             Boolean value that indicates whether a trigger signal should be
+%             added to the pulse program.
+%             (Default: HW.MPI.trigger.use)
+%
+%       duration
+%             Duration of the trigger signal in seconds.
+%             (Default: HW.MPI.trigger.duration)
+%
+%       offset
+%             Time of the rising edge of the trigger signal relative to the
+%             start of the CH5 rampup in seconds.
+%             (Default: HW.MPI.trigger.offset)
+%
+%       output
+%             Value of the digital output channels that is set while the trigger
+%             signal is high.
+%             (Default: HW.MPI.trigger.output)
 %
 %     average
 %           Number of averages (complete experiment including Seq.nPrepare).
@@ -292,7 +321,7 @@ function [SeqOut, dataOut, data, data_1D] = sequence_MPI(HW, Seq)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -393,9 +422,21 @@ if Seq.PreProcessSequence
     % 2: customizable
     Seq.AQmode = 2;
   end
+  omitAQ = false;
+  if Seq.AQmode < 0
+    Seq.AQmode = abs(Seq.AQmode);
+    if Seq.AQmode < 1
+       Seq.AQmode = 0;
+    end
+    omitAQ = true;
+  end
   if isemptyfield(Seq, 'AQDataMode')
     % data mode (bit width) for transmission of received signal between console and PC
     Seq.AQDataMode = 3*(HW.MMRT(Seq.Device).FPGA_Firmware >= 20221129);
+  end
+  if isemptyfield(Seq, 'GetDataEarly')
+    % get data as early as possible after each acquisition
+    Seq.GetDataEarly = false;
   end
 
   if isemptyfield(Seq, 'fAQ'), Seq.fAQ = 0; end  % AQ mixing frequency in Hz
@@ -413,7 +454,7 @@ if Seq.PreProcessSequence
     if isempty(HW.MPI.fSampleAQ)
       Seq.fSampleAQ = 2.5e6;
     else
-      Seq.fSampleAQ = HW.MPI.SR;
+      Seq.fSampleAQ = HW.MPI.fSampleAQ;
     end
   end
   % round to integer reduction factor
@@ -516,7 +557,7 @@ if Seq.PreProcessSequence
     else
       Seq.tSampleGrad = HW.MPI.tSampleGrad;
     end
-end
+  end
 
   Seq.startGrad = -Seq.tRampUpGrad - Seq.tRampUpHoldGrad;
 
@@ -650,6 +691,25 @@ end
     end
   end
 
+  % trigger
+  if isemptyfield(Seq, {'trigger', 'use'})
+    % Boolean value to indicate whether trigger signal should be used
+    Seq.trigger.use = HW.MPI.trigger.use;
+  end
+  if isemptyfield(Seq, {'trigger', 'duration'})
+    % duration of the trigger signal in seconds
+    Seq.trigger.duration = HW.MPI.trigger.duration;
+  end
+  if isemptyfield(Seq, {'trigger', 'offset'})
+    % time of the rising edge of the trigger relative to the start of the CH5
+    % rampup in seconds
+    Seq.trigger.offset = HW.MPI.trigger.offset;
+  end
+  if isemptyfield(Seq, {'trigger', 'output'})
+    % digital output value for trigger
+    Seq.trigger.output = HW.MPI.trigger.output;
+  end
+
   if isemptyfield(Seq, 'average'), Seq.average = 1; end  % number of averages
   if isemptyfield(Seq, 'averageBreak'), Seq.averageBreak = []; end  % break between averages in seconds (must be > 1 ms)
   if isemptyfield(Seq, 'plotData'), Seq.plotData = 1; end  % plot acquired data
@@ -691,6 +751,10 @@ end
   AQ.nSamples = round(Seq.tAQ * AQ.fSample);
   AQ.DataMode = Seq.AQDataMode;
   AQ.Device = Seq.Device;
+  AQ.GetData = false(size(Seq.tRep));
+  if Seq.GetDataEarly
+    AQ.GetData(Seq.nPrepare+1:end) = true;
+  end
 
   % Seq.MissingSamples = Seq.tEndGrad*AQ.fSample(1)-AQ.nSamples(1);
   % AQ.Frequency = 125e6/6000;
@@ -841,25 +905,43 @@ end
     Grad(Gn).Amp(end,end) = 0;
   end
 
+  if omitAQ
+    AQ.Start(:) = NaN;
+  end
+
+  if Seq.trigger.use
+    Seq.DigitalIO.SetTime = NaN(2, numel(Seq.tRep));
+    % timing is relative to start of CH5 signal
+    Seq.DigitalIO.SetTime(1,:) = TX(1).Start(1,:) + Seq.trigger.offset;
+    Seq.DigitalIO.SetTime(2,:) = Seq.DigitalIO.SetTime(1,:) + Seq.trigger.duration;
+    Seq.DigitalIO.SetValue = Seq.DigitalIO.SetTime;
+    Seq.DigitalIO.SetValue(1,:) = Seq.trigger.output;
+    Seq.DigitalIO.SetValue(2,:) = 0;
+  end
+
   % some important characteristics for the gradient programming:
   % - the first Amp (Grad.Amp(1,:)) is copied to the beginning of each tRep,
   % - the last used Amp per tRep is copied to the end of each tRep.
   % - It's not (yet) allowed to have Grad ramp to the next tRep, only a constant value is allowed.
 end
 
-if Seq.StartSequence || Seq.PollPPGfast || Seq.GetRawData
+if Seq.PreProcessSequence || Seq.StartSequence || Seq.PollPPGfast || Seq.GetRawData
   % HW.Grad.AmpUnit={'V' 'V' 'V' 'V'};  % Change the Text at the plots to a proper unit
   % HW.Grad.AmpUnitScale=1./HW.Grad.Amp2PaUout(HW.Grad.xyzB); % Change the scale to match the units
 
 
   % while 1 % start sequence and loop until pressing Strg+C
+  if nargout > 3 || Seq.plotData
     [~, SeqOut, data, data_1D] = set_sequence(HW, Seq, AQ, TX, Grad);
-  %   sleep(0.2); % restart sequence after less than 2 Seconds to avoid turning of the gradients by the auto Mute
+  else
+    [~, SeqOut, data] = set_sequence(HW, Seq, AQ, TX, Grad);
+  end
+  %   sleep(0.2); % restart sequence after less than 2 Seconds to avoid turning off the gradients by the auto Mute
   % end
   % MRIUnit.MRISequency.exctractArrayToFile(talker.mySequency.getCommandArray,'test.txt')
 end
 
-if ~Seq.PostProcessSequence || (numel(data.data)==1 && isnan(data.data))
+if ~Seq.PostProcessSequence || (isscalar(data.data) && isnan(data.data))
   % return early
   dataOut = [];
   return;

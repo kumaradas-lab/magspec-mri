@@ -8,7 +8,9 @@ function [HW, mySave, ShimMatrix, DDS] = LoadHW(varargin)
 % When called, the connection to the MMRT device is established and default
 % values are set. Default values can be changed by editing "LoadMySystem.m".
 %
+%
 % INPUT:
+%
 %   The following optional property-value-pairs are allowed:
 %   'HW'          HW-structure or object. Default: []
 %   'mySave'      mySave structure. Default: []
@@ -27,14 +29,17 @@ function [HW, mySave, ShimMatrix, DDS] = LoadHW(varargin)
 %   'userName'    string. User name that is used for different User folders.
 %                 Default: 'default'
 %
+%
 % OUTPUT:
+%
 %   HW            HW-structure or object
 %   mySave        mySave-stucture
 %   ShimMatrix    ShimMatrix object if applicable, empty otherwise
 %   DDS           DDS object if applicable, empty otherwise
 %
+%
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -56,6 +61,7 @@ end
 %#function PD.MySave
 %#function PD.UnwindProtectGuard
 %#function PD.helper_HW_Shim
+%#function checkDeviceSerial
 %#function check_FPGA_Firmware_Libs
 %#function getOpenMatlabRootPath
 %#function get_MRDevice

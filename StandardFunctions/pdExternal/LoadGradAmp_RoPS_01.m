@@ -48,7 +48,7 @@ for iDevice = 1:numel(talker)
 
     HW.RecoveryCPMG.PowerSupply.EnableAnalogChannel = 0;
 
-    HW.Grad.CoilPowerDissipation(2) = 2*65;  % power dissipation at maximum temperature in Watt (measured in Rimpar: 70 W)
+    HW.Grad(iDevice).CoilPowerDissipation(2) = 2*65;  % power dissipation at maximum temperature in Watt (measured in Rimpar: 70 W)
 
     HW.Grad(iDevice).CoilMaxDcCurrent(4) = 4;  % maximum (nominal) DC current of fuse in Ampere
     HW.Grad(iDevice).CoilCurrentSquareTime(4) = 29.165 * 0.95;  % time-lag fuse parameter (maximum "accumulated heat") in A^2*sec

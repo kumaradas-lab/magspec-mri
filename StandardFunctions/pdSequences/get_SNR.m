@@ -113,7 +113,7 @@ function [AmpSnrHz, FdB, F, AllOutputs] = get_SNR(HW, showPlot, tEcho, fSampleDi
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -344,7 +344,7 @@ FdB = 10 * log10(F);
 
 
 %% plot results
-if showPlot
+if ishghandle(showPlot, 'figure') || showPlot
   if ~ishghandle(showPlot, 'figure')
     hf = figure(showPlot);
   else
@@ -357,7 +357,7 @@ if showPlot
   ax1 = subplot(3,1,1, 'Parent', hf);
   plot(ax1, dataN.f_fft1_data(INroi,1,end), sqrt(PnoiseDensityPerBinSmooth(INroi)*HW.RX(iDevice).Rin), 'b'...
           , dataN.f_fft1_data(INroi,1,end), sqrt(PnoiseDensityMean*HW.RX(iDevice).Rin) * ones(size((dataN.f_fft1_data(INroi,1,end)))), '--b'...
-          , dataN.f_fft1_data(INroi,1,end), UnoiseRinDensity *                  ones(size((dataN.f_fft1_data(INroi,1,end)))), '--g');
+          , dataN.f_fft1_data(INroi,1,end), UnoiseRinDensity * ones(size((dataN.f_fft1_data(INroi,1,end)))), '--g');
   title(ax1, 'Noise Vrms/\surd{Hz}');
   xlabel(ax1, 'frequency in Hz');
   ylabel(ax1, 'Vrms/\surd{Hz}');

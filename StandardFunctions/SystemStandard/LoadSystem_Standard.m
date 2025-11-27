@@ -14,5 +14,6 @@
 %#function LoadProbe_Standard
 %#function LoadRXTXCoil_Standard
 %#function LoadRXTX_Standard
+%#function LoadSampleHeater_Standard
 %#function LoadShimMatrix_Standard
 

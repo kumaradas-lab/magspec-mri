@@ -11,7 +11,7 @@ function d = SetupAxes(this, d, xmesh, ymesh, zmesh)
 % Copyright 2000, 2001, 2002, 2003, 2004, 2005 The MathWorks Inc
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2016-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -29,9 +29,14 @@ end
 if isempty(this.hParent), this.hParent = this.hFigure; end
 
 if this.hParent == this.hFigure
+  if ishghandle(this.hFigure, 'figure')
+    oldVisibility = get(this.hFigure, 'Visible');
+  else
+    oldVisibility = 'on';
+  end
   this.hFigure = figure(this.hFigure);
   clf(this.hFigure, 'reset')
-  set(this.hFigure, 'Name', 'Sliceomatic');
+  set(this.hFigure, 'Name', 'Sliceomatic', 'Visible', oldVisibility);
 end
 
 %% trigger delete function of previous sliceomatic in parent
@@ -115,7 +120,7 @@ else
   axis(this.hAxes, 'vis3d');
 end
 
-hold(this.hAxes, 'all');
+hold(this.hAxes, 'on');
 grid(this.hAxes, 'on');
 
 %% Set up the four controller axes

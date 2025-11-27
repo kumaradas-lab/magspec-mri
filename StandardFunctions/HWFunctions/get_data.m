@@ -1,7 +1,8 @@
 function [Seq, data_S_AQs_TRs] = get_data(Seq, raw_data_AQs, dataProps, Channel, iDevice, nucleusX)
 %% Sort raw data into structure with array of samples x AQ windows x tRep
 %
-%   [Seq, data_S_AQs_TRs] = get_data(Seq, raw_data_AQs, dataProps, Channel, iDevice, nucleusX)
+%   [Seq, data] = get_data(Seq, raw_data_AQs, dataProps, Channel, iDevice, nucleusX)
+%
 %
 % INPUT:
 %
@@ -57,7 +58,7 @@ function [Seq, data_S_AQs_TRs] = get_data(Seq, raw_data_AQs, dataProps, Channel,
 %   Seq
 %         Exact same as input Seq.
 %
-%   data_S_AQs_TRs
+%   data
 %         Structure with arrays containing the sorted results. Amongst others
 %         the fields are:
 %
@@ -74,14 +75,14 @@ function [Seq, data_S_AQs_TRs] = get_data(Seq, raw_data_AQs, dataProps, Channel,
 %         complex data (in T) acquired at each of the above samples.
 %
 %     averages
-%         Matrix with the same size as data_S_AQs_TRs.data containing the number
-%         of averages at each sample if there were any missing samples. It is a
+%         Matrix with the same size as data.data containing the number of
+%         averages at each sample if there were any missing samples. It is a
 %         scalar with the number of averages, otherwise.
 %
 %     overflow
-%         Matrix with the same size as data_S_AQs_TRs.data flagging the samples
-%         for which the receiver was saturated if it was saturated for at least
-%         one sample. It is empty, otherwise.
+%         Matrix with the same size as data.data flagging the samples for which
+%         the receiver was saturated if it was saturated for at least one
+%         sample. It is empty, otherwise.
 %
 %     device
 %         Device number that was used to acquire the data.
@@ -95,8 +96,8 @@ function [Seq, data_S_AQs_TRs] = get_data(Seq, raw_data_AQs, dataProps, Channel,
 %         frequencies.
 %
 %     fft1_data
-%         If Seq.AQ.CalculateFFTOfData is true, this field contains the
-%         FFT of the data in each acquisition window corrected for the transfer
+%         If Seq.AQ.CalculateFFTOfData is true, this field contains the FFT of
+%         the data in each acquisition window corrected for the transfer
 %         function of the CIC filter (i.e., data.cic_corr).
 %
 %     f_fft1_data
@@ -132,7 +133,7 @@ function [Seq, data_S_AQs_TRs] = get_data(Seq, raw_data_AQs, dataProps, Channel,
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2016-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 

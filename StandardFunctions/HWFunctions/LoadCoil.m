@@ -4,7 +4,7 @@
 % HW.TX.LoadCoilPath if applicable
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2018-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2018-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %-------------------------------------------------------------------------------
 
@@ -20,6 +20,7 @@
 %#function LoadCoil_MultiCore_08
 %#function LoadCoil_MultiCore_09
 %#function LoadCoil_MultiCore_10
+%#function LoadCoil_MultiCore_11
 %#function LoadCoil_MultiCore_IDCycLIB
 %#function LoadCoil_RoPS_01
 %#function PD.Talker

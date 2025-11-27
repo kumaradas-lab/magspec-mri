@@ -4,7 +4,7 @@ classdef Talker < handle
 %   this = PD.TCP.Talker(tcpDevice)
 %
 % ----------------------------------------------------------------------------
-% (C) Copyright 2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2024-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ----------------------------------------------------------------------------
 

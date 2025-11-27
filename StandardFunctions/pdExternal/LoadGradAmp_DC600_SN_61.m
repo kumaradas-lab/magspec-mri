@@ -21,10 +21,10 @@ HW.Grad(iDevice).PaPmaxInt(1:4) = [100, 100, 100, 100];       % maximum internal
 
 HW.Grad(iDevice).PaRout(1:4) = [15000, 15000, 15000, 15000];  % output impedance in Ohm
 
-HW.Grad(iDevice).tRamp = 50e-6;                               % minimum ramp time in s
+HW.Grad(iDevice).tRamp = 42e-6;                               % minimum ramp time in s
 HW.Grad(iDevice).tEC = 50e-6;                                 % eddy current time in s
-% TODO: Run Grad Delay with DC-600 calibration!
-HW.Grad(iDevice).SystemTimeDelay(1:3) = [50e-6, 50e-6, 50e-6];  % time delay of gradient amplifier in s
+
+HW.Grad(iDevice).SystemTimeDelay(HW.Grad(iDevice).xyzB(1:3)) = [47.200, 46.268, 34.380]*1e-6;  % time delay of gradient amplifier in s
 HW.Grad(iDevice).MaxAmpSlice = 0.1;                           % maximum gradient amplitude for slice selection in T/m
 
 HW.Grad(iDevice).Status1 = 1;                                 % power supply of DC-600 ok

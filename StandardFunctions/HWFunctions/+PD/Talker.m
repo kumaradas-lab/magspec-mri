@@ -9,7 +9,7 @@ classdef Talker < handle
 % interface in both cases.
 %
 % ----------------------------------------------------------------------------
-% (C) Copyright 2019-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2019-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ----------------------------------------------------------------------------
 

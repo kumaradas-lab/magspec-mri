@@ -38,7 +38,7 @@ function spectrumData = plot_spectrum(HW, hf, ppm, spectrumData, settings)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2016-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -140,7 +140,7 @@ end
       hReal(2:size(spectrumData, 2)) = ...
         plot(haxes(1), ppm(:,2:end), real(spectrumData(:,2:end))*settings.Norm2Amp(min(2,end)), 'DisplayName', 'real');
     end
-    hold(haxes(1), 'all');
+    hold(haxes(1), 'on');
     setappdata(hf, 'hReal', hReal);
     % absolute
     yyaxis(haxes(1), 'left');
@@ -200,7 +200,7 @@ end
     haxes(2) = axes('Parent', hf, 'Position', [0.1, 0.25, 0.83, 0.15]);
     acc_spec = -sign(diff(ppm(1:2)))*(bsxfun(@rdivide, cumsum(real(spectrumData), 1), sum(real(spectrumData), 1))-.5)+.5;
     hInt = plot(haxes(2), ppm, acc_spec);
-    hold(haxes(2), 'all');
+    hold(haxes(2), 'on');
     acc_spec((acc_spec>=0)&(acc_spec<=1)) = NaN;
     hIntOff = plot(haxes(2), ppm, acc_spec, 'HitTest', 'off');
     set(haxes(2), 'Color', 'none', 'YLim', [-.1 1.1], 'XTickLabel', []);
@@ -398,7 +398,7 @@ hImag = getappdata(hf, 'hImag');
 hAbs = getappdata(hf, 'hAbs');
 
 hComplex = getappdata(hf, 'hComplex');
-if isappdata(hf, 'hCore');
+if isappdata(hf, 'hCore')
   hCore = getappdata(hf, 'hCore');
 end
 

@@ -1,28 +1,46 @@
-function hax = plot_Smith(HW, Network, hax, type)
+function [hax, Network] = plot_Smith(HW, Network, hax, type)
 %% Plot a Smith chart with the data from sequence_Network
 %
-%     hax = plot_Smith(HW, Network, hax, type)
+%     [hax, Network] = plot_Smith(HW, Network, hax, type)
 %
 % Plot the measured admittance and impedance in a Smith chart. Additionally,
 % calculate the loaded Q-factor of the coil with the method described in
 % https://engineering.olemiss.edu/~eedarko/experience/rfqmeas2b.pdf
 %
 % INPUT:
-%   HW        HW structure or PD.HWClass object
-%   Network   Structure with at least the following fields:
-%     Frequency     Vector with frequencies in Hz
-%     Reflection    Complex reflection ratio
-%   hax       Optional. Handle to an axes to use for the Smith chart. If omitted
-%             or empty, a new figure (201) is created for the chart.
-%   type      Optional. Type of Smith chart ('z', 'y', 'yz'), default: 'z'.
+%
+%   HW
+%       HW structure or PD.HWClass object.
+%
+%   Network
+%       Structure with at least the following fields:
+%     Frequency
+%         Vector with frequencies in Hz.
+%     Reflection
+%         Complex reflection ratio.
+%
+%   hax
+%       Optional. Handle to an axes to use for the Smith chart. If omitted or
+%       empty, a new figure (201) is created for the chart.
+%
+%   type
+%       Optional. Type of Smith chart ('z', 'y', 'yz'), default: 'z'.
+%
 %
 % OUTPUT:
-%   hax       Handle to the axes containing the Smith chart
+%
+%   hax
+%       Handle to the axes containing the Smith chart.
+%
+%   Network
+%       Structure as in input with additional fields (see get_QFactor_Smith).
+%
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
+
 
 %% Check input parameters
 if nargin < 4
@@ -35,6 +53,7 @@ if nargin < 3 || isempty(hax)
   set(fh, 'Name', 'Smith Chart', 'NumberTitle', 'off');
   hax = gca;
 end
+
 
 %% Create Smith chart
 Z0 = HW.RX.Rin;
@@ -67,19 +86,25 @@ if isempty(hsm) || ~ishghandle(hsm, 'smith')
 else
   set(hsm, smithProps);
   hsm.clear();
-  hold(hax, 'all')
+  hold(hax, 'on');
 end
 setappdata(hax, 'smithObject', hsm);
+
 
 %% plot (interpolated) impedance and admittance
 Frequency = interpn(Network.Frequency, 4);
 Reflection = interpn(Network.Reflection, 4, 'spline');
 [MinReflection, iMinReflection] = min(Reflection);
 fMinReflection = Frequency(iMinReflection);
+fMinFormatStr = '%.1f dB @ %.3f MHz';
+fMinStr = sprintf(fMinFormatStr, 20*log10(abs(MinReflection)), fMinReflection/1e6);
 
 smithline = plot(hax, Reflection, 'LineWidth', 2);
 smithlineY = plot(hax, -Reflection, 'm', 'LineWidth', 2);
-legend(hax, 'impedance', 'admittance')
+hl = legend([smithline,smithlineY], {'impedance', 'admittance'});
+if ~verLessThan('Matlab', '9.2')
+  set(hl, 'AutoUpdate', 'off');  % Do not automatically add new entries to legend
+end
 
 % smithl.XData=get(smithline,'XData');
 % smithl.YData=get(smithline,'YData');
@@ -87,6 +112,10 @@ legend(hax, 'impedance', 'admittance')
 
 xSmith = get(smithline, 'XData');
 ySmith = get(smithline, 'YData');
+
+xMinReflection = double(interp1(Frequency, xSmith, fMinReflection, 'nearest'));
+yMinReflection = double(interp1(Frequency, ySmith, fMinReflection, 'nearest'));
+
 
 %% Loaded Q-factor (https://engineering.olemiss.edu/~eedarko/experience/rfqmeas2b.pdf):
 % "Draw line" from (0,0) trough fMinReflection
@@ -97,48 +126,39 @@ ySmith = get(smithline, 'YData');
 % following equivalent approach:
 
 % Find circle that fits points around min. reflection.
-tempRef = sort(abs(Reflection));
-iStart = find(abs(Reflection) < tempRef(round(numel(Reflection)/10)), 1, 'first');
-iStop  = find(abs(Reflection) < tempRef(round(numel(Reflection)/10)), 1, 'last');
-Par = CircleFitByPratt([xSmith(iStart:iStop)', ySmith(iStart:iStop)']);
-xCenterQ = Par(1);
-yCenterQ = Par(2);
+Network.minRefFrequencySSInt  = NaN;
+Network.minRefReflection_dB   = NaN;
+Network.QLFrequencySSInt      = NaN;
 
-% find points with minimal distance to orthogonal diameter (diameter line that
-% is orthogonal to the line from the center of the smith chart through the
-% center of the Q-circle)
-reflCenterQ = sqrt(xCenterQ^2 + yCenterQ^2);
-distanceOrth = abs(xCenterQ*xSmith + yCenterQ*ySmith - reflCenterQ^2) / reflCenterQ;
-minDist1 = min(distanceOrth(Frequency>fMinReflection));
-if ~isempty(minDist1)
-  if1 = find(distanceOrth == minDist1, 1, 'first');
-end
-minDist2 = min(distanceOrth(Frequency<fMinReflection));
-if ~isempty(minDist2)
-  if2 = find(distanceOrth == minDist2, 1, 'last');
-end
+Network = get_loadedQFactor_Smith(Network);
 
-% calculate loaded Q factor and construct string for plot
-fMinFormatStr = '%.1f dB @ %.3f MHz';
-if isempty(minDist1) || isempty(minDist2) || (if1 - if2 < 5) || ...
-    (Par(3) > 0.9) || ((minDist1 > 0.1*Par(3)) && (minDist2 > 0.1*Par(3)))
-  fMinStr = sprintf(fMinFormatStr, 20*log10(abs(MinReflection)), fMinReflection/1e6);
-else
-  if minDist1 > 0.1*Par(3)
-    df = 2*abs(Frequency(if2) - fMinReflection);
-    if1 = [];
-  elseif minDist2 > 0.1*Par(3)
-    df = 2*abs(Frequency(if1) - fMinReflection);
-    if2 = [];
-  else
-    df = abs(Frequency(if1) - Frequency(if2));
-  end
-  QL = fMinReflection / df;
+if isfinite(Network.minRefFrequencySSInt)
+  plot(hax, Network.Reflection([Network.Q_iStart, Network.Q_iStop]), 'kd')
+  plot(hax, -Network.Reflection([Network.Q_iStart, Network.Q_iStop]), 'kd')
+  xB = real(Network.Q_circle_center);
+  yB = imag(Network.Q_circle_center);
+  rB = Network.Q_circle_radius;
+  fplot(hax, @(t) rB*sin(t)+xB, @(t) rB*cos(t)+yB, [-pi, pi], ':k', 'MeshDensity', 360*1);
+  xB = -xB;
+  yB = -yB;
+  fplot(hax, @(t) rB*sin(t)+xB, @(t) rB*cos(t)+yB, [-pi, pi], ':k', 'MeshDensity', 360*1);
+
+  plot(hax, Network.Q_circle_minCenter, 'ko')
+  centerCircle2minRefCircle = Network.Q_circle_center - Network.Q_circle_minCenter;
+  line2plot = [Network.Q_circle_minCenter; Network.Q_circle_center; NaN; ...
+    Network.Q_circle_center+centerCircle2minRefCircle.*exp(-1i*(+pi/2)); ...
+    Network.Q_circle_center+centerCircle2minRefCircle.*exp(-1i*(-pi/2)); ...
+    NaN];
+  plot(hax, [line2plot; -line2plot], ':ko');  % plot diameter and line to minRefCycle
+
   fMinFormatStr = [fMinFormatStr ' (Q_L = %.1f)'];
-  fMinStr = sprintf(fMinFormatStr, 20*log10(abs(MinReflection)), fMinReflection/1e6, QL);
-  plot(hax, Reflection([if1, if2]), 'ro')
-  plot(hax, -Reflection([if1, if2]), 'ro')
+  fMinStr = sprintf(fMinFormatStr, ...
+    20*log10(abs(Network.Q_circle_minCenter)), Network.minRefFrequencySSInt/1e6, ...
+    Network.QLFrequencySSInt);
+  xMinReflection = real(Network.Q_circle_minCenter);
+  yMinReflection = imag(Network.Q_circle_minCenter);
 end
+
 
 %% Mark at Larmor frequency and resonant frequency
 x = interp1(Frequency, xSmith, HW.fLarmor, 'nearest');
@@ -153,12 +173,13 @@ text(double(interp1(Frequency, xSmith, HW.fLarmor, 'nearest')), ...
   'FontWeight', 'bold', ...
   'Rotation', 90, 'FontSize', 12, 'Parent', hax);
 
-text(double(interp1(Frequency, xSmith, fMinReflection, 'nearest')), ...
-  double(interp1(Frequency, ySmith, fMinReflection, 'nearest')), ...
+text(xMinReflection, ...
+  yMinReflection, ...
   ['\color[rgb]{0 .5 0}\leftarrow' fMinStr], ...
   'HorizontalAlignment', 'left', ...
   'FontWeight', 'bold', ...
   'Rotation', -90, 'FontSize', 12, 'Parent', hax);
+
 
 %% Calculate parameters of series LC circuit
 R = real(Zt)*Z0;
@@ -175,6 +196,7 @@ ZT = Zt*Z0;
 
 title1 = sprintf('Series circuit X = %.1f Ohm, R = %.1f Ohm and %s = %.3f %s @ fLarmor (%.6f MHz)', ...
   ZT, R, Xtext, X*1e9, Xeinheit, HW.fLarmor/1e6);
+
 
 %% Calculate parameters of parallel LC circuit
 Y0 = 1/Z0;
@@ -205,6 +227,7 @@ title2 = sprintf('Parallel circuit Y = %.3f 1/Ohm, R = %.1f Ohm and %s = %.3f %s
 title3 = sprintf('Parallel resonant circuit %s = %.3f %s; add %s = %.3f %s to get resonant @ fLarmor (%.6f MHz)', ...
   Xtext, X*1e9, Xeinheit, XaddText, Xadd*1e9, XaddEinheit, HW.fLarmor/1e6);
 
+
 %% Mark at Larmor frequency and resonant frequency
 text(double(interp1(Frequency, get(smithlineY, 'XData'), HW.fLarmor, 'nearest')), ...
   double(interp1(Frequency, get(smithlineY, 'YData'), HW.fLarmor, 'nearest')), ...
@@ -213,12 +236,13 @@ text(double(interp1(Frequency, get(smithlineY, 'XData'), HW.fLarmor, 'nearest'))
   'FontWeight', 'bold', ...
   'Rotation', 0, 'FontSize', 12, 'Parent', hax)
 
-text(double(interp1(Frequency, get(smithlineY, 'XData'), fMinReflection, 'nearest')), ...
-  double(interp1(Frequency, get(smithlineY, 'YData'), fMinReflection, 'nearest')), ...
+text(-xMinReflection, ...
+  -yMinReflection, ...
   ['\color[rgb]{0 .5 0}' fMinStr ' \rightarrow'], ...
   'HorizontalAlignment', 'right', ...
   'FontWeight', 'bold', ...
   'Rotation', 0, 'FontSize', 12, 'Parent', hax)
+
 
 %% Add title
 set(hax, 'Unit', 'pixels')
@@ -243,95 +267,5 @@ end
 
 
 hold(hax, 'off');
-
-end
-
-function Par = CircleFitByPratt(XY)
-%% Circle fit by Pratt
-%   V. Pratt, "Direct least-squares fitting of algebraic surfaces",
-%   Computer Graphics, Vol. 21, pages 145-152 (1987)
-%
-% Input:  XY(n,2) is the array of coordinates of n points x(i)=XY(i,1), y(i)=XY(i,2)
-%
-% Output: Par = [a b R] is the fitting circle:
-%                       center (a,b) and radius R
-%
-% Note: This fit does not use built-in matrix functions (except "mean"),
-%       so it can be easily programmed in any programming language
-
-n = size(XY,1);      % number of data points
-
-centroid = mean(XY);   % the centroid of the data set
-
-% computing moments (note: all moments will be normed, i.e. divided by n)
-
-Mxx=0; Myy=0; Mxy=0; Mxz=0; Myz=0; Mzz=0;
-
-for i=1:n
-  Xi = XY(i,1) - centroid(1);  %  centering data
-  Yi = XY(i,2) - centroid(2);  %  centering data
-  Zi = Xi*Xi + Yi*Yi;
-  Mxy = Mxy + Xi*Yi;
-  Mxx = Mxx + Xi*Xi;
-  Myy = Myy + Yi*Yi;
-  Mxz = Mxz + Xi*Zi;
-  Myz = Myz + Yi*Zi;
-  Mzz = Mzz + Zi*Zi;
-end
-
-Mxx = Mxx/n;
-Myy = Myy/n;
-Mxy = Mxy/n;
-Mxz = Mxz/n;
-Myz = Myz/n;
-Mzz = Mzz/n;
-
-% computing the coefficients of the characteristic polynomial
-
-Mz = Mxx + Myy;
-Cov_xy = Mxx*Myy - Mxy*Mxy;
-Mxz2 = Mxz*Mxz;
-Myz2 = Myz*Myz;
-
-A2 = 4*Cov_xy - 3*Mz*Mz - Mzz;
-A1 = Mzz*Mz + 4*Cov_xy*Mz - Mxz2 - Myz2 - Mz*Mz*Mz;
-A0 = Mxz2*Myy + Myz2*Mxx - Mzz*Cov_xy - 2*Mxz*Myz*Mxy + Mz*Mz*Cov_xy;
-A22 = A2 + A2;
-
-epsilon = sqrt(eps(class(XY)));
-ynew=1e+20;
-IterMax=20;
-xnew = 0;
-
-% Newton's method starting at x=0
-
-for iter=1:IterMax
-  yold = ynew;
-  ynew = A0 + xnew*(A1 + xnew*(A2 + 4.*xnew*xnew));
-  if (abs(ynew)>abs(yold))
-    disp('Newton-Pratt goes wrong direction: |ynew| > |yold|');
-    xnew = 0;
-    break;
-  end
-  Dy = A1 + xnew*(A22 + 16*xnew*xnew);
-  xold = xnew;
-  xnew = xold - ynew/Dy;
-  if (abs((xnew-xold)/xnew) < epsilon), break, end
-  if (iter >= IterMax)
-    disp('Newton-Pratt did not converge');
-    xnew = 0;
-  end
-  if (xnew<0.)
-    fprintf(1, 'Newton-Pratt negative root:  x=%f\n', xnew);
-    xnew = 0;
-  end
-end
-
-% computing the circle parameters
-
-DET = xnew*xnew - xnew*Mz + Cov_xy;
-Center = [Mxz*(Myy-xnew)-Myz*Mxy , Myz*(Mxx-xnew)-Mxz*Mxy]/DET/2;
-
-Par = [Center+centroid , sqrt(Center*Center'+Mz+2*xnew)];
 
 end

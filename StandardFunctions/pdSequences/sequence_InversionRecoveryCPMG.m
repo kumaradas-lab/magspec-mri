@@ -5,7 +5,7 @@ function [data, SeqOut] = sequence_InversionRecoveryCPMG(HW, Seq)
 % Use sequence_RecoveryCPMG instead.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2015-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2015-2025 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -187,46 +187,46 @@ shading interp
 
 %% T1
 if SeqOut.FitT1
-  t1=nan;
-  T1=nan;
-  if SeqOut.nTau1>3;
+  t1 = NaN;
+  T1 = NaN;
+  if SeqOut.nTau1 > 3
     T1 = fit_exp(real(data.MeanEchoTau1PhaseCorrected(1,:)),data.Tau1Time(1,:),SeqOut.PlotT1,0,0,1);
     t1=T1.tau;
     T1.half=log(2)*T1.tau;
     T1.half1=log(2)*T1.tau1;
     T1.half2=log(2)*T1.tau2;
-    data.T1=T1;
+    data.T1 = T1;
   else
-    disp('nTau1 too low')
+    disp('nTau1 too low');
   end
 end
 
 %% T2
 if SeqOut.FitT2
-  fh=figure(82);
+  fh = figure(82);
   clf(fh)
-  ax(1)=subplot(1,1,1, 'Parent',fh);
-  if SeqOut.nEcho>3;
+  ax(1) = subplot(1,1,1, 'Parent', fh);
+  if SeqOut.nEcho > 3
     for t=1:SeqOut.nTau1
       % fitting exponential functions to the data
       T2(t) = fit_exp(real(data.MeanEchoTau1PhaseCorrected(:,t)),data.EchoTime(:,t),SeqOut.PlotT2,0,0,0);
       figure(82)
-      hold(ax(1), 'all');
+      hold(ax(1), 'on');
       plot(ax(1),T2(t).timeCorrected,T2(t).dataPhaseCorrectedReal,'b');
       % legend(ax(1),'real');
-      xlabel(ax(1),'time / s')
-      ylabel(ax(1),'amplitude')
-      title(ax(1),{[' ', ' ', ' ']})
+      xlabel(ax(1), 'time / s')
+      ylabel(ax(1), 'amplitude')
+      title(ax(1), {[' ', ' ', ' ']})
 
       plot(ax(1),T2(t).functionTime,T2(t).functionAmpDouble,'b-.');
-      legend(ax(1),'real','fit double');
+      legend(ax(1), 'real', 'fit double');
 
       hold(ax(1), 'off')
     end
 
-    data.T2=T2;
+    data.T2 = T2;
   else
-    disp('nEcho too low')
+    disp('nEcho too low');
   end
 end
 SeqOut.iLaplace2D.T1Start=SeqOut.Tau1Start*2;

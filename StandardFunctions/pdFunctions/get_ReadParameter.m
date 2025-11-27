@@ -1,7 +1,7 @@
-function Seq = get_ReadParameter(Seq, HW)
+function Seq = get_ReadParameter(Seq, HW, idxModule)
 %% Calculate read encoder
 %
-%    Seq = get_ReadParameter(Seq, HW)
+%    Seq = get_ReadParameter(Seq, HW, idxModule)
 %
 % This function calculates read gradients (and respective rephase and dephase
 % gradients) derived from the values in Seq.Read. It also creates settings for
@@ -12,131 +12,222 @@ function Seq = get_ReadParameter(Seq, HW)
 %
 % "Seq" is a structure with the field "Read" that is an (array of) structures
 % with the following fields:
-%   UseCoordinate   Number of the coordinate for which the phase encoder is used
-%                   (default: 2).
-%   GradLength      Length of the read pulse in seconds (default:
-%                   1/Seq.Read(t).HzPerPixelMin+Seq.Read(t).tEC*2+Seq.Read(t).tRamp*2; ).
-%   GradSign        Sign of the read pulse (default: 1).
+%
+%   UseCoordinate
+%       Number of the coordinate for which the phase encoder is used.
+%       (Default: 2)
+%
+%   GradLength
+%       Length of the read pulse in seconds.
+%       (Default: 1/Seq.Read(t).HzPerPixelMin+Seq.Read(t).tEC*2+Seq.Read(t).tRamp*2; )
+%
+%   GradSign
+%       Sign of the read pulse.
+%       (Default: 1)
+%
 %   GradTimeIntegralOffset
-%                   Offset for the time integral of the read pulse in
-%                   s*T/m (default: 0).
-%   tRamp           Ramp time of the gradients in seconds (default:
-%                   HW.Grad.tRamp).
-%   tEC             Additional in seconds time that the gradients need to reach
-%                   their set amplitude due to Eddy currents in the pole shoe
-%                   (default: HW.Grad.tEC).
-%   HzPerPixelMin   Minimal Hertz per Pixel in Hz (default:
-%                   1/(Seq.Read(t).GradLength-HW.Grad.tEC*2-Seq.Read(t).tRamp*2) )
-%   GradTimeDelay   1x3 vector with time delays in seconds for each gradient
-%                   channel. Positive values lead to the gradient pulses being
-%                   set earlier. (Default: [0 0 0]).
-%   Gamma           Gyromagnetic ratio of the sample in rad/s/T (default:
-%                   HW.GammaDef).
+%       Offset for the time integral of the read pulse in s*T/m.
+%       (Default: 0)
+%
+%   tRamp
+%       Ramp time of the gradients in seconds.
+%       (Default: HW.Grad.tRamp)
+%
+%   tEC
+%       Additional time in seconds that the gradients need to reach their set
+%       amplitude (e.g., due to eddy currents in the pole shoe).
+%       (Default: HW.Grad.tEC)
+%
+%   HzPerPixelMin
+%       Minimal Hertz per Pixel in Hz.
+%       (Default: 1/(Seq.Read(t).GradLength-HW.Grad.tEC*2-Seq.Read(t).tRamp*2) )
+%
+%   GradSamplesExtra
+%       Extend the readout gradient before and after the acquisition by the
+%       given number of samples. For the calculation of the duration of one
+%       sample, HzPerPixelMin is used. This is allowed to be a fractional value.
+%       (Default: HW.RX.GradSamplesExtra)
+%
+%   GradSamplesExtraWarning
+%       Minimum delay between readout gradient ramps and acquisition in number
+%       of samples. The actual sampling frequency is used to calculate the
+%       duration of one sample. If the delays are shorter than the set number of
+%       samples, a warning is emitted. This is allowed to be a fractional value.
+%       (Default: HW.RX.GradSamplesExtraWarning)
+%
+%   GradTimeDelay
+%       1x3 vector with time delays in seconds for each gradient channel.
+%       Positive values lead to the gradient pulses being set earlier.
+%       (Default: [0 0 0])
+%
+%   Gamma
+%       Gyromagnetic ratio of the sample in rad/s/T.
+%       (Default: HW.GammaDef)
+%
 %   StartWithKSpaceCenter
-%                   If not equal to 0, this is a factor for a linear transition
-%                   between compensating the read dephase at the center of the
-%                   readout (limit -> 0) or at the center of the first acquired
-%                   sample (=1). If equal to 0, the acquisition is positioned
-%                   such that the k-space center matches the condition for a
-%                   discrete Fourier transform. (Default: 0)
+%       If not equal to 0, this is a factor for a linear transition between
+%       compensating the read dephase at the center of the readout (limit -> 0)
+%       or at the center of the first acquired sample (=1). If equal to 0, the
+%       acquisition is positioned such that the k-space center matches the
+%       condition for a discrete Fourier transform.
+%       (Default: 0)
+%
 %   StartWithKSpaceCenterNoSampleShift
-%                   If StartWithKSpaceCenter ~= 0, the acquisition window is not
-%                   shifted such that the encoding is correct at the center of
-%                   the respective sample, but it is shifted such that the
-%                   encoding is correct at the start of each sample.
-%                   (Default: 0)
+%       If StartWithKSpaceCenter ~= 0, the acquisition window is not shifted
+%       such that the encoding is correct at the center of the respective
+%       sample, but it is shifted such that the encoding is correct at the start
+%       of each sample.
+%       (Default: 0)
+%
 %   StartWithKSpaceCenterNonlinear
-%                   Start readout at start of read-out ramp up (default: false).
+%       Start readout at start of read-out ramp up.
+%       (Default: false)
+%
 %   StartWithGradientBeforeExcitationPulse
-%                   Start gradient before excitation pulse starts (default:
-%                   false).
+%       Start gradient before excitation pulse starts.
+%       (Default: false)
+%
 %   StartWithGradientTime
-%                   Time in seconds when the gradient switches on (default: 0).
-%   useAQSlice      Index that is used for Seq.AQSlice for the following default
-%                   parameters (default: 1).
-%   sizeRead        Size of the spectral encoding of the gradient pulses in
-%                   meters (default:
-%                   Seq.AQSlice(Seq.Read(t).useAQSlice).sizeRead(t))).
-%   nRead           Number of points in read direction (default:
-%                   Seq.AQSlice(Seq.Read(t).useAQSlice).nRead(t)).
-%   ReadOS          Over-sampling factor in read direction (default:
-%                   Seq.AQSlice(Seq.Read(t).useAQSlice).ReadOS(t)).
-%   SamplingFactor  Integer sampling factor for an additional software
-%                   downsampling that mimicks the characteristics of a CIC
-%                   filter. (default: 1 or the lowest sampling factor to come
-%                   closest to the required sampling rate)
+%       Time in seconds when the gradient switches on.
+%       (Default: 0)
+%
+%   useAQSlice
+%       Index that is used for Seq.AQSlice for the following default parameters.
+%       (Default: 1)
+%
+%   sizeRead
+%       Size of the spectral encoding of the gradient pulses in meters.
+%       (Default: Seq.AQSlice(Seq.Read(t).useAQSlice).sizeRead(t)) )
+%
+%   nRead
+%       Number of points in read direction.
+%       (Default: Seq.AQSlice(Seq.Read(t).useAQSlice).nRead(t) )
+%
+%   ReadOS
+%       Over-sampling factor in read direction.
+%       (Default: Seq.AQSlice(Seq.Read(t).useAQSlice).ReadOS(t) )
+%
+%   SamplingFactor
+%       Integer sampling factor for an additional software downsampling that
+%       mimicks the characteristics of a CIC filter.
+%       (Default: 1 or the lowest sampling factor to come closest to the
+%       required sampling rate)
+%
 %   alfa / phi / theta
-%                   Angles in radians that activley rotate the direction of the
-%                   read encoding (see UseCoordinate). The first rotation "alfa"
-%                   is around the x-axis, the second rotation "phi" is around
-%                   the y-axis and the last rotation "theta" is around the
-%                   z-axis.
-%   distance        Distance of the center of the encoded space to the center of
-%                   the gradient system in meter (default: 0).
+%       Angles in radians that activley rotate the direction of the read
+%       encoding (see UseCoordinate). The first rotation "alfa" is around the
+%       x-axis, the second rotation "phi" is around the y-axis and the last
+%       rotation "theta" is around the z-axis.
+%       (Default: 0 or the corresponding values in
+%       Seq.AQSlice(Seq.Read(t).useAQSlice) )
+%
+%   distance
+%       Read coordinate of the origin of the gradient system in the image
+%       coordinate system in meter. I.e., a positive value moves the center of
+%       the image towards positive read direction. Calling functions might set
+%       this from the value of Seq.AQSlice(1).Center2OriginImage(3).
+%       (Default: 0)
+%
 %   UseAtRepetitionTime
-%                   Repetition times (tReps) at which the gradient pulses are
-%                   used (no default!).
-%   PhaseIncrement  Increment of the AQ phase (default: 0).
-%   Phase           AQ phase in degrees (default: 0).
-%   ResetPhases     unused
-%   GetData         Boolean value. This can be a scalar or a vector of the size
-%                   of UseAtRepetitionTime. If true, the measurement data can be
-%                   collected at the end of that tRep. Otherwise, the
-%                   measurement data can be collected at the end of the last
-%                   tRep of the sequence (default: 0).
-%   UseCoordinate   Scalar k-space coordinate along which the read-out gradient
-%                   is applied. (Default: 2)
-%   kLineDir        Direction in k-space along which the read-out gradient is
-%                   applied. This can be a 3x1 vector in which case the same
-%                   direction applies to all read-out windows or a 3xN matrix in
-%                   which case a direction must be supplied for each read-out
-%                   window. The amplitudes of these vectors scale the read-out
-%                   gradient amplitude. (Default: unit vector in direction
-%                   Seq.Read.UseCoordinate)
+%       Repetition times (tReps) at which the gradient pulses are used.
+%       (No default!)
+%
+%   PhaseIncrement
+%       Increment of the AQ phase.
+%       (Default: 0)
+%
+%   Phase
+%       AQ phase in degrees
+%       (Default: 0)
+%
+%   ResetPhases
+%       unused
+%
+%   GetData
+%       Boolean value. This can be a scalar or a vector of the size of
+%       UseAtRepetitionTime. If true, the measurement data can be collected at
+%       the end of that tRep. Otherwise, the measurement data can be collected
+%       at the end of the last tRep of the sequence.
+%       (Default: 0)
+%
+%   UseCoordinate
+%       Scalar k-space coordinate along which the read-out gradient is applied.
+%       (Default: 2)
+%
+%   kLineDir
+%       Direction in k-space along which the read-out gradient is applied. This
+%       can be a 3x1 vector in which case the same direction applies to all
+%       read-out windows or a 3xN matrix in which case a direction must be
+%       supplied for each read-out window. The amplitudes of these vectors scale
+%       the read-out gradient amplitude.
+%       (Default: unit vector in direction Seq.Read.UseCoordinate)
+%
 % For the rephase and dephase pulses:
+%
 %   GradDephaseLengthFactor / GradRephaseLengthFactor
-%                   Factor to the default length of the dephase or rephase
-%                   gradient pulse, respectively. The default length is such
-%                   that the amplitude of the gradient pulse is the same as the
-%                   readout gradient amplitude (potentially opposite sign). If
-%                   set to 0, the minimum gradient duration (given the ramp
-%                   time) is used. Note that using 0 might lead to unpredictable
-%                   effects (e.g., due to eddy currents). (Default: 1)
+%       Factor to the default length of the dephase or rephase gradient pulse,
+%       respectively. The default length is such that the amplitude of the
+%       gradient pulse is the same as the readout gradient amplitude
+%       (potentially opposite sign). If set to 0, the minimum gradient duration
+%       (given the ramp time) is used. Note that using 0 might lead to
+%       unpredictable effects (e.g., due to eddy currents).
+%       (Default: 1)
+%
 %   GradDephaseLength / GradRephaseLength
-%                   Length of the dephase or rephase gradient pulse in seconds
-%                   (default: see above GradDephaseLengthFactor /
-%                   GradRephaseLengthFactor).
+%       Length of the dephase or rephase gradient pulse in seconds.
+%       (Default: see above GradDephaseLengthFactor / GradRephaseLengthFactor)
+%
 %   CenterOfDephase / CenterOfRephase
-%                   Center of dephase or rephase gradient pulse in seconds on
-%                   the tRep timeline. (Default: Such that the ramps of the
-%                   dephase/rephase pulse and the adjacent readout gradient
-%                   coincide.)
+%       Center of dephase or rephase gradient pulse in seconds on the tRep
+%       timeline.
+%       (Default: Such that the ramps of the dephase/rephase pulse and the
+%       adjacent readout gradient coincide.)
+%
 %   GradDephaseSign / GradRephaseSign
-%                   Sign of the rephase/dephase pulse (default: -1).
+%       Sign of the rephase/dephase pulse.
+%       (Default: -1)
+%
+%
+% "HW" is the HW object or structure.
+%
+%
+% "idxModule" is an optional input argument with the indices of the read modules
+% for which the pulse program matrices should be created.
+% (Default: 1:numel(Seq.Read))
 %
 %
 % OUTPUT:
 %
 % To each structure Seq.Read the following fields are added:
+%
 %   Grad / GradRephase / GradDephase
-%                   Structure with the fields "Amp" and "Time" containing the
-%                   amplitudes and times of the rephase/dephase pulses
-%                   corresponding to  the input parameters that can be added to
-%                   the sequence with "add_Grad".
-%   AQ              Structure containing the settings for the acquisition
-%                   window. It can be added to the sequence with "add_AQ".
+%       Structure with the fields "Amp" and "Time" containing the amplitudes and
+%       times of the rephase/dephase pulses corresponding to  the input
+%       parameters that can be added to the sequence with "add_Grad".
+%
+%   AQ
+%       Structure containing the settings for the acquisition window. It can be
+%       added to the sequence with "add_AQ".
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
-%%
 
-if ~isfield(Seq.Read, 'UseCoordinate'), Seq.Read(1).UseCoordinate = 2; end
+%% default parameters
+if nargin < 3 || isempty(idxModule)
+  idxModule = 1:numel(Seq.Read);
+end
+
+
+%% loop over (selected) Seq.Read "modules"
+% if ~isfield(Seq.Read, 'UseCoordinate'), Seq.Read(1).UseCoordinate = 2; end
 % if Seq.showSliceRead, Seq.Read(t).UseCoordinate = Seq.Slice(t).UseCoordinate; end
-for t = 1:numel(Seq.Read)
+
+for t = idxModule
+  %% get default or derived readout parameters
   if isemptyfield(Seq.Read(t), 'UseAtRepetitionTime')
     % Element isn't used. Skip this loop, but make sure the created pulse
     % program elements are empty.
@@ -146,7 +237,7 @@ for t = 1:numel(Seq.Read)
     Seq.Read(t).GradDephase = [];
     continue;
   end
-  if isempty(Seq.Read(t).UseCoordinate), Seq.Read(t).UseCoordinate = 2; end
+  if isemptyfield(Seq.Read(t), 'UseCoordinate'), Seq.Read(t).UseCoordinate = 2; end
   if isemptyfield(Seq.Read(t), 'useAQSlice'), Seq.Read(t).useAQSlice = 1; end
   if isemptyfield(Seq.Read(t), 'iDevice')
     if isemptyfield(Seq, 'AQSlice') ...
@@ -156,8 +247,22 @@ for t = 1:numel(Seq.Read)
       Seq.Read(t).iDevice = Seq.AQSlice(Seq.Read(t).useAQSlice).iDevice;
     end
   end
-  if isemptyfield(Seq.Read(t), 'tRamp'), Seq.Read(t).tRamp = HW.Grad(Seq.Read(t).iDevice).tRamp; end
-  if isemptyfield(Seq.Read(t), 'tEC'), Seq.Read(t).tEC = HW.Grad(Seq.Read(t).iDevice).tEC; end
+  if isemptyfield(Seq.Read(t), 'tRamp')
+    Seq.Read(t).tRamp = HW.Grad(Seq.Read(t).iDevice).tRamp;
+  end
+  if isemptyfield(Seq.Read(t), 'tEC')
+    Seq.Read(t).tEC = HW.Grad(Seq.Read(t).iDevice).tEC;
+  end
+  if isemptyfield(Seq.Read(t), 'GradSamplesExtra')
+    % extend readout gradient before and after the acquisition by the given
+    % number of samples
+    Seq.Read(t).GradSamplesExtra = HW.RX(Seq.Read(t).iDevice).GradSamplesExtra;
+  end
+  if isemptyfield(Seq.Read(t), 'GradSamplesExtraWarning')
+    % check minimum delay between readout gradient ramps and acquisition
+    % number of samples
+    Seq.Read(t).GradSamplesExtraWarning = HW.RX(Seq.Read(t).iDevice).GradSamplesExtraWarning;
+  end
 
   if isemptyfield(Seq.Read(t), 'GradSign'), Seq.Read(t).GradSign = 1; end
 
@@ -261,12 +366,17 @@ for t = 1:numel(Seq.Read)
 
   if isemptyfield(Seq.Read(t), 'GradLength')
     % extend gradient length by one pixel to account for a shifted AQ window
-    Seq.Read(t).GradLength = (1 + any(Seq.Read(t).fftReadoutShift~=0)./(Seq.Read(t).nRead*Seq.Read(t).ReadOS))/Seq.Read(t).HzPerPixelMin + ...
-      Seq.Read(t).tEC*2 + Seq.Read(t).tRamp*2;
+    Seq.Read(t).GradLength = ...
+      (1 + (any(Seq.Read(t).fftReadoutShift~=0) + 2*Seq.Read(t).GradSamplesExtra) ...
+           ./ (Seq.Read(t).nRead*Seq.Read(t).ReadOS)) ...
+      / Seq.Read(t).HzPerPixelMin ...
+      + Seq.Read(t).tEC*2 + Seq.Read(t).tRamp*2;
   end
   if isemptyfield(Seq.Read(t), 'HzPerPixelMin')
-    Seq.Read(t).HzPerPixelMin = (1 + any(Seq.Read(t).fftReadoutShift~=0)./(Seq.Read(t).nRead*Seq.Read(t).ReadOS)) / ...
-      (Seq.Read(t).GradLength - Seq.Read(t).tEC*2 - Seq.Read(t).tRamp*2);
+    Seq.Read(t).HzPerPixelMin = ...
+      (1 + (any(Seq.Read(t).fftReadoutShift~=0) + 2*Seq.Read(t).GradSamplesExtra) ...
+           ./ (Seq.Read(t).nRead*Seq.Read(t).ReadOS)) ...
+      / (Seq.Read(t).GradLength - Seq.Read(t).tEC*2 - Seq.Read(t).tRamp*2);
   end
 
   if isemptyfield(Seq.Read(t), 'GradDephaseLengthFactor')
@@ -337,9 +447,9 @@ for t = 1:numel(Seq.Read)
   Seq.Read(t).AcquisitionTime = Seq.Read(t).nRead*Seq.Read(t).ReadOS / Seq.Read(t).fSample;
   Seq.Read(t).HzPerPixel = 1/Seq.Read(t).AcquisitionTime;
 
-  Seq.Read(t).GradTimeIntegralAQ = 2*pi/Seq.Read(t).Gamma/Seq.Read(t).Resolution .* Seq.Read(t).GradSign;
-  Seq.Read(t).GradAmp = Seq.Read(t).GradTimeIntegralAQ./Seq.Read(t).AcquisitionTime;
-  Seq.Read(t).GradTimeIntegral = (Seq.Read(t).GradAmp).*(Seq.Read(t).GradLength-Seq.Read(t).tRamp);
+  Seq.Read(t).GradTimeIntegralAQ = 2*pi / Seq.Read(t).Gamma ./ Seq.Read(t).Resolution .* Seq.Read(t).GradSign;
+  Seq.Read(t).GradAmp = Seq.Read(t).GradTimeIntegralAQ ./ Seq.Read(t).AcquisitionTime;
+  Seq.Read(t).GradTimeIntegral = Seq.Read(t).GradAmp .* (Seq.Read(t).GradLength - Seq.Read(t).tRamp);
   % FIXME: Should "fftReadoutShift" be considered in the limit of
   %        StartWithKSpaceCenter -> 0?
   if Seq.Read(t).StartWithKSpaceCenter == 0
@@ -415,11 +525,11 @@ for t = 1:numel(Seq.Read)
   if isemptyfield(Seq.Read(t), 'Overdrive'), Seq.Read(t).Overdrive = 0; end
   if isemptyfield(Seq.Read(t), 'StartWithGradientTime'), Seq.Read(t).StartWithGradientTime = 0; end
 
-  if round((Seq.Read(t).GradDephaseLength-Seq.Read(t).tRamp*2)*HW.MMRT(Seq.Read(t).iDevice).fSystem) < 2
+  if any(round((Seq.Read(t).GradDephaseLength-Seq.Read(t).tRamp*2)*HW.MMRT(Seq.Read(t).iDevice).fSystem) < 2)
     error('PD:get_ReadParameter:GradDephaseLengthTooShort', ...
       'Seq.Read(%d).GradDephaseLength too short to fit 2*tRamp', t);
   end
-  if round((Seq.Read(t).GradRephaseLength-Seq.Read(t).tRamp*2)*HW.MMRT(Seq.Read(t).iDevice).fSystem) < 2
+  if any(round((Seq.Read(t).GradRephaseLength-Seq.Read(t).tRamp*2)*HW.MMRT(Seq.Read(t).iDevice).fSystem) < 2)
     error('PD:get_ReadParameter:GradRephaseLengthTooShort', ...
       'Seq.Read(%d).GradRephaseLength too short to fit 2*tRamp', t);
   end
@@ -428,12 +538,12 @@ for t = 1:numel(Seq.Read)
     (Seq.Read(t).GradDephaseLength - Seq.Read(t).tRamp) * Seq.Read(t).GradDephaseSign;
   Seq.Read(t).GradAmpRephase = Seq.Read(t).GradTimeIntegralRephase ./ ...
     (Seq.Read(t).GradRephaseLength - Seq.Read(t).tRamp) * Seq.Read(t).GradRephaseSign;
-  Seq.Read(t).AcquisitionFrequencyOffset = Seq.Read(t).Gamma/2/pi * Seq.Read(t).distance .* Seq.Read(t).GradAmp;
+  Seq.Read(t).AcquisitionFrequencyOffset = Seq.Read(t).Gamma/2/pi * (-Seq.Read(t).distance) .* Seq.Read(t).GradAmp;
   Seq.Read(t).AcquisitionFrequency = Seq.Read(t).Gamma/2/pi*HW.B0 + Seq.Read(t).AcquisitionFrequencyOffset;
   FrequencyGridRX = HW.RX(Seq.Read(t).iDevice).fSample / (2^HW.RX(Seq.Read(t).iDevice).DdsPicBits);
   Seq.Read(t).AcquisitionFrequency = round(Seq.Read(t).AcquisitionFrequency/FrequencyGridRX) * FrequencyGridRX;
   if ~isempty(Seq.Read(t).GammaX)
-    Seq.Read(t).AcquisitionFrequencyOffsetX = Seq.Read(t).GammaX/2/pi * Seq.Read(t).distance .* Seq.Read(t).GradAmp;
+    Seq.Read(t).AcquisitionFrequencyOffsetX = Seq.Read(t).GammaX/2/pi * (-Seq.Read(t).distance) .* Seq.Read(t).GradAmp;
     Seq.Read(t).AcquisitionFrequencyX = HW.fLarmorX + Seq.Read(t).AcquisitionFrequencyOffsetX;
     Seq.Read(t).AcquisitionFrequencyX = round(Seq.Read(t).AcquisitionFrequencyX/FrequencyGridRX) * FrequencyGridRX;
   end
@@ -488,6 +598,7 @@ for t = 1:numel(Seq.Read)
   end
 
 
+  %% translate to pulse program matrices
   Seq.Read(t).AQ.Start = NaN(1, size(Seq.tRep,2));
   Seq.Read(t).AQ.fSample = Seq.Read(t).AQ.Start;
   Seq.Read(t).AQ.nSamples = Seq.Read(t).AQ.Start;
@@ -508,7 +619,7 @@ for t = 1:numel(Seq.Read)
   Seq.Read(t).AQ.fSample(:,Seq.Read(t).UseAtRepetitionTime) = Seq.Read(t).fSample;
   Seq.Read(t).AQ.nSamples(:,Seq.Read(t).UseAtRepetitionTime) = Seq.Read(t).nRead*Seq.Read(t).ReadOS * tempsize;
   Seq.Read(t).AQ.SamplingFactor(:,Seq.Read(t).UseAtRepetitionTime) = Seq.Read(t).SamplingFactor;
-  if numel(Seq.Read(t).AcquisitionFrequency) == 1
+  if isscalar(Seq.Read(t).AcquisitionFrequency)
     Seq.Read(t).AQ.Frequency(:,Seq.Read(t).UseAtRepetitionTime) = Seq.Read(t).AcquisitionFrequency * tempsize;
   else
     Seq.Read(t).AQ.Frequency(:,Seq.Read(t).UseAtRepetitionTime) = Seq.Read(t).AcquisitionFrequency;
@@ -522,7 +633,7 @@ for t = 1:numel(Seq.Read)
   end
   if ~isempty(Seq.Read(t).GammaX)
     Seq.Read(t).AQ.FrequencyX = NaN(size(Seq.Read(t).AQ.Start));
-    if numel(Seq.Read(t).AcquisitionFrequencyX) == 1
+    if isscalar(Seq.Read(t).AcquisitionFrequencyX)
       Seq.Read(t).AQ.FrequencyX(:,Seq.Read(t).UseAtRepetitionTime) = Seq.Read(t).AcquisitionFrequencyX * tempsize;
     else
       Seq.Read(t).AQ.FrequencyX(:,Seq.Read(t).UseAtRepetitionTime) = Seq.Read(t).AcquisitionFrequencyX;
@@ -548,8 +659,8 @@ for t = 1:numel(Seq.Read)
   Seq.Read(t).GradAmpDephase = zeros(3, numel(tempsize));
   if all(1 == [numel(Seq.Read(t).alfa), numel(Seq.Read(t).phi), numel(Seq.Read(t).theta)])
     Seq.Read(t).GradAmp =        repmat((Rz*Ry*Rx)*Seq.Read(t).GradAmpNorm,        1, numel(tempsize)/size(Seq.Read(t).GradAmpNorm, 2));
-    Seq.Read(t).GradAmpRephase = repmat((Rz*Ry*Rx)*Seq.Read(t).GradAmpRephaseNorm, 1, numel(tempsize)/size(Seq.Read(t).GradAmpNorm, 2));
-    Seq.Read(t).GradAmpDephase = repmat((Rz*Ry*Rx)*Seq.Read(t).GradAmpDephaseNorm, 1, numel(tempsize)/size(Seq.Read(t).GradAmpNorm, 2));
+    Seq.Read(t).GradAmpRephase = repmat((Rz*Ry*Rx)*Seq.Read(t).GradAmpRephaseNorm, 1, numel(tempsize)/size(Seq.Read(t).GradAmpRephaseNorm, 2));
+    Seq.Read(t).GradAmpDephase = repmat((Rz*Ry*Rx)*Seq.Read(t).GradAmpDephaseNorm, 1, numel(tempsize)/size(Seq.Read(t).GradAmpDephaseNorm, 2));
   else
     for tt = 1:numel(tempsize)
       Seq.Read(t).GradAmp(:,tt) = Rz(:,:,tt) * (Ry(:,:,tt) * (Rx(:,:,tt) * Seq.Read(t).GradAmpNorm(:,tt)));
@@ -695,6 +806,27 @@ for t = 1:numel(Seq.Read)
     %     - Seq.Read(t).GradTimeDelay(n);
     % end
   end
+
+
+  %% some sanity checks
+  if any((Seq.Read(t).AQ.Start(1,Seq.Read(t).UseAtRepetitionTime) ...
+          - Seq.Read(t).Grad(1).Time(2,Seq.Read(t).UseAtRepetitionTime)) ...
+         < Seq.Read(t).GradSamplesExtraWarning ./ Seq.Read(t).AQ.fSample(1,Seq.Read(t).UseAtRepetitionTime))
+    warning('PD:get_ReadParameter:shortReadOutGrad', ...
+      ['The delay between the end of the read out gradient ramp up and the start of the acquisition is less then %.1f samples.\n', ...
+      'Consider increasing Seq.Read(%d).tEC or Seq.Read(%d).GradSamplesExtra.'], ...
+      Seq.Read(t).GradSamplesExtraWarning, t, t);
+  elseif any((Seq.Read(t).Grad(1).Time(3,Seq.Read(t).UseAtRepetitionTime) ...
+              - (Seq.Read(t).AQ.Start(1,Seq.Read(t).UseAtRepetitionTime) ...
+                 + Seq.Read(t).AQ.nSamples(1,Seq.Read(t).UseAtRepetitionTime) ...
+                   ./ Seq.Read(t).AQ.fSample(1,Seq.Read(t).UseAtRepetitionTime))) ...
+             < Seq.Read(t).GradSamplesExtraWarning ./ Seq.Read(t).AQ.fSample(1,Seq.Read(t).UseAtRepetitionTime))
+    warning('PD:get_ReadParameter:shortReadOutGrad', ...
+      ['The delay between the end of the acquisition and the start of the read out gradient ramp down is less then %.1f samples.\n', ...
+      'Consider increasing Seq.Read(%d).tEC or Seq.Read(%d).GradSamplesExtra.'], ...
+      Seq.Read(t).GradSamplesExtraWarning, t, t);
+  end
+
 end
 
 end

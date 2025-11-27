@@ -1,29 +1,36 @@
 %% Settings for LNA S/N 10
 
-HW.RX.LnaSN = 10;
+if ~exist('iDevice', 'var'), iDevice = 1; end
+
+HW.RX(iDevice).LnaSN = 10;
 
 % Resonant coil 15 mm
-% HW.TX.Uout2PaUout(2)=HW.TX.Uout2PaUout(2)*10^(-0.2/20);
-HW.TX.ChannelDef=2;         % default TX rf channel
-% HW.RX2TXdeadTime=5e-6;      % Totzeit des Empfängers vor dem Senden
-% HW.TX2RXdeadTime=3e-6;      % 1µs -0.2 dB 5µs ok (schnelle Pindioden im LNA 10) Totzeit des Empfängers nach dem Senden 
-% HW.TX.BlankOffset=160e-9;     % Offset des Blankingsignals vor dem TX Puls
-% HW.TX.BlankPostset=160e-9;    % Zeitzusatz des Blankingsignals nach dem TX Puls
-HW.RX.VGAGainDef=HW.RX.VGAGainMax/3; % Normale Empfangsverstärkung
+% HW.TX(iDevice).Uout2PaUout(2) = HW.TX(iDevice).Uout2PaUout(2) * 10^(-0.2/20);
+HW.TX(iDevice).ChannelDef = 2;  % default TX rf channel
+% HW.RX2TXdeadTime = 5e-6;  % dead-time of receiver before TX pulse
+% HW.TX2RXdeadTime = 3e-6;  % 1 us -0.2 dB 5us ok (fast PIN diodes in LNA #10) - dead-time of receiver after TX pulse
+% HW.TX(iDevice).BlankOffset = 160e-9;  % blank of transmit before TX pulse
+% HW.TX(iDevice).BlankPostset = 160e-9;  % blank of transmit after TX pulse
 
-% HW.RX.LNAGain=10^((22.7-1.2)/20); % 22.7 dB gain @ 24.71 MHz F=1 dB
-HW.RX.LNAGain=10^(((-37.8286)-(-60))/20); % 22.1714 dB gain @ 24790905.9089 MHz F=0.65698 dB (-60 dBm cal) (HW.RX.VGAGainDef=HW.RX.VGAGainMax/3)
+HW.RX(iDevice).VGAGainDef = HW.RX(iDevice).VGAGainMax/3;  % default receiver gain
 
-HW.TX.Max.PaUout(2)=min(HW.TX.Max.PaUout(2),100);
+% HW.RX(iDevice).LNAGain = 10^((22.7-1.2)/20);  % 22.7 dB gain @ 24.71 MHz F=1 dB
+HW.RX(iDevice).LNAGain = 10^(((-37.8286)-(-60))/20);  % 22.1714 dB gain @ 24790905.9089 MHz F=0.65698 dB (-60 dBm cal) (HW.RX.VGAGainDef=HW.RX.VGAGainMax/3)
 
-% %% TRx switch during transmit at Tx2
-% HW.TX.BlankOffsetAQ=80e-9;        % Blank of receiver before TX pulse
-% HW.TX.BlankPostsetAQ=240e-9;       % Blank of receiver after TX pulse
-% HW.TX.BlankAQ=1;                    % Switch TRx to 50 Ohm Resistor during TX pulse, to avoid saturation.
+HW.TX(iDevice).Max.PaUout(2) = min(HW.TX(iDevice).Max.PaUout(2), 100);
 
 % %% TRx switch during transmit at Tx2
-% HW.TX.BlankOffsetAQ=1000e-9;        % Blank of receiver before TX pulse
-% HW.TX.BlankPostsetAQ=2000e-9;       % Blank of receiver after TX pulse
-% HW.TX.BlankAQ=1;                    % Switch TRx to 50 Ohm Resistor during TX pulse, to avoid saturation.
-% if ~HW.TX.ExtRFSN;if isfield(HW.TX.CalibrationRfAmp,'TriScatteredAmp');HW.TX.CalibrationRfAmp=rmfield(HW.TX.CalibrationRfAmp,'TriScatteredAmp');end;end
-if ~HW.TX.ExtRFSN;HW.TX.CalibrationRfAmp=[];end
+% HW.TX(iDevice).BlankOffsetAQ = 80e-9;  % blank of receiver before TX pulse
+% HW.TX(iDevice).BlankPostsetAQ = 240e-9;  % blank of receiver after TX pulse
+% HW.TX(iDevice).BlankAQ = 1;  % switch TRx to 50 Ohm resistor during TX pulse, to avoid saturation.
+
+% %% TRx switch during transmit at Tx2
+% HW.TX(iDevice).BlankOffsetAQ = 1000e-9;  % blank of receiver before TX pulse
+% HW.TX(iDevice).BlankPostsetAQ = 2000e-9;  % blank of receiver after TX pulse
+% HW.TX(iDevice).BlankAQ = 1;  % switch TRx to 50 Ohm resistor during TX pulse, to avoid saturation.
+% if ~HW.TX(iDevice).ExtRFSN && isfield(HW.TX(iDevice).CalibrationRfAmp, 'TriScatteredAmp')
+%   HW.TX(iDevice).CalibrationRfAmp = rmfield(HW.TX(iDevice).CalibrationRfAmp,'TriScatteredAmp');
+% end
+if ~HW.TX(iDevice).ExtRFSN
+  HW.TX(iDevice).CalibrationRfAmp = [];
+end

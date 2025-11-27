@@ -31,6 +31,7 @@ switch HW.UserName
     HW.Grad(iDevice).SystemTimeDelay(1:3) = [61.128, 89.308, 102.806]*1e-6;  % time delay of gradient amplifier in s
   case 'probe_MRE'
     HW.Grad(iDevice).SystemTimeDelay(HW.Grad(iDevice).xyzB(1:3)) = [42.826, 40.330, 32.022]*1e-6;  % time delay of gradient amplifier in s
+    HW.Grad(iDevice).tRamp = 42e-6;  % minimum ramp time in s
   otherwise
     error('PD:LoadGradAmp:UnknownUser', ...
       'No settings for user "%s" specified in "%s"', HW.UserName, mfilename());

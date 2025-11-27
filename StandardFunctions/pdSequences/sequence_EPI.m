@@ -5,7 +5,7 @@
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2014-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2014-2025 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -341,13 +341,13 @@ if double(Seq.AQSlice(1).nPhase(2)>1); Grad=add_Grad(Grad, Seq.Phase(4).GradDeph
 % Seq.Loops=1;
 % Seq.average=1;
 % for Loop=1:Seq.Loops
-% if Loop==1; Seq.Reinitialize=1;end
+% if Loop==1, Seq.Reinitialize=1;end
 % if Seq.Loops>1; Seq.TimeToNextSequence=0.5; else Seq.TimeToNextSequence=[]; end
-% if Loop==2;
+% if Loop==2
 %     Seq.Reinitialize=0;
 %     Seq.TimeFromLastSequence=Seq.TimeToNextSequence;
 % end
-% if Loop==Seq.Loops;
+% if Loop==Seq.Loops
 %     Seq.TimeFromLastSequence=Seq.TimeToNextSequence;
 %     Seq.TimeToNextSequence=[];
 % end

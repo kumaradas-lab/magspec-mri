@@ -62,9 +62,10 @@ function pulseData = Pulse_Rect_Slice(HW, Center, Pulse, varargin)
 % the duration of the pulse to have the same bandwidth (FWHM) as a rect pulse.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2018-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2018-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
+
 
 %% Convert from syntax (2) to syntax (1)
 if nargin < 3, Pulse = []; end
@@ -74,6 +75,7 @@ if nargin > 4, Pulse.MaxNumberOfSegments = varargin{2}; end
 if nargin > 5, Pulse.MaxLength = varargin{3}; end
 if nargin > 6, Pulse.Frequency = varargin{4}; end
 if nargin > 7, Pulse.Phase = varargin{5}; end
+
 
 %% default values
 bwFactor = 0.442946; % solve sinc(pi*x) = 1/sqrt(2) for x -> x=0.442946
@@ -85,6 +87,7 @@ Pulse = set_EmptyField(Pulse, 'Frequency', HW.fLarmor);
 Pulse = set_EmptyField(Pulse, 'Phase', 0);
 Pulse = set_EmptyField(Pulse, 'Bandwidth', max(1/Pulse.MaxLength/bwFactor, 2e3)); % FIXME: Is this a sensible default?
 Pulse = set_EmptyField(Pulse, 'iDevice', 1);
+
 
 %% short path
 if nargin == 2
@@ -102,6 +105,7 @@ if nargin == 2
   return;
 end
 
+
 %% "real" path
 % Use gamma that better matches the frequency of the pulse
 % FIXME: Could this be an issue with (very) off-center slice pulses?
@@ -115,7 +119,7 @@ BlockLength = 1/Pulse.Bandwidth*bwFactor;
 
 gain = HW.TX(Pulse.iDevice).AmpDef * 2*tFlipPi * (Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / BlockLength;
 
-if Pulse.MaxLength + 1/HW.TX(Pulse.iDevice).fSample < BlockLength;
+if Pulse.MaxLength + 1/HW.TX(Pulse.iDevice).fSample < BlockLength
   error('PD:Pulse_Rect_Slice:MaxLengthTooShort', ...
     'MaxLength of rf pulse is %.3f %cs too short.', ...
     (BlockLength - Pulse.MaxLength)*1e6, char(181));
@@ -130,5 +134,6 @@ pulseData.Amplitude = gain;
 pulseData.Duration = BlockLength;
 pulseData.Frequency = Pulse.Frequency;
 pulseData.Phase = Pulse.Phase;
+
 
 end

@@ -112,7 +112,7 @@ function [HW, mySave, SeqOut] = Find_Frequency_Sweep(HW, mySave, minTime, span, 
 %
 %
 % ------------------------------------------------------------------------
-% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------
 
@@ -151,11 +151,21 @@ end
 iDevice = 1;
 
 % first time clear mySave
-if isempty(mySave), mySave = struct(); end
-if isemptyfield(mySave, 'lastTime'), mySave.lastTime = 0; end
-if isemptyfield(mySave, 'HW'), mySave.HW = struct(); end
-if isemptyfield(mySave.HW, 'B0'), mySave.HW.B0 = HW.B0; end
-if isemptyfield(mySave.HW, 'B0shift'), mySave.HW.B0shift = HW.Grad(iDevice).AmpOffset(4); end
+if isempty(mySave)
+  mySave = struct();
+end
+if isemptyfield(mySave, 'lastTime')
+  mySave.lastTime = 0;
+end
+if isemptyfield(mySave, 'HW')
+  mySave.HW = struct();
+end
+if isemptyfield(mySave.HW, 'B0')
+  mySave.HW.B0 = HW.B0;
+end
+if isemptyfield(mySave.HW, 'B0shift')
+  mySave.HW.B0shift = HW.Grad(iDevice).AmpOffset(4);
+end
 
 Dummy = false;
 if ~isemptyfield(mySave, 'DummySerial') ...
@@ -200,7 +210,7 @@ if ~Dummy && (now*24*3600-mySave.lastTime > minTime - eps(mySave.lastTime))
   AQ.Frequency = linspace(-span/2, span/2, Seq.nMeasurements)' + Seq.fLarmor;
 
   % Check for gaps in the frequency coverage.
-  if Seq.nMeasurements > 1 && diff(AQ.Frequency(1:2)) > AQ.fSample
+  if Seq.nMeasurements > 1 && diff(AQ.Frequency(1:2))/2 > AQ.fSample/3
     warning('PD:Find_Frequency_Sweep:IncompleteCoverage', ...
       ['The acquisition bandwidth (%.3f kHz) is not high enough to cover ', ...
        'the selected frequency span (%.3f kHz) without gaps with the ', ...
@@ -285,7 +295,6 @@ if ~Dummy && (now*24*3600-mySave.lastTime > minTime - eps(mySave.lastTime))
   %   SeqOut.AQ(1).fSample(1)/2/pi;
 
   [maxA, maxI] = max(abs(data(1).data), [], 1);
-  maxA(maxA<max(maxA)/10) = NaN;
 
   % FIXME: It would be nice if we could distinguish the "systematic"
   %        contribution to the standard error of the phase slope from the
@@ -348,12 +357,21 @@ if ~Dummy && (now*24*3600-mySave.lastTime > minTime - eps(mySave.lastTime))
 
   end
 
+  % Do not use signals that are close to the Nyquist frequency.
+  % Depending on T1, these signals could have pretty high amplitude.
+  fOffsetFIDs(abs(fOffsetFIDs) > AQ.fSample/3) = NaN;
+  % discard very low amplitudes (compared to the highest remaining signal)
+  fOffsetFIDs(maxA < max(maxA(~isnan(fOffsetFIDs)))/10) = NaN;
+
+  fOffsetFIDsStd(isnan(fOffsetFIDs)) = NaN;
+
   % find the frequency
   % find index of the window with the lowest standard deviation
-  [fOffsetFIDsStdMinValue, fOffsetFIDsStdIndx] = min(fOffsetFIDsStd, [], 2);
+  [~, fOffsetFIDsStdIndx] = min(fOffsetFIDsStd, [], 2);
+  fOffsetFIDsStdMinValue = fOffsetFIDsStd(fOffsetFIDsStdIndx);
   SeqOut.fLarmorStdev = fOffsetFIDsStdMinValue;  % standard uncertainty of measurement
   % mean of offset frequency of each AQ window
-  fOffsetFID = mean(fOffsetFIDs, 1) - SeqOut.AQ(1).Frequency' + Seq.fLarmor;
+  fOffsetFID = fOffsetFIDs - SeqOut.AQ(1).Frequency' + Seq.fLarmor;
   newfLarmor = Seq.fLarmor - double(fOffsetFID(fOffsetFIDsStdIndx)); % calculate new Larmor frequency
   if fOffsetFIDsStdMinValue < HW.FindFrequencySweep.fOffsetFIDsStdMaxValue ...
       && newfLarmor > 0

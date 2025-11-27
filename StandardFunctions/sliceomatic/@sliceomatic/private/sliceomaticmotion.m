@@ -1,7 +1,12 @@
 function sliceomaticmotion(hFigure, eventData, hParent)
 % Handle generic motion events for the figure window.
+%
+% Copyright 2000, 2001, 2002, 2003, 2004, 2005 The MathWorks Inc
+% ------------------------------------------------------------------------------
+% (C) Copyright 2015-2025 Pure Devices GmbH, Wuerzburg, Germany
+% www.pure-devices.com
+% ------------------------------------------------------------------------------
 
-% Copyright 2000, 2001, 2002, 2003, 2004, 2005 The MathWorks Inc, 2015 Pure Devices
 
 obj = hittest(hFigure);
 
@@ -30,12 +35,14 @@ d = getappdata(hParent, 'sliceomatic');
 
 if ~isfield(d, 'displayComplete') || ~d.displayComplete
   % window is not drawn yet. do nothing
-  return
+  return;
 end
 
-% The motion meta slice is a line that is managed here.
-% There is only one.
-if isempty(d.motionmetaslice)
+% The motion meta slice is a line that indicates the position of a new slice
+% while hovering the slice selection bars.
+% There is only one motion meta slice. Potentially, it needs to be re-created
+% after loading a sliceomatic figure from a file.
+if isempty(d.motionmetaslice) || ~all(ishghandle(d.motionmetaslice))
   d.motionmetaslice(1) = line('Parent', d.axmain, ...
     'Visible', 'off', ...
     'LineStyle', '-', ...
@@ -59,7 +66,7 @@ if isempty(obj) || (obj ~= d.axx && obj ~= d.axy && obj ~= d.axz)
   if ishandle(d.motionmetaslice)
     set(d.motionmetaslice, 'Visible', 'off');
   end
-  return
+  return;
 end
 
 % OBJ can only be an Axes because of the previous IF statement.

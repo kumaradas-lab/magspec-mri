@@ -103,9 +103,9 @@ if winsize.used
     if sizeIn(t) == 1
       r{t} = 0;
     elseif mod(sizeIn(t), 2)
-      r{t} = linspace((-0.5)/winsize.size(t), (0.5)/winsize.size(t), sizeIn(t)).';
+      r{t} = linspace((-0.5+0.5/size(toFill,t)) /winsize.size(t), (0.5-0.5/size(toFill,t)) /winsize.size(t), sizeIn(t)).';
     else
-      r{t} = linspace((-0.5)/winsize.size(t), (0.5-1/size(toFill,t))/winsize.size(t), sizeIn(t)).';
+      r{t} = linspace((-0.5)                    /winsize.size(t), (0.5-1.0/size(toFill,t)) /winsize.size(t), sizeIn(t)).';
     end
     r{t} = reshape(castFcn(r{t}), [], 1);  % make sure orientation is in dim 1
   end
@@ -126,7 +126,7 @@ if winsize.used
   switch winsize.winType
     case 'RaisedCos'
       dist(dist>0.5) = 0.5;
-      filter_win = cos(dist*pi) .^ (2 .* winsize.winexp);
+      filter_win = cosd(dist*180) .^ (2 .* winsize.winexp);
     case 'Gaussian'
       filter_win = exp(- ((dist*exp(0.5)*2).^2) .* winsize.winexp);
     otherwise

@@ -118,7 +118,7 @@ function [HW, mySave, SliceSelectOut, SeqOut] = Find_Shim(HW, mySave, minTime, d
 %   SeqOut    structure with sequence parameters and results
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -128,7 +128,7 @@ if nargin < 1  % HW
   error('PD:Find_Shim:noHW', 'The first input argument "HW" is mandatory.');
 end
 if nargin<2, mySave = []; end
-if nargin<3 || isempty(minTime), minTime = 1000; end  % Minimal time in seconds since the last Find_Shim.
+if nargin<3 || isempty(minTime), minTime = 1000; end  % Minimum time in seconds since the last Find_Shim.
 if nargin<4 || isempty(doPlot), doPlot = 0; end  % Plot sequence and data
 if nargin<5, Seq = []; end
 if nargin<6, SliceSelect = []; end
@@ -187,7 +187,7 @@ end
 if isemptyfield(Seq, 'verbose'),  Seq.verbose = true;  end
 
 if ~Seq.nEchos
-  if ~isempty(Seq.tFID) && isemptyfield(Seq, 'ShimSequence');
+  if ~isempty(Seq.tFID) && isemptyfield(Seq, 'ShimSequence')
     Seq.tEcho = Seq.tFID*2;  % echo time (if Seq.AQFID = 2 -> FID AQ Time)
     Seq.AQFID = 1;  % relative part of (echo time)/2 for data acquisition at FID ]0...1[
     Seq.AQEcho = 0.5;  % relative part of echo time for data acquistion at echos [0...1[;  0 meaning 1 sample
@@ -219,7 +219,7 @@ if isemptyfield(SliceSelect, 'iDevice'), SliceSelect.iDevice = 1; end
 
 %% initialization
 % first time clear mySave
-if isempty(mySave);
+if isempty(mySave)
   mySave.HW = HW;
   mySave.lastTime_Shim = 0;
 end
@@ -234,6 +234,8 @@ end
 
 % Search again only if time since last shim search has exceeded "minTime"
 if (now*24*3600 - mySave.lastTime_Shim) <= minTime
+  fprintf('Minimum time since last shimming (%.0f s) not yet exceeded. Skipping auto shim.\n', ...
+    minTime);
   return;
 end
 

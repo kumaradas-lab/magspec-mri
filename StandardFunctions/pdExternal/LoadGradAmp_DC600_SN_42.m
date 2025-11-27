@@ -48,7 +48,7 @@ HW.Grad(iDevice).Status2 = 1;                                 % gradient and tem
 % HW.Grad(iDevice).PaOffsetU(1:4) = [0, 0, 0, 0];               % offset voltage in V
 % HW.Grad(iDevice).PaOffsetI(1:4) = [0.001608395,0.004901222,-0.0005537333,0.002335037]; % Offset Current 14-Feb-2022 12:22:25
 %
-% HW.Grad(iDevice).PaUin2PaIout(1:4) = ([0.3350187,0.3385017,0.3333863,0.3361627]-HW.Grad.PaOffsetI)./1; % Input Voltage to output Current ratio% Input Voltage to output Current ratio 14-Feb-2022 12:22:25
+% HW.Grad(iDevice).PaUin2PaIout(1:4) = ([0.3350187,0.3385017,0.3333863,0.3361627]-HW.Grad(iDevice).PaOffsetI)./1; % Input Voltage to output Current ratio% Input Voltage to output Current ratio 14-Feb-2022 12:22:25
 %
 % HW.Grad(iDevice).PaPmaxInt(1:4) = [100, 100, 100, 100];       % maximum internal power dissipation in W
 %
@@ -57,7 +57,7 @@ HW.Grad(iDevice).Status2 = 1;                                 % gradient and tem
 % HW.Grad(iDevice).tRamp = 50e-6;                               % minimum ramp time in s
 % HW.Grad(iDevice).tEC = 50e-6;                                 % eddy current time in s
 %
-% HW.Grad.SystemTimeDelay(1:3) = [7.4316e-05   0.00010474  0.000124528]; % Time delay of grad amp
+% HW.Grad(iDevice).SystemTimeDelay(1:3) = [7.4316e-05   0.00010474  0.000124528]; % Time delay of grad amp
 % HW.Grad(iDevice).MaxAmpSlice = 0.1;                           % maximum gradient amplitude for slice selection in T/m
 %
 % HW.Grad(iDevice).Status1 = 1;                                 % power supply of DC-600 ok

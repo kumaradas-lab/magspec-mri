@@ -4,7 +4,7 @@ classdef PowerSupplyEA9000 < handle
 %     this = PD.PowerSupplyEA9000.GetInstance()
 %
 % ----------------------------------------------------------------------------
-% (C) Copyright 2021-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2021-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ----------------------------------------------------------------------------
 

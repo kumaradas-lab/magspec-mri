@@ -86,6 +86,18 @@ classdef RX < handleHidden
 %       filter. Changing it from its default value can lead to undefined
 %       behavior.
 %
+%   GradSamplesExtra
+%       Default value for the number of samples with which the readout
+%       gradient is extended before and after the acquisition in
+%       "get_ReadParameter". The value is allowed to be fractional.
+%
+%   GradSamplesExtraWarning
+%       The function "get_ReadParameter" checks whether the time delay between
+%       the acquisition window and the readout gradient edges is at least a
+%       given number of samples. This parameter sets the default value for
+%       the minimum number of samples in that check. The value is allowed to
+%       be fractional.
+%
 %   n
 %       Number of RX inputs of the connected device. Changing it from its
 %       default value can lead to undefined behavior.
@@ -219,8 +231,33 @@ classdef RX < handleHidden
 %            approximately quadruple the maximum sampling rate compared to
 %            data mode 0.
 %
+%   WarningDangerousDecimationFactor
+%       When switching between acquisitions with some decimation factors in
+%       data mode 2 or 3, the timing of the acquisition might be slightly
+%       incorrect. If that condition is met within a pulse sequence, an error
+%       is emitted. However, tracking whether that condition is met from one
+%       pulse program to a following one is difficult in general. So, a
+%       warning is emitted if (at least theoretically) there could be an
+%       issue. That warning can be suppressed with:
+%       "warning('off', 'PD:set_sequence:DangerousDecimationFactor');".
+%       However, even the suppressed warning sets the "lastwarn" state. If
+%       this is an issue, this property can be set to "false" to not emit the
+%       warning at all.
+%       (Default: true)
+%
 %   ClampCoil
 %       Structure with settings for clamping during acquisitions.
+%
+%   LoadCalibrationSamplePath
+%       Name of the script that contains the calibration data of the
+%       calibration samples.
+%
+%   CalibrationSampleNameList
+%       Cell vector of strings with the unique identifiers of calibration
+%       samples that are presented for the current device/user.
+%
+%   CalibrationSampleName
+%       String with unique identifier of the currently
 %
 %   Amplitude2LnaUin
 %       Receive coil efficiency at the default Larmor frequency (HW.fLarmor)
@@ -306,7 +343,7 @@ classdef RX < handleHidden
 %
 %
 % ----------------------------------------------------------------------------
-% (C) Copyright 2016-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ----------------------------------------------------------------------------
 

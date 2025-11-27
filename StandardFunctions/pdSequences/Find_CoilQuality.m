@@ -52,7 +52,7 @@ function [HW, mySave, Seq] = Find_CoilQuality(HW, mySave, Seq)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2024-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -217,6 +217,9 @@ end
 % initialize data for plot and evaluation
 meanFID = NaN(1, Seq.nStepsPulseAmp);
 factorsFID = linspace(Seq.minFactorPulseAmp, Seq.maxFactorPulseAmp, Seq.nStepsPulseAmp);
+fOffsetFIDs = zeros(1, Seq.nStepsPulseAmp);
+fOffsetFIDsStd = zeros(1, Seq.nStepsPulseAmp);
+newfLarmor = zeros(1, Seq.nStepsPulseAmp);
 
 clear excitationPulse
 excitationPulse.FlipAngle = pi/2*factorsFID;
@@ -270,7 +273,7 @@ if ishghandle(Seq.plot)
   plot(axExc(1), timeFID*1e3, abs(dataFID)*1e6, ...
     timeFID*1e3, real(dataFID)*1e6, ...
     timeFID*1e3, imag(dataFID)*1e6);
-  hold(axExc(1), 'all');
+  hold(axExc(1), 'on');
   title(axExc(1), 'Acquired signal');
   ylabel(axExc(1), ['RX Amplitude in ' char(181) 'V']);
   xlabel(axExc(1), 'Time in ms');
@@ -301,14 +304,14 @@ end
 
 % actual measurement FID
 Seq.Reinitialize = 1;
-for iStep = 1:length(factorsFID)
+for iStep = reshape([ones(1, length(factorsFID))*numel(factorsFID); 1:length(factorsFID)], 1, [])
   if Seq.getQfactor
     Seq.tExcitation = tFlipFID1(iStep);
     Seq.excitationAngle = HW.GammaDef/2/pi*360 * Seq.tExcitation ...
       * exP.Amplitude(1);
   else
     Seq.excitationAngle = HW.GammaDef/2/pi*360 * Seq.tExcitation ...
-      * excPaUout(iStep) * HW.TX(iDevice).PaUout2Amplitude(HW.TX(iDevice).ChannelDef);
+      * get_TX_Amplitude(HW, 'PaUout', excPaUout(iStep), 'Device', iDevice);
   end
 
   [data, SeqOutCoil] = sequence_RecoveryCPMG(HW, Seq);
@@ -324,12 +327,53 @@ for iStep = 1:length(factorsFID)
       data.MeanEchoTau1PhaseCorrectedTime*1e3, imag(data.MeanEchoTau1PhaseCorrected)*1e6, '-.');
     meanFID(iStep) = mean(mean(abs(data.MeanEchoTau1PhaseCorrected), 1), 2);
   else
-    dataEcho = (data.data(:))*data.Amplitude2Uin(1)/HW.RX.LNAGain;
-    timeEcho = data.time_of_tRep(:);
+    dataEcho = data.data(~isnan(data.data))*data.Amplitude2Uin(1)/HW.RX.LNAGain;
+    timeEcho = data.time_all(~isnan(data.data));
     plot(axExc(1), timeEcho*1e3, abs(dataEcho)*1e6, '-', ...
       timeEcho*1e3, real(dataEcho)*1e6, ':', ...
       timeEcho*1e3, imag(dataEcho)*1e6, '-.');
-    meanFID(iStep) = mean(mean(abs(data.SampleEchoTau1*data.Amplitude2Uin(1)/HW.RX.LNAGain), 1), 2);
+    % meanFID(iStep) = mean(mean(abs(data.SampleEchoTau1*data.Amplitude2Uin(1)/HW.RX.LNAGain), 1), 2);
+    meanFID(iStep) = mean(mean(abs(dataEcho), 1), 2);
+
+    % calculate weighted phase slope for selected samples
+    [phaseDiffWeightedMean, phaseDiffWeightedStd] = ...
+      get_MeanPhaseDiffWeighted(double(dataEcho), 1, 'omitnan');
+
+    % FIXME: Will the indices for AQ.fSample always be correct here?
+    fOffsetFIDs(iStep) = phaseDiffWeightedMean * SeqOutCoil.AQ(1).fSample(1,2) / (2*pi);
+    fOffsetFIDsStd(iStep) = phaseDiffWeightedStd * SeqOutCoil.AQ(1).fSample(1,2) / (2*pi);
+
+    newfLarmor(iStep) = HW.fLarmor - double(fOffsetFIDs(iStep)); % calculate new Larmor frequency
+    if fOffsetFIDsStd(iStep) < HW.FindFrequencySweep.fOffsetFIDsStdMaxValue ...
+        && newfLarmor(iStep) > 0
+      % save the new frequency to mySave
+      HW.B0 = newfLarmor(iStep) * 2*pi/HW.FindFrequencyGamma;  % calculate the new magnetic field strength
+      if ~isemptyfield(HW.FindFrequencySweep, 'shiftB0') ...
+          && HW.FindFrequencySweep.shiftB0
+        if isempty(HW.B0Target) || ~isfinite(HW.B0Target)
+          warning('PD:Find_CoilQuality:NoB0Target', ...
+            ['HW.FindFrequencySweep.shiftB0 is set to true, but HW.B0Target is not set.\n', ...
+            'B0 amplitude cannot be shifted without a target. Adjusting HW.fLarmor instead.']);
+        else
+          newB0shift = HW.Grad(iDevice).AmpOffset(4) + (HW.B0Target - HW.B0);
+          newB0 = HW.B0Target;
+          if abs(newB0shift) > HW.Grad(iDevice).HoldShimNormMax(4)*HW.Grad(iDevice).MaxAmp(4)
+            desiredB0shift = newB0shift;
+            newB0shift = sign(newB0shift) * HW.Grad(iDevice).HoldShimNormMax(4) * HW.Grad(iDevice).MaxAmp(4);
+            newB0 = newB0 - (desiredB0shift - newB0shift);
+            warning('PD:Find_CoilQuality:B0ShiftExceeded', ...
+              ['The required B0 shift (%.1f %cT) is larger than the maximum shift (%.1f %cT).\n', ...
+              'Consider setting a different HW.B0Target. Adjusting HW.fLarmor to stay in range.'], ...
+              desiredB0shift*1e6, 181, HW.Grad(iDevice).HoldShimNormMax(4)*HW.Grad(iDevice).MaxAmp(4)*1e6, 181);
+          end
+          HW.Grad(iDevice).AmpOffset(4) = newB0shift;
+          HW.B0 = newB0;
+        end
+      end
+    else
+      error('PD:Find_CoilQuality:UncertainFrequency', ...
+        'The current Larmor frequency could not be determined with sufficient accuracy.');
+    end
   end
   set(hl2, 'YData', abs(meanFID)*1e6);
 
@@ -352,7 +396,7 @@ if Seq.getQfactor
   maxFID1Amp = [tFlip90^2, tFlip90, 1] * A;
   meanEchoInterp = A.' * [tFlip1Interp.^2; tFlip1Interp; ones(size(tFlip1Interp))];
 
-  hold(axExc(2), 'all');
+  hold(axExc(2), 'on');
   plot(axExc(2), tFlip1Interp*1e6, abs(meanEchoInterp)*1e6, '-');
   plot(axExc(2), tFlip90*1e6, maxFID1Amp*1e6, '-o');
   hold(axExc(2), 'off');
@@ -366,9 +410,9 @@ if Seq.getQfactor
 
   newPaUout2Amplitude = HW.TX(iDevice).PaUout2Amplitude;
   newPaUout2Amplitude(HW.TX(iDevice).ChannelDef) = B1./excPaUout;
-  comment = sprintf('%s (p90 = %.3f %ss @ %.3f V) from FID amplitude by %s', ...
+  comment = sprintf('%s (p90 = %.3f %ss @ %.3f V @ %.6f MHz) from FID amplitude by %s', ...
     datestr(now, 'yyyy-mm-ddTHH:MM:SS'), tFlip90*1e6, char(181), ...
-    excPaUout, mfilename());
+    excPaUout, HW.fLarmor/1e6, mfilename());
 else
   % driving voltage has been incremented
   excPaUoutInterp = linspace(exP.Amplitude(1), exP.Amplitude(end), 4*Seq.nStepsPulseAmp)./HW.TX.PaUout2Amplitude(HW.TX.ChannelDef);
@@ -378,7 +422,7 @@ else
   maxFID1Amp = [paUoutFlip90^2, paUoutFlip90, 1] * A;
   meanEchoInterp = A.' * [excPaUoutInterp.^2; excPaUoutInterp; ones(size(excPaUoutInterp))];
 
-  hold(axExc(2), 'all');
+  hold(axExc(2), 'on');
   plot(axExc(2), excPaUoutInterp, abs(meanEchoInterp)*1e6, '-');
   plot(axExc(2), paUoutFlip90, maxFID1Amp*1e6, '-o');
   hold(axExc(2), 'off');
@@ -393,9 +437,9 @@ else
   % calculate coil efficiency
   newPaUout2Amplitude = HW.TX(iDevice).PaUout2Amplitude;
   newPaUout2Amplitude(HW.TX(iDevice).ChannelDef) = B1./paUoutFlip90;
-  comment = sprintf('%s (p90 = %.3f %ss @ %.3f V) from FID amplitude by %s', ...
+  comment = sprintf('%s (p90 = %.3f %cs @ %.3f V @ %.6f MHz) from FID amplitude by %s', ...
     datestr(now, 'yyyy-mm-ddTHH:MM:SS'), Seq.tExcitation*1e6, char(181), ...
-    paUoutFlip90, mfilename());
+    paUoutFlip90, HW.fLarmor/1e6, mfilename());
 end
 
 if isempty(HW.TX(iDevice).CoilName)
@@ -452,16 +496,14 @@ fprintf('90%s pulse duration: %.3f %ss @ %.3f V\n', char(176), ...
 % FIXME:  Do we want to write the coil efficiency already to the file when
 %         Seq.getQfactor is true?
 
-if ~Seq.getQfactor
-  % temporarily set coil efficiency for correct 90° pulses
-  HW.TX(iDevice).PaUout2Amplitude = newPaUout2Amplitude;
-end
-
-if ~isempty(HW.TX(iDevice).PaUout2AmplitudePath)
+if ~isempty(HW.TX(iDevice).PaUout2AmplitudePath) ...
+    && (isemptyfield(mySave, 'DummySerial') ...
+        || mySave.DummySerial(min(iDevice, numel(mySave.DummySerial))) <= 0)
+  addFirstLine = ~exist(HW.TX(iDevice).PaUout2AmplitudePath, 'file');
   fid = fopen(HW.TX(iDevice).PaUout2AmplitudePath, 'a+');
   fid_protect = onCleanup(@() fclose(fid));
-  if ~exist(HW.TX(iDevice).PaUout2AmplitudePath, 'file')
-    fwrite(fid, ['% factor from voltage amplitude at the coil input to B1+ field strength in T/V', sprintf('\n')]);
+  if addFirstLine
+    fprintf(fid, '%s\n', '% factor from voltage amplitude at the coil input to B1+ field strength in T/V');
   end
   if savePulseFile
     fwrite(fid, newCalLine);
@@ -476,7 +518,7 @@ if ~isempty(HW.TX(iDevice).PaUout2AmplitudePath)
     warning('PD:sequence_PulseDurationCPMG:FID', warnStr, newCalLine);
   end
   delete(fid_protect);
-else
+elseif savePulseFile
   fprintf('\n');
   fprintf('\nPlease add the following line to your LoadMySystem.m file:\n%s\n', ...
     newCalLine);
@@ -502,6 +544,9 @@ if ~savePulseFile
   %   uiwait(herr);
   % end
   return;
+elseif ~Seq.getQfactor
+  % temporarily set coil efficiency for correct 90° pulses
+  HW.TX(iDevice).PaUout2Amplitude = newPaUout2Amplitude;
 end
 
 %% get current magnet frequency (or shift to target B0 amplitude)
@@ -552,7 +597,7 @@ if Seq.getQfactor
     plot(axExc2(1), timeFID*1e3, abs(dataFID)*1e6, ...
       timeFID*1e3, real(dataFID)*1e6, ...
       timeFID*1e3, imag(dataFID)*1e6);
-    hold(axExc2(1), 'all');
+    hold(axExc2(1), 'on');
     title(axExc2(1), 'Acquired signal');
     ylabel(axExc2(1), ['RX Amplitude in ' char(181) 'V']);
     xlabel(axExc2(1), 'Time in ms');
@@ -625,7 +670,7 @@ if Seq.getQfactor
   Seq.smallAngle = asind(meanFID2Amp/maxFID1Amp);
   meanFID2Interp = [tFlip2Interp; ones(size(tFlip2Interp))].' * A2;
 
-  hold(axExc2(2), 'all');
+  hold(axExc2(2), 'on');
   plot(axExc2(2), tFlip2Interp*1e6, abs(meanFID2Interp)*1e6, '-');
   plot(axExc2(2), tFlipSmall*1e6, meanFID2Amp*1e6, '-o');
   hold(axExc2(2), 'off');
@@ -729,7 +774,7 @@ for iPhase = 1:4
 
     % hf = figure(40+iPhase); clf(hf)
     % haxes = axes(hf);
-    hold(haxes, 'all');
+    hold(haxes, 'on');
     plot(haxes, AOdd(:,1), evalPhase.phaseEchoesOdd, 'xb');
     plot(haxes, AEven(:,1), evalPhase.phaseEchoesEven, 'xr');
     plot(haxes, fitEchoes(:,1), fitEchoes*evalPhase.fitOdd, '--b', 'LineWidth', 2);
@@ -892,11 +937,11 @@ else
   HW.RecoveryCPMG.refocusingPhase = Seq.refocusingPhase;
 
   newCalLines = {...
-    sprintf('HW.RecoveryCPMG.refocusingAngle = %.3f;  %% %s (p180 = %.3f %cs @ %.3f V) from CPMG Echo train by %s', ...
-    Seq.refocusingAngle, datestr(now), SeqOutInv.tRefocus*1e6, 181, ...
-    paUoutRefocus, mfilename()), ...
+    sprintf('HW.RecoveryCPMG.refocusingAngle = %.3f;  %% %s (p180 = %.3f %cs @ %.3f V @%.6f MHz) from CPMG Echo train by %s', ...
+    Seq.refocusingAngle, datestr(now, 'yyyy-mm-ddTHH:MM:SS'), SeqOutInv.tRefocus*1e6, 181, ...
+    paUoutRefocus, HW.fLarmor/1e6, mfilename()), ...
     sprintf('HW.RecoveryCPMG.refocusingPhase = %.3f;  %% %s phase of refocusing pulse in degrees from CPMG Echo train by %s', ...
-    Seq.refocusingPhase, datestr(now), mfilename())};
+    Seq.refocusingPhase, datestr(now, 'yyyy-mm-ddTHH:MM:SS'), mfilename())};
 
   % some consistency checks
   savePulseFile = true;
@@ -913,7 +958,9 @@ else
     savePulseFile = false;
   end
 
-  if ~isempty(HW.TX(iDevice).PaUout2AmplitudePath)
+  if ~isempty(HW.TX(iDevice).PaUout2AmplitudePath) ...
+      && (isemptyfield(mySave, 'DummySerial') ...
+          || mySave.DummySerial(min(iDevice, numel(mySave.DummySerial))) <= 0)
     fid = fopen(HW.TX(iDevice).PaUout2AmplitudePath, 'a+');
     fid_protect = onCleanup(@() fclose(fid));
     if savePulseFile
@@ -924,7 +971,7 @@ else
     delete(fid_protect);
     fprintf('\nNew lines were added to the following file:\n%s\n%s\n', ...
       HW.TX(iDevice).PaUout2AmplitudePath, sprintf('%s\n', newCalLines{:}));
-  else
+  elseif savePulseFile
     fprintf('\n');
     fprintf('\nPlease add the following lines to your LoadMySystem.m file:\n%s\n', ...
       sprintf('%s\n', newCalLines{:}));

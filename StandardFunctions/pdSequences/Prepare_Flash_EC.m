@@ -17,7 +17,7 @@ function [HW, Seq, AQ, TX, Grad] = Prepare_Flash_EC(HW, Seq, AQ, TX, Grad)
 %       (Default: 1)
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2022-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2022-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -70,6 +70,11 @@ end
 %% (re-)create pulse program for adjusted units
 Seq = get_PhaseParameter(Seq, HW);
 Seq = get_ReadParameter(Seq, HW);
+
+
+%% add gradients to pulse program
+Grad = add_Grad(Grad, Seq.Phase(end).GradDephase);
+Grad = add_Grad(Grad, Seq.Phase(end).GradRephase);
 
 
 end

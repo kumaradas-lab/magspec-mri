@@ -18,7 +18,7 @@ HW.Grad(iDevice).PaOffsetU(1:4) = [0, 0, 0, 0];               % offset voltage i
 HW.Grad(iDevice).PaOffsetI(1:4) = [-0.0002590115, 0.001552958, -0.001099738, -0.001513675];  % offset current in A  24-Oct-2022 10:44:39
 
 HW.Grad(iDevice).PaUin2PaIout(1:4) = ([0.3326805, 0.3349972, 0.332308, 0.3322325] - HW.Grad(iDevice).PaOffsetI) ./ 1;  % amplification in A/V  24-Oct-2022 10:44:39
-% HW.Grad(iDevice).PaUin2PaIout(1:4) = ([0.3346045,0.335718,0.3340415,0.3333802]-HW.Grad.PaOffsetI)./1; % Input Voltage to output Current ratio% Input Voltage to output Current ratio 11-Feb-2022 10:01:41
+% HW.Grad(iDevice).PaUin2PaIout(1:4) = ([0.3346045, 0.335718, 0.3340415, 0.3333802] - HW.Grad(iDevice).PaOffsetI) ./ 1;  % Input Voltage to output Current ratio% Input Voltage to output Current ratio 11-Feb-2022 10:01:41
 
 HW.Grad(iDevice).PaPmaxInt(1:4) = [100, 100, 100, 100];       % maximum internal power dissipation in W
 

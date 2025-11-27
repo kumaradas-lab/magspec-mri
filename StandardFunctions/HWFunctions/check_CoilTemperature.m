@@ -34,8 +34,12 @@ function coilTemp = check_CoilTemperature(coilTemp, Seq)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2018-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2018-2025 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
 end
+
+
+%#function isemptyfield
+

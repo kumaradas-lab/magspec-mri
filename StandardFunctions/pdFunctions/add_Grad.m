@@ -22,7 +22,7 @@ function Grad = add_Grad(Grad1, Grad2)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2013-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2013-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -37,7 +37,7 @@ for t = min(numel(Grad1), numel(Grad2)):-1:1
     if isfield(Grad2(t), 'Time')
       Grad(t).Time = Grad2(t).Time;
       Grad(t).Amp = Grad2(t).Amp;
-      if isfield(Grad1(t), 'Shim');
+      if isfield(Grad1(t), 'Shim')
         Grad(t).Shim = sum([Grad1(t).Shim, Grad2(t).Shim]);
       else
         Grad(t).Shim = Grad2(t).Shim;
@@ -54,7 +54,7 @@ for t = min(numel(Grad1), numel(Grad2)):-1:1
     if isfield(Grad1(t), 'Time')
       Grad(t).Time = Grad1(t).Time;
       Grad(t).Amp = Grad1(t).Amp;
-      if isfield(Grad2(t), 'Shim');
+      if isfield(Grad2(t), 'Shim')
         Grad(t).Shim = sum([Grad1(t).Shim, Grad2(t).Shim]);
       else
         Grad(t).Shim = Grad1(t).Shim;
@@ -87,6 +87,18 @@ for t = min(numel(Grad1), numel(Grad2)):-1:1
     Grad(t).Amp = [];
     continue;
   end
+
+  % try to account for small time differences between the two input Grad
+  % structures
+  timeAll = reshape([Grad1(t).Time; Grad2(t).Time], [], 1);
+  % Timing differences larger than 1 ns are likely not due to double precision
+  % errors. If larger differences occur in the input and that wasn't
+  % intentional, it should be fixed in the calling function.
+  [timeCommon, ~, IC] = uniquetol(timeAll, 1e-9/max(abs(timeAll(:)), [], 'omitnan'));
+  timeAll = reshape(timeCommon(IC), size(Grad1(t).Time,1) + size(Grad2(t).Time,1), numtRep);
+  Grad1(t).Time = timeAll(1:size(Grad1(t).Time,1),:);
+  Grad2(t).Time = timeAll(size(Grad1(t).Time,1)+1:end,:);
+  clear timeCommon timeAll
 
   % get "extend" of gradient pulses in each tRep
   firstGradTime = min([Grad1(t).Time; Grad2(t).Time], [], 1, 'omitnan');

@@ -2,7 +2,7 @@
 
 if ~exist('iDevice', 'var'), iDevice = 1; end
 
-HW.Grad(iDevice).ExtGradSN = 61;                              % serial number
+HW.Grad(iDevice).ExtGradSN = 14;                              % serial number
 HW.Grad(iDevice).ExtGradType = 'DC600';
 
 HW.Grad(iDevice).PowerDown = 0;                               % power down amplifier after some time (sleep)
@@ -21,7 +21,7 @@ HW.Grad(iDevice).PaPmaxInt(1:4) = [100, 100, 100, 100];       % maximum internal
 
 HW.Grad(iDevice).PaRout(1:4) = [15000, 15000, 15000, 15000];  % output impedance in Ohm
 
-HW.Grad(iDevice).tRamp = 50e-6;                               % minimum ramp time in s
+HW.Grad(iDevice).tRamp = 42e-6;                               % minimum ramp time in s
 HW.Grad(iDevice).tEC = 50e-6;                                 % eddy current time in s
 
 HW.Grad(iDevice).SystemTimeDelay(1:3) = [34.912, 49.530, 47.850]*1e-6;  % time delay of gradient amplifier in s

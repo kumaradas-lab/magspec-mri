@@ -1,7 +1,7 @@
-function Seq = get_SliceParameter(Seq, HW)
+function Seq = get_SliceParameter(Seq, HW, idxModule)
 %% Create "module" with (slice selective) rf pulse
 %
-%   Seq = get_SliceParameter(Seq, HW)
+%   Seq = get_SliceParameter(Seq, HW, idxModule)
 %
 % This function create slice selection gradients (including the respective
 % dephase and rephase gradients) derived from the values in Seq.Slice. It also
@@ -18,7 +18,9 @@ function Seq = get_SliceParameter(Seq, HW)
 %       (Default: 1)
 %
 %   Thickness
-%       Thickness of slice that is excited in meter. (Default: 1e12)
+%       Thickness of slice that is excited in meter. Setting this to Inf (or a
+%       very large value, means no slice selection.
+%       (Default: Inf)
 %
 %   CenterOfPulse
 %       Center of excitation pulse in seconds on the tRep timeline. (Default: 0)
@@ -68,8 +70,9 @@ function Seq = get_SliceParameter(Seq, HW)
 %       Angles in radians that activley rotate the direction of the selected
 %       slice (see UseCoordinate). The first rotation "alfa" is around the
 %       x-axis, the second rotation "phi" is around the y-axis and the last
-%       rotation "theta" is around the z-axis. (Default: 0 or the corresponding
-%       values in Seq.AQSlice(Seq.Slice(t).useAQSlice) )
+%       rotation "theta" is around the z-axis.
+%       (Default: 0 or the corresponding values in
+%       Seq.AQSlice(Seq.Slice(t).useAQSlice) )
 %
 %   UseAtRepetitionTime
 %       Indices for the repetition times (tReps) at which the gradient pulses
@@ -80,9 +83,11 @@ function Seq = get_SliceParameter(Seq, HW)
 %       be used. (Default: UseAtRepetitionTime)
 %
 %   distance
-%       Displacement of the selected slice to the center of the  gradient system
-%       in image coordinate system in meter. I.e., a positive value moves the
-%       selected slice towards negative slice direction. (Default: 0)
+%       Slice coordinate of the origin of the gradient system in the image
+%       coordinate system in meter. I.e., a positive value moves the center of
+%       the image towards positive slice direction. Calling functions might set
+%       this from the value of Seq.AQSlice(1).Center2OriginImage(1).
+%       (Default: 0)
 %
 %   Pulse
 %       Structure for the TX pulse with the following fields:
@@ -113,6 +118,14 @@ function Seq = get_SliceParameter(Seq, HW)
 %       the same slice thickness and with the same center as the primary pulse.
 %
 %
+% "HW" is the HW object or structure.
+%
+%
+% "idxModule" is an optional input argument with the indices of the slice
+% modules for which the pulse program matrices should be created.
+% (Default: 1:numel(Seq.Slice))
+%
+%
 % OUTPUT:
 %
 % To each structure Seq.Phase the following fields are added:
@@ -128,13 +141,20 @@ function Seq = get_SliceParameter(Seq, HW)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
 
-%%
-for t = 1:numel(Seq.Slice)
+%% default parameters
+if nargin < 3 || isempty(idxModule)
+  idxModule = 1:numel(Seq.Slice);
+end
+
+
+%% loop over (selected) Seq.Slice "modules"
+for t = idxModule
+  %% get default or derived readout parameters
   if isemptyfield(Seq.Slice(t), 'useAQSlice'), Seq.Slice(t).useAQSlice = 1; end
   if isemptyfield(Seq.Slice(t), 'UseCoordinate'), Seq.Slice(t).UseCoordinate = 1; end
   if isemptyfield(Seq.Slice(t), 'iDevice')
@@ -305,7 +325,7 @@ for t = 1:numel(Seq.Slice)
         Pulse.FlipAngle = Seq.Slice(t).Pulse.FlipAngleX(min(tt, end));
         Pulse.Frequency = Seq.Slice(t).Pulse.FrequencyX(tt);
         TXsX(tt) = Seq.Slice(t).Pulse.Function(HW, Seq.Slice(t).CenterOfPulse, Pulse);
-        maxDuration = max(maxDuration, sum(TXs(tt).Duration));
+        maxDuration = max(maxDuration, sum(TXsX(tt).Duration));
       end
     end
   end
@@ -441,8 +461,9 @@ for t = 1:numel(Seq.Slice)
   end
 
   % end
-  % tempsize(~Seq.Slice(t).UseAtRepetitionTime)=nan;
 
+
+  %% translate to pulse program matrices
   Seq.Slice(t).TX(1).Start = NaN(size(TXs(1).Start,1), size(Seq.tRep,2));
   Seq.Slice(t).TX(1).Duration = NaN(size(TXs(1).Duration,1), size(Seq.tRep,2));
   Seq.Slice(t).TX(1).Amplitude = NaN(size(TXs(1).Amplitude,1), size(Seq.tRep,2));
@@ -482,7 +503,7 @@ for t = 1:numel(Seq.Slice)
     clear TXsX
   end
 
-  Angle2Deg=Seq.Slice(t).angle2Turns*360;
+  Angle2Deg = Seq.Slice(t).angle2Turns*360;
   [Rx, Ry, Rz] = get_aptDegRotationMatrix(Seq.Slice(t).alfa*Angle2Deg, Seq.Slice(t).phi*Angle2Deg, Seq.Slice(t).theta*Angle2Deg);
 
   temp = zeros(3,1);
@@ -500,7 +521,7 @@ for t = 1:numel(Seq.Slice)
   Seq.Slice(t).GradAmpDephaseUnitVector = Rz*(Ry*(Rx*Seq.Slice(t).GradAmpDephaseUnitVector));
 
   for n = 1:3
-    % if Seq.Slice(t).Overdrive==0;
+    % if Seq.Slice(t).Overdrive == 0
     %   Seq.Slice(t).Grad(n).Amp=zeros(4,size(tempsize,2));
     %   Seq.Slice(t).GradRephase(n).Amp=zeros(4,size(tempsize,2));
     %   Seq.Slice(t).GradDephase(n).Amp=zeros(4,size(tempsize,2));

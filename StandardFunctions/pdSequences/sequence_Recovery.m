@@ -150,7 +150,7 @@ function [t1, T1, data, SeqOut] = sequence_Recovery(HW, Seq)
 %   SeqOut  Structure with actually used measurement parameters.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -276,7 +276,7 @@ if Seq.PreProcessSequence
 
   if Seq.tFlipStart==0, Seq.tFlipStart = Seq.tPreparationPulse + Seq.tExcitationPulse; end
 
-  if numel(Seq.tFlip)==1
+  if isscalar(Seq.tFlip)
     if Seq.tFlipLog
       Seq.tFlip = logspace(log10(Seq.tFlipStart), log10(Seq.tFlipEnd), Seq.nFids);
     else
@@ -454,10 +454,10 @@ if Seq.fitT1
 
       % Console output
       if Seq.ConsoleOut
-        disp(['T1 = ' num2str(T1.tau*1000, '% 10.1f') ' ms'])
+        fprintf('\nT1   = %10.1f ms\n', T1.tau*1000);
         if Seq.fitExp.DoubleExp
-          disp(['T1_1 = ' num2str(T1.xminDouble(3)*1000, '% 10.1f') ' ms; weighting factor = ' num2str(T1.tau1w*100, '% 10.1f') '%'])
-          disp(['T1_2 = ' num2str(T1.xminDouble(5)*1000, '% 10.1f') ' ms; weighting factor = ' num2str(T1.tau2w*100, '% 10.1f') '%'])
+          fprintf('T1_1 = %10.1f ms; weighting factor = %5.1f%%\n', T1.xminDouble(3)*1000, T1.tau1w*100);
+          fprintf('T1_2 = %10.1f ms; weighting factor = %5.1f%%\n', T1.xminDouble(5)*1000, T1.tau2w*100);
         end
       end
 

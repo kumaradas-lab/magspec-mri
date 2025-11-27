@@ -89,7 +89,7 @@ function [hAxes, config] = plot_data_1D(HW, data_1D, hAxes, raiseWindow, config)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -238,6 +238,7 @@ hForeign = findobj(hKids, 'flat', '-not', {'-regexp', 'Tag', 'plotData1D_Axes[1-
 delete(hForeign);
 
 %% Check if hAxes is (still) valid and re-create axes if necessary
+autoXLim = true;
 if isempty(hAxes) || numel(hAxes) < lastAxes || any(~ishghandle(hAxes(plotAxes(1:lastAxes)), 'axes'))
   fig_title = config.figureTitle;
   found_axes(1:3) = false;
@@ -291,6 +292,10 @@ if isempty(hAxes) || numel(hAxes) < lastAxes || any(~ishghandle(hAxes(plotAxes(1
       hAxes(3) = subplot(sum(plotAxes), 1, nAxes, 'Parent', hParent, 'Tag', 'plotData1D_Axes3');
     end
     if numel(hAxes(plotAxes)) > 1
+      if ~all(strcmp(get(hAxes, 'XLimMode'), 'auto'))
+        % If the XLimMode of any of the axes is 'manual', keep it that way.
+        autoXLim = false;
+      end
       linkaxes(hAxes(plotAxes), 'x');
     end
     if isFigure
@@ -374,7 +379,7 @@ if config.plotData && ~isempty(data_1D.data)
           data_1D.(config.timeFieldname)(plotIdx), ...
           abs(data_1D.data(plotIdx))/HW.RX(data_1D.device).AmplitudeUnitScale, ...
           'Tag', 'plotData1D_Line1');
-        hold(hAxes(1), 'all');
+        hold(hAxes(1), 'on');
         h_lines(2) = plot(hAxes(1), ...
           data_1D.(config.timeFieldname)(plotIdx), nanData, ...
           'Tag', 'plotData1D_Line2');
@@ -382,7 +387,7 @@ if config.plotData && ~isempty(data_1D.data)
         h_lines(1) = plot(hAxes(1), ...
           data_1D.(config.timeFieldname)(plotIdx), nanData, ...
           'Tag', 'plotData1D_Line1');
-        hold(hAxes(1), 'all');
+        hold(hAxes(1), 'on');
         h_lines(2) = plot(hAxes(1), ...
           data_1D.(config.timeFieldname)(plotIdx), ...
           real(data_1D.data(plotIdx))/HW.RX(data_1D.device).AmplitudeUnitScale, ...
@@ -397,7 +402,7 @@ if config.plotData && ~isempty(data_1D.data)
         data_1D.(config.timeFieldname)(plotIdx), ...
         abs(data_1D.data(plotIdx))/HW.RX(data_1D.device).AmplitudeUnitScale, ...
         'Tag', 'plotData1D_Line1');
-      hold(hAxes(1), 'all');
+      hold(hAxes(1), 'on');
       h_lines(2) = plot(hAxes(1), ...
         data_1D.(config.timeFieldname)(plotIdx), ...
         real(data_1D.data(plotIdx))/HW.RX(data_1D.device).AmplitudeUnitScale, ...
@@ -533,7 +538,7 @@ if config.plotFreq && ~isempty(data_1D.data)
     h_lines(~strcmpi(get(h_lines, 'Type'), 'line')) = [];
   end
   grad_time = gradient(data_1D.(config.timeFieldname));
-  offsetFrequency = gradient(unwrap(angle(data_1D.data)))./2./pi./grad_time;
+  offsetFrequency = gradient(unwrap(angle(double(data_1D.data))))./2./pi./grad_time;
   signalFrequency = data_1D.AqFrequency - offsetFrequency;
   iv = ~isnan(data_1D.data);
   meanOffset = -mean(offsetFrequency(iv) ...
@@ -616,6 +621,15 @@ end
 % refresh(hParent)
 % drawnow expose
 
+if autoXLim
+  % For some versions of Matlab (e.g., R2024a), the x axis limits get stuck to
+  % some values (e.g., [0, 20e-3]) for unknown reasons. To work around that,
+  % manually set the XLimMode to 'auto' after the lines have been updated if the
+  % original state of these axes have not been set to 'manual' before (e.g., by
+  % a user calling this function in a loop).
+  set(hAxes(end), 'XLimMode', 'auto');
+end
+
 end
 
 
@@ -653,7 +667,7 @@ switch targetTag
     % frequency (offset)
     ylab = get(get(get(target, 'Parent'), 'YLabel'), 'String');
     outputTxt = {['time: ' num2str(pos(1), 3) ' s'],
-      sprintf('%s: %.0f Hz', lower(ylab{1}), pos(2))};
+      sprintf('%s: %.1f Hz', lower(ylab{1}), pos(2))};
 
   otherwise
     outputTxt = [];

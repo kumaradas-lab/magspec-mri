@@ -15,7 +15,7 @@ classdef DynamicHandle < dynamicprops
   %               returned (no copy constructor).
   %
   % ----------------------------------------------------------------------------
-  % (C) Copyright 2017-2024 Pure Devices GmbH, Wuerzburg, Germany
+  % (C) Copyright 2017-2025 Pure Devices GmbH, Wuerzburg, Germany
   % www.pure-devices.com
   % ----------------------------------------------------------------------------
 
@@ -170,11 +170,9 @@ classdef DynamicHandle < dynamicprops
 
     function strct = ToStruct(this)
       %% return the properties of this object in a struct
-      [warnStr, warnID] = lastwarn();
-      warns = warning('off', 'MATLAB:structOnObject');
+      protectWarning = PD.IgnoreWarning('MATLAB:structOnObject');
       strct = struct(this);
-      warning(warns);
-      lastwarn(warnStr, warnID);
+      delete(protectWarning);
     end
 
 

@@ -61,7 +61,7 @@ function [Seq, raw_data, num_averages, matrix_check_overflow, timestamps] ...
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2015-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2015-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 

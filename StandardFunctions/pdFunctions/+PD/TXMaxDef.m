@@ -4,7 +4,7 @@ classdef TXMaxDef < handle
   %     PD.TXMaxDef(TX, type, freq)
   %
   % ----------------------------------------------------------------------------
-  % (C) Copyright 2020-2023 Pure Devices GmbH, Wuerzburg, Germany
+  % (C) Copyright 2020-2025 Pure Devices GmbH, Wuerzburg, Germany
   % www.pure-devices.com
   % ----------------------------------------------------------------------------
 
@@ -45,6 +45,12 @@ classdef TXMaxDef < handle
   end
 
 
+  properties (GetAccess = private, SetAccess = ?PD.TXClass)
+    %% private property that is allowed to be updated on fSystem change (by HW.TX)
+    FrequencyGrid
+  end
+
+
   properties (GetAccess = private, SetAccess = private)
     %% calculate set of output values for each input value
     % The matrices in this section contain 5 rows. They correspond to the values
@@ -79,6 +85,15 @@ classdef TXMaxDef < handle
         % This only works for HW object!
         this.fLarmor = tx.HWInstance.fLarmor;
         this.fLarmorX = tx.HWInstance.fLarmorX;
+      end
+
+      if (isa(tx, 'PD.TXClass') && ~isempty(tx.fSample) && ~isempty(tx.DdsPicBits)) ...
+          || (isstruct(tx) && ~isemptyfield(tx, 'fSample') && ~isemptyfield(tx, 'DdsPicBits'))
+        this.FrequencyGrid = tx.fSample / 2^tx.DdsPicBits;
+      else
+        % FIXME: This is the default value. The actual value might be different
+        %        for some configurations.
+        this.FrequencyGrid = 125e6 / 2^32;
       end
 
       % default input values
@@ -420,6 +435,7 @@ classdef TXMaxDef < handle
           else
             frequency = this.Frequency;
           end
+          frequency = round(frequency/this.FrequencyGrid) * this.FrequencyGrid;
           uoutCalibrated = ...
             this.TX.CalibrationRfAmp(iChannel).TriScatteredAmp(frequency, ...
                                                                paUoutCalibrated(iChannel));
@@ -434,6 +450,7 @@ classdef TXMaxDef < handle
           else
             frequency = this.Frequency;
           end
+          frequency = round(frequency/this.FrequencyGrid) * this.FrequencyGrid;
           uout2PaUoutCalibrationGain(iChannel) = ...
             interp1(this.TX.CalibrationRfAmp(iChannel).Frequency, ...
                     this.TX.CalibrationRfAmp(iChannel).Gain, ...
@@ -473,6 +490,7 @@ classdef TXMaxDef < handle
           else
             frequency = this.Frequency;
           end
+          frequency = round(frequency/this.FrequencyGrid) * this.FrequencyGrid;
           uoutCalibratedVec = ...
             this.TX.CalibrationRfAmp(iChannel).TriScatteredAmp(frequency*ones(size(paUoutVec)), ...
                                                                paUoutVec);
@@ -509,6 +527,7 @@ classdef TXMaxDef < handle
           else
             frequency = this.Frequency;
           end
+          frequency = round(frequency/this.FrequencyGrid) * this.FrequencyGrid;
           uout2PaUoutCalibrationGain(iChannel) = ...
             interp1(this.TX.CalibrationRfAmp(iChannel).Frequency, ...
             this.TX.CalibrationRfAmp(iChannel).Gain, frequency, 'pchip', 1);
@@ -552,6 +571,7 @@ classdef TXMaxDef < handle
           else
             frequency = this.Frequency;
           end
+          frequency = round(frequency/this.FrequencyGrid) * this.FrequencyGrid;
           mmrtUoutCalibrated = ...
             this.TX.CalibrationUout(iChannel).TriScatteredAmp(frequency, ...
                                                               uoutCalibrated(iChannel));
@@ -570,6 +590,7 @@ classdef TXMaxDef < handle
           else
             frequency = this.Frequency;
           end
+          frequency = round(frequency/this.FrequencyGrid) * this.FrequencyGrid;
           mmrtUout2UoutCalibrationGain(iChannel) = ...
             interp1(this.TX.CalibrationUout(iChannel).Frequency, ...
                     this.TX.CalibrationUout(iChannel).Gain, frequency, 'pchip', 1);
@@ -614,6 +635,7 @@ classdef TXMaxDef < handle
           else
             frequency = this.Frequency;
           end
+          frequency = round(frequency/this.FrequencyGrid) * this.FrequencyGrid;
           mmrtUoutCalibratedVec = ...
             this.TX.CalibrationUout(iChannel).TriScatteredAmp(frequency*ones(size(uoutVec)), ...
                                                               uoutVec);
@@ -650,6 +672,7 @@ classdef TXMaxDef < handle
           else
             frequency = this.Frequency;
           end
+          frequency = round(frequency/this.FrequencyGrid) * this.FrequencyGrid;
           mmrtUout2UoutCalibrationGain(iChannel) = ...
             interp1(this.TX.CalibrationUout(iChannel).Frequency, ...
                     this.TX.CalibrationUout(iChannel).Gain, frequency, 'pchip', 1);

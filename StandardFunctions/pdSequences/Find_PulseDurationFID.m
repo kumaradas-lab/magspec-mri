@@ -38,7 +38,7 @@ function [HW, mySave] = Find_PulseDurationFID(HW, mySave, minTime, doPlot, itera
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2025 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -80,7 +80,7 @@ if iterations > 0
       timeFID*1e3, abs(dataFID)*1e6, ...
       timeFID*1e3, real(dataFID)*1e6, ...
       timeFID*1e3, imag(dataFID)*1e6);
-    hold(ax(1), 'all');
+    hold(ax(1), 'on');
     title(ax(1), 'Acquired signal');
     ylabel(ax(1), sprintf('Amplitude in %cV', 181));
     xlabel(ax(1), 'Time in ms');
@@ -89,7 +89,7 @@ if iterations > 0
 
     ax(2) = subplot(2,1,2, 'Parent', hf);
     plot(ax(2), flipAngle*1e6, maxFID*1e6, 'x');
-    hold(ax(2), 'all');
+    hold(ax(2), 'on');
     ylabel(ax(2), sprintf('Amplitude in %cV', 181));
     xlabel(ax(2), sprintf('Pulse duration in %cs', 181));
     ylim(ax(2), [0, Inf]);

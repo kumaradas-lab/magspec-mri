@@ -29,7 +29,7 @@ function sPPG = finalizePPG(HW, sPPG, config)
 %       be executed by the console.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2023-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 

@@ -23,7 +23,7 @@ HW.Grad(iDevice).PaRout(1:4) = [15000, 15000, 15000, 15000];  % output impedance
 
 HW.Grad(iDevice).tRamp = 50e-6;                               % minimum ramp time in s
 HW.Grad(iDevice).tEC = 50e-6;                                 % eddy current time in s
-HW.Grad.SystemTimeDelay(1:3) = [5.2656e-05, 6.272e-05, 6.1616e-05];  % time delay of gradient amplifier in s
+HW.Grad(iDevice).SystemTimeDelay(1:3) = [5.2656e-05, 6.272e-05, 6.1616e-05];  % time delay of gradient amplifier in s
 HW.Grad(iDevice).MaxAmpSlice = 0.1;                           % maximum gradient amplitude for slice selection in T/m
 
 HW.Grad(iDevice).Status1 = 1;                                 % power supply of DC-600 ok

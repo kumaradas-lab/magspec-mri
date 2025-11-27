@@ -1,7 +1,7 @@
-function [HW, mySave] = Find_Frequency_FID(HW, mySave, minTime, iterations, tAQ, tAQStart)
+function [HW, mySave, SeqOut] = Find_Frequency_FID(HW, mySave, minTime, iterations, tAQ, tAQStart)
 %% Search the Larmor frequency and store it in HW
 %
-%   [HW, mySave] = Find_Frequency_FID(HW, mySave, minTime, iterations, tAQ, tAQStart)
+%   [HW, mySave, SeqOut] = Find_Frequency_FID(HW, mySave, minTime, iterations, tAQ, tAQStart)
 %
 % This function searches the MR frequency and stores it in HW and mySave.
 % It is fast and can be adjusted to loose only a part of the magnetization M0
@@ -81,9 +81,12 @@ function [HW, mySave] = Find_Frequency_FID(HW, mySave, minTime, iterations, tAQ,
 %   mySave
 %       mySave structure
 %
+%   SeqOut
+%       Structure with sequence parameters and results.
+%
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -113,6 +116,8 @@ if ~isemptyfield(mySave, 'DummySerial')
     mySave.HW.B0 = HW.B0;
   end
 end
+
+SeqOut = struct();
 
 
 %% actual measurement
@@ -183,6 +188,8 @@ if ~Dummy && (now*24*3600-mySave.lastTime > minTime)
     % calculate frequency offset
     fOffsetFID = double(MeanPhaseDiffWeighted)*SeqOut.AQ(1).fSample(1)/2/pi + fOffsetFID;
     fOffsetFIDStd = phaseDiffWeightedStd * SeqOut.AQ(1).fSample(1)/2/pi;
+    SeqOut.fLarmorStdev = fOffsetFIDStd;  % standard uncertainty of measurement
+
     if HW.FindFrequencyPauseFID >= 1
       fprintf('Waiting %2d seconds after finding Frequency... ', round(HW.FindFrequencyPauseFID));
       sleep(HW.FindFrequencyPauseFID);

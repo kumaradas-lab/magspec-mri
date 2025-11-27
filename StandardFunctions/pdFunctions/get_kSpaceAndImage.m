@@ -49,7 +49,7 @@ function [data, dataOut] = get_kSpaceAndImage(data, UseSample, UseAQWindow, Uset
 %               2d array where each column contains the indices (in the 3rd
 %               dimension of UsetRep and/or UseAQWindow, corresponding to the
 %               6th dimension in the resulting k-space and image data) that are
-%               used for each  of the resulting images. By default, the data for
+%               used for each of the resulting images. By default, the data for
 %               the images is equally spaced over the images defined along the
 %               3rd dimension of UsetRep (and/or UseAQWindow).
 %
@@ -143,17 +143,24 @@ function [data, dataOut] = get_kSpaceAndImage(data, UseSample, UseAQWindow, Uset
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2025 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
 if nargin == 2
-  if isstruct(UseSample), AQSlice = UseSample; else error('second argument is not a struct'); end
+  if isstruct(UseSample)
+    AQSlice = UseSample;
+  else
+    error('second argument is not a struct');
+  end
 else
   AQSlice = struct();
 end
 
-if isemptyfield(AQSlice(1), 'partsAverage'), AQSlice(1).partsAverage = 1; end % Calculate average over images defined along 3rd dimension of AQSlice.UsetRep
+if isemptyfield(AQSlice(1), 'partsAverage')
+  % Calculate average over images defined along 3rd dimension of AQSlice.UsetRep
+  AQSlice(1).partsAverage = 1;
+end
 
 for iAQSlice = 1:numel(AQSlice)
   if nargin == 2
@@ -164,8 +171,12 @@ for iAQSlice = 1:numel(AQSlice)
   % if isvector(UseAQWindow), UseAQWindow = UseAQWindow(:); end
 
   [nKLines, nImages, nParts] = size(UsetRep);
-  if numel(UseAQWindow)==1, UseAQWindow(1:nKLines,1:nImages,1:nParts) = UseAQWindow; end
-  if AQSlice(1).partsAverage>nParts || ~AQSlice(1).partsAverage; AQSlice(1).partsAverage = nParts; end
+  if isscalar(UseAQWindow)
+    UseAQWindow(1:nKLines,1:nImages,1:nParts) = UseAQWindow;
+  end
+  if AQSlice(1).partsAverage>nParts || ~AQSlice(1).partsAverage
+    AQSlice(1).partsAverage = nParts;
+  end
   if isemptyfield(AQSlice(1), 'partsAverageOrder')
     nA = nParts/AQSlice(1).partsAverage;
     AQSlice(1).partsAverageOrder = zeros(nA, AQSlice(1).partsAverage);
@@ -253,7 +264,9 @@ for iAQSlice = 1:numel(AQSlice)
       %     data.ImageCsiRaw=fftshift(ifftn(ifftshift(data.kSpaceCsiRaw)));
       %     data.ImageCsi=data.ImageCsiRaw.*reshape(data.cic_corr(UseSample,UseAQWindow,UsetRep),[AQSlice.ReadOS,MySizeOS]);
       %     data.ImageCsiFrequency=reshape(data.f_fft1_data(UseSample,UseAQWindow,UsetRep),[AQSlice.ReadOS,MySizeOS]);
-      %     if ~isfield(AQSlice, 'ReadZeroFill');AQSlice.ReadZeroFill=[];end; if isempty(AQSlice.ReadZeroFill); AQSlice.ReadZeroFill=8; end;
+      %     if isemptyfield(AQSlice, 'ReadZeroFill')
+      %       AQSlice.ReadZeroFill = 8;
+      %     end
       %
       %       data.ImageCsiRawZero=fftshift(ifftn(ifftshift(zeroFill(data.kSpaceCsiRaw,[AQSlice.ReadOS*AQSlice.ReadZeroFill,MySizeOS]))));
       %       % data.ImageCsi=data.ImageCsiRawZero.*reshape(data.cic_corr(UseSample,UseAQWindow,UsetRep),[AQSlice.ReadOS,MySizeOS]);
@@ -282,11 +295,13 @@ for iAQSlice = 1:numel(AQSlice)
       end
 
       if isNUFFT
-        if numel(AQSlice(iAQSlice).ZeroFillFactor) == 1
-          AQSlice(iAQSlice).ZeroFillFactor = [1, AQSlice(iAQSlice).ZeroFillFactor([1 1 1])];
+        if isscalar(AQSlice(iAQSlice).ZeroFillFactor)
+          AQSlice(iAQSlice).ZeroFillFactor = ...
+            [1, AQSlice(iAQSlice).ZeroFillFactor([1 1 1])];
         end
-        if numel(AQSlice(iAQSlice).ZeroFillWindowSize) == 1
-          AQSlice(iAQSlice).ZeroFillWindowSize = [Inf, AQSlice(iAQSlice).ZeroFillWindowSize([1 1 1])];
+        if isscalar(AQSlice(iAQSlice).ZeroFillWindowSize)
+          AQSlice(iAQSlice).ZeroFillWindowSize = ...
+            [Inf, AQSlice(iAQSlice).ZeroFillWindowSize([1 1 1])];
         end
         AQSlice(iAQSlice).ZeroFillFactor(MySize<=1) = 1;
         AQSlice(iAQSlice).ZeroFillWindowSize(MySize<=1) = Inf;
@@ -596,11 +611,13 @@ for iAQSlice = 1:numel(AQSlice)
         % RAW data of the oversampled k-Space
         if AQSlice(iAQSlice).nRead == 1 && prod(AQSlice(iAQSlice).nPhase) > 1
           %% only phase encoding (SPI/CSI)
-          if numel(AQSlice(iAQSlice).ZeroFillFactor) == 1
-            AQSlice(iAQSlice).ZeroFillFactor = [1, AQSlice(iAQSlice).ZeroFillFactor([1 1 1])];
+          if isscalar(AQSlice(iAQSlice).ZeroFillFactor)
+            AQSlice(iAQSlice).ZeroFillFactor = ...
+              [1, AQSlice(iAQSlice).ZeroFillFactor([1 1 1])];
           end
-          if numel(AQSlice(iAQSlice).ZeroFillWindowSize) == 1
-            AQSlice(iAQSlice).ZeroFillWindowSize = [Inf, AQSlice(iAQSlice).ZeroFillWindowSize([1 1 1])];
+          if isscalar(AQSlice(iAQSlice).ZeroFillWindowSize)
+            AQSlice(iAQSlice).ZeroFillWindowSize = ...
+              [Inf, AQSlice(iAQSlice).ZeroFillWindowSize([1 1 1])];
           end
           AQSlice(iAQSlice).ZeroFillFactor(end+1:4) = 1;
           AQSlice(iAQSlice).ZeroFillWindowSize(end+1:4) = Inf;
@@ -745,11 +762,13 @@ for iAQSlice = 1:numel(AQSlice)
 
         else
           %% read and phase encoding
-          if numel(AQSlice(iAQSlice).ZeroFillFactor) == 1
-            AQSlice(iAQSlice).ZeroFillFactor = AQSlice(iAQSlice).ZeroFillFactor([1 1 1 1]);
+          if isscalar(AQSlice(iAQSlice).ZeroFillFactor)
+            AQSlice(iAQSlice).ZeroFillFactor = ...
+              AQSlice(iAQSlice).ZeroFillFactor([1 1 1 1]);
           end
-          if numel(AQSlice(iAQSlice).ZeroFillWindowSize) == 1
-            AQSlice(iAQSlice).ZeroFillWindowSize = AQSlice(iAQSlice).ZeroFillWindowSize([1 1 1 1]);
+          if isscalar(AQSlice(iAQSlice).ZeroFillWindowSize)
+            AQSlice(iAQSlice).ZeroFillWindowSize = ...
+              AQSlice(iAQSlice).ZeroFillWindowSize([1 1 1 1]);
           end
           AQSlice(iAQSlice).ZeroFillFactor(end+1:4) = 1;
           AQSlice(iAQSlice).ZeroFillWindowSize(end+1:4) = Inf;
@@ -923,10 +942,10 @@ if ~AQSlice.ReadRadial
   % if AQSlice.nRead == 1
   %   data.kSpaceOs=data.kSpaceOsRaw;
   %
-  % elseif numel(UseSample)==MySizeOS(1);
+  % elseif numel(UseSample)==MySizeOS(1)
   %   data.kSpaceOs=fftshift(fft(ifftshift(reshape(data.fft1_data(UseSample,UseAQWindow,UsetRep), ...
   %                                                MySizeOS), 1), [], 1), 1);
-  % elseif numel(UseSample)==1
+  % elseif isscalar(UseSample)
   %   data.kSpaceOs=data.kSpaceOsRaw;
   % else
   %   warning('no CIC correction available')

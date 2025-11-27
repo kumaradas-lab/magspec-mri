@@ -122,8 +122,8 @@ BlockLength = 1/Pulse.Bandwidth*bwFactor;
 
 gain = HW.TX(Pulse.iDevice).AmpDef * 2*tFlipPi * (Pulse.FlipAngle/Pulse.FlipAngleFullTurn) / BlockLength;
 
-if Pulse.MaxLength < BlockLength;
-  error('maxLength of HF Pulse to short')
+if Pulse.MaxLength < BlockLength
+  error('maxLength of HF Pulse to short');
 end
 
 if Pulse.MaxNumberOfSegments < 1

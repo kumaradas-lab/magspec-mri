@@ -133,7 +133,7 @@ function [Spectrum] = get_Spectrum(HW, SeqOut)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2016-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2025 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -244,28 +244,6 @@ ppm = -bsxfun(@rdivide, ...
 ppmStartI = find(ppm(:,1)<=SeqOut.Spectro.ppmStart, 1, 'first');
 ppmStopI = find(ppm(:,1)>=SeqOut.Spectro.ppmStop, 1, 'last');
 
-
-% extrapolate at the beginning of the FID (if necessary)
-StopI = nSamplesGrid*2;
-if StopI > 1
-  for t = 1:(size(FIDs,2)*size(FIDs,3))
-    % fitexpStartGrid=fit_exp( FIDs(nSamplesGrid+(1:StopI),t).*exp(-1i.*get_MeanPhaseDiffWeighted(FIDs(nSamplesGrid+(1:StopI),t)).*(nSamplesGrid+(1:StopI)).'),myTime(nSamplesGrid+(1:StopI),t),0,0,1,0,0);
-    % FIDs(1:nSamplesGrid,t)=fitexpStartGrid.xminSingle(2).*exp(-myTime(1:nSamplesGrid)./fitexpStartGrid.xminSingle(3));
-    [p, S, mu] = polyfit(myTime(nSamplesGrid+(1:StopI)), abs(FIDs(nSamplesGrid+(1:StopI),t)), 2);  % extrapolate
-    % [p,S,mu]=polyfit([-flipud(myTime(nSamplesGrid+(1:StopI)));myTime(nSamplesGrid+(1:StopI))],...
-    %                  [ flipud(abs(FIDs(nSamplesGrid+(1:StopI),t)));abs(FIDs(nSamplesGrid+(1:StopI),t))],4); % extrapolate to horizontal
-    a = polyval(p, myTime(1:StopI), S, mu);
-    [p, S, mu] = polyfit(myTime(nSamplesGrid+(1:StopI)), unwrap(angle(FIDs(nSamplesGrid+(1:StopI),t)),[],1), 2);
-    FIDs(1:StopI,t) = a .* exp(1i*polyval(p, myTime(1:StopI), S, mu));
-    % figure(251)
-    % subplot(2,1,1)
-    % plot(myTime(1:nSamplesGrid*4),(abs(FIDs(1:nSamplesGrid*4,t))))
-    % subplot(2,1,2)
-    % plot(myTime(1:nSamplesGrid*4),(angle(FIDs(1:nSamplesGrid*4,t))))
-    % pause
-  end
-end
-
 if SeqOut.Spectro.ReferenceFID
   % linear phase correction of Ref FID and Smoothing and generate Reference FID
   FIDRefRaw = zeros(size(myTime));
@@ -277,21 +255,76 @@ if SeqOut.Spectro.ReferenceFID
   nSamplesRefGrid = find(myTime<=HW.Spectro.ReferenceTime(1), 1, 'last');
   if nSamplesRefGrid > 0
     % number of samples from reference FID used for extrapolation
-    nSamplesExtrap = min(numel(myTime), max(floor(numel(myTime)/50), nSamplesRefGrid*2));
+%     nSamplesExtrap = min(numel(myTime), max(floor(numel(myTime)/50), nSamplesRefGrid*2));
+    nSamplesExtrap = min([numel(myTime)-nSamplesRefGrid,... % limit
+                          nSamplesRefGrid*2,... % normal
+                          find(abs(FIDRefRaw(nSamplesRefGrid))/2>abs(FIDRefRaw(nSamplesRefGrid+(1:nSamplesRefGrid*2),:)),1,'first')]); % bad T2*
     % amplitude - extrapolate quadratically
-    [p, S, mu] = ...
-      polyfit(myTime(nSamplesRefGrid+(1:nSamplesExtrap)), ...
-              abs(FIDRefRaw(nSamplesRefGrid+(1:nSamplesExtrap))), 2);
-    % [p,S,mu]=polyfit([-flipud(myTime(nSamplesRefGrid+(1:nSamplesRefGrid*2)));myTime(nSamplesRefGrid+(1:nSamplesRefGrid*2))],...
-    %                  [ flipud(abs(FIDRefRaw(nSamplesRefGrid+(1:nSamplesRefGrid*2))));abs(FIDRefRaw(nSamplesRefGrid+(1:nSamplesRefGrid*2)))],4); % extrapolate to horizontal
-    a = polyval(p, myTime(1:nSamplesExtrap), S, mu);
-    % phase - extrapolate quadratically
-    [p, S, mu] = ...
-      polyfit(myTime(nSamplesRefGrid+(1:nSamplesExtrap)), ...
-      unwrap(angle(FIDRefRaw(nSamplesRefGrid+(1:nSamplesExtrap))),[],1), 2);
-    FIDRefRaw(1:nSamplesExtrap) = a .* exp(1i*polyval(p, myTime(1:nSamplesExtrap), S, mu));
-  end
+%     [p, S, mu] = ...
+%       polyfit(myTime(nSamplesRefGrid+(1:nSamplesExtrap)), ...
+%               abs(FIDRefRaw(nSamplesRefGrid+(1:nSamplesExtrap))), 2);
+%     [p,S,mu]=polyfit([-flipud(myTime(nSamplesRefGrid+(1:nSamplesRefGrid*2)));myTime(nSamplesRefGrid+(1:nSamplesRefGrid*2))],...
+%                      [ flipud(abs(FIDRefRaw(nSamplesRefGrid+(1:nSamplesRefGrid*2))));abs(FIDRefRaw(nSamplesRefGrid+(1:nSamplesRefGrid*2)))],4); % extrapolate to horizontal
+    [p,S,mu]=polyfit([-flipud(myTime(nSamplesRefGrid+(1:nSamplesExtrap)));myTime(nSamplesRefGrid+(1:nSamplesExtrap))],...
+                     [ flipud(abs(FIDRefRaw(nSamplesRefGrid+(1:nSamplesExtrap))));abs(FIDRefRaw(nSamplesRefGrid+(1:nSamplesExtrap)))],4); % extrapolate to horizontal
+    a = polyval(p, myTime(1:nSamplesRefGrid), S, mu);
+%     AmpRef0=a(1);
 
+    % phase - extrapolate linear
+    [p, S, mu] = ...
+      polyfit(myTime(nSamplesRefGrid+(1:nSamplesExtrap)), ...
+      unwrap(angle(FIDRefRaw(nSamplesRefGrid+(1:nSamplesExtrap))),[],1), 1);
+    PhaseRef0=polyval(p, myTime(1), S, mu);
+    FIDRefRaw(1:nSamplesRefGrid) = a .* exp(1i*polyval(p, myTime(1:nSamplesRefGrid), S, mu));
+    if any(abs(FIDRefRaw(1,:))/3>abs(FIDRefRaw(nSamplesRefGrid*3,:)))
+      warning('PD:get_Spectrum:extrapolationFIDRefRawTooFar','extrapolation at the beginning of the FIDRefRaw too far')
+    end
+  else
+    PhaseRef0=0;
+  end
+end
+
+
+
+% extrapolate at the beginning of the FID (if necessary)
+FIDsMean=mean(FIDs(nSamplesGrid+(1:nSamplesGrid*2),:),2);
+StopI = min([nSamplesGrid*2,find(abs(FIDsMean(1))/2>abs(FIDsMean),1,'first')]);
+% Amp0Corr=1.000;
+Phase0Corr=0.00;
+W=5*StopI*1;
+if StopI > 1
+  for tt = 1:(size(FIDs,2)*size(FIDs,3))
+    % fitexpStartGrid=fit_exp( FIDs(nSamplesGrid+(1:StopI),t).*exp(-1i.*get_MeanPhaseDiffWeighted(FIDs(nSamplesGrid+(1:StopI),t)).*(nSamplesGrid+(1:StopI)).'),myTime(nSamplesGrid+(1:StopI),t),0,0,1,0,0);
+    % FIDs(1:nSamplesGrid,t)=fitexpStartGrid.xminSingle(2).*exp(-myTime(1:nSamplesGrid)./fitexpStartGrid.xminSingle(3));
+%     [p, S, mu] = polyfit(myTime(nSamplesGrid+(1:StopI)), abs(FIDs(nSamplesGrid+(1:StopI),t)), 2);  % extrapolate
+    [p,S,mu]=polyfit([-flipud(myTime(nSamplesGrid+(1:StopI)));myTime(nSamplesGrid+(1:StopI))],...
+                     [ flipud(abs(FIDs(nSamplesGrid+(1:StopI),tt)));abs(FIDs(nSamplesGrid+(1:StopI),tt))],4); % extrapolate to horizontal
+    a = polyval(p, myTime(1:nSamplesGrid), S, mu);
+    if PhaseRef0+Phase0Corr ~= 0
+      FIDs(nSamplesGrid+1:end,tt) = FIDs(nSamplesGrid+1:end,tt).* exp(1i*(-PhaseRef0+Phase0Corr));
+      [p, S, mu] = polyfit([flipud(-myTime(nSamplesGrid+(1:StopI)));                          repmat(myTime(1),W,1);  myTime(nSamplesGrid+(1:StopI))],...
+        [flipud(unwrap(angle(conj(FIDs(nSamplesGrid+(1:StopI),tt))),[],1));zeros(W,1); unwrap(angle(FIDs(nSamplesGrid+(1:StopI),tt)),[],1)], 5);
+      FIDs(1:nSamplesGrid,tt) = a .* exp(1i*polyval(p, myTime(1:nSamplesGrid), S, mu));
+      FIDs(:,tt) = FIDs(:,tt).* exp(1i*(+PhaseRef0));
+    else
+      [p, S, mu] = polyfit(myTime(nSamplesGrid+(1:StopI)), unwrap(angle(FIDs(nSamplesGrid+(1:StopI),tt)),[],1), 1);
+      FIDs(1:nSamplesGrid,tt) = a .* exp(1i*polyval(p, myTime(1:nSamplesGrid), S, mu));
+    end
+    % figure(251)
+    % subplot(2,1,1)
+    % plot(myTime(1:nSamplesGrid*4),(abs(FIDs(1:nSamplesGrid*4,t))))
+    % subplot(2,1,2)
+    % plot(myTime(1:nSamplesGrid*4),(angle(FIDs(1:nSamplesGrid*4,t))))
+    % pause
+
+  end
+  if any(abs(FIDs(1,:))/3>abs(FIDs(nSamplesGrid+StopI,:)))
+    warning('PD:get_Spectrum:extrapolationFIDsTooFar','extrapolation at the beginning of the FID too far')
+  end
+end
+
+
+if SeqOut.Spectro.ReferenceFID
   % correct for potential frequency offset (before smoothing)
   nFilter = round(numel(FIDRefRaw)/500);
   PhaseCorr1 = get_MeanPhaseDiffWeighted(...
@@ -322,10 +355,39 @@ if SeqOut.Spectro.ReferenceFID
     fitexp = fit_exp(abs(RefFID(startI:end,1)), myTime(startI:end,1), 1, 0, 0, 0, 0);
     SeqOut.Spectro.FIDIdealT2Star = fitexp.xminSingle(3);  %  T2*
   end
+
+  if isemptyfield(SeqOut.Spectro, 'FIDWindowDuration')
+    SeqOut.Spectro.FIDWindowDuration = myTime(end);
+  end
+  if isemptyfield(SeqOut.Spectro, 'FIDWindowResolutionEnhancedDuration')
+    SeqOut.Spectro.FIDWindowResolutionEnhancedDuration = SeqOut.Spectro.FIDWindowDuration;
+  end
+  cutFidIndexREEnd = find(myTime<=SeqOut.Spectro.FIDWindowResolutionEnhancedDuration, 1, 'last');
+  % FID window function
+  if isequal(SeqOut.Spectro.FIDWindowResolutionEnhanced, @LorentzToGauss)
+    if isemptyfield(SeqOut.Spectro, 'FIDWindowResolutionEnhancedLB')
+      SeqOut.Spectro.FIDWindowResolutionEnhancedLB = -2/2*cutFidIndexREEnd/cutFidIndexREEnd;
+    end
+    if isemptyfield(SeqOut.Spectro, 'FIDWindowResolutionEnhancedWmax')
+      SeqOut.Spectro.FIDWindowResolutionEnhancedWmax = 1/6;
+    end
+    Window_ResolutionEnhanced = ...
+      [LorentzToGauss(cutFidIndexREEnd, ...
+      SeqOut.Spectro.FIDWindowResolutionEnhancedLB, ...
+      SeqOut.Spectro.FIDWindowResolutionEnhancedWmax, ...
+      SeqOut.AQ(SeqOut.Spectro.AQChannel).fSample(tr), 1); ...
+      zeros(size(FIDs,1)-cutFidIndexREEnd, 1)];
+    % Window_ResolutionEnhanced= LorentzToGauss(size(FIDs,1), -2/5*size(FIDs,1)/nSamples(tr), 1/10, SeqOut.AQ(SeqOut.Spectro.AQChannel).fSample(tr), 1);
+  else
+    Window_ResolutionEnhanced = ...
+      [SeqOut.Spectro.FIDWindowResolutionEnhanced(cutFidIndexREEnd); ...
+      zeros(size(FIDs,1)-cutFidIndexREEnd,1)];
+  end
+
   % mytime(find(abs(FIDRef)<max(abs(FIDRef)),1,'last'))
   % abs(FIDRef(find(abs(FIDRef)<max(abs(FIDRef)),1,'last')))
   FidIdealStartValue = abs(FIDRef(1)); % start value
-  FidIdeal = FidIdealStartValue .* exp(-myTime./SeqOut.Spectro.FIDIdealT2Star);
+  FidIdeal = FidIdealStartValue .* exp(-myTime./SeqOut.Spectro.FIDIdealT2Star) .* Window_ResolutionEnhanced;
 
   % generate Fid Correction window
   FidCorr = FidIdeal ./ FIDRef;
@@ -363,38 +425,13 @@ end
 
 FidIdealIntegral = sum(abs(FidIdeal));
 
-if isemptyfield(SeqOut.Spectro, 'FIDWindowDuration')
-  SeqOut.Spectro.FIDWindowDuration = myTime(end);
-end
-if isemptyfield(SeqOut.Spectro, 'FIDWindowResolutionEnhancedDuration')
-  SeqOut.Spectro.FIDWindowResolutionEnhancedDuration = SeqOut.Spectro.FIDWindowDuration;
-end
-cutFidIndexREEnd = find(myTime<=SeqOut.Spectro.FIDWindowResolutionEnhancedDuration, 1, 'last');
-% FID window function
-if isequal(SeqOut.Spectro.FIDWindowResolutionEnhanced, @LorentzToGauss)
-  if isemptyfield(SeqOut.Spectro, 'FIDWindowResolutionEnhancedLB')
-    SeqOut.Spectro.FIDWindowResolutionEnhancedLB = -2/2*cutFidIndexREEnd/cutFidIndexREEnd;
-  end
-  if isemptyfield(SeqOut.Spectro, 'FIDWindowResolutionEnhancedWmax')
-    SeqOut.Spectro.FIDWindowResolutionEnhancedWmax = 1/6;
-  end
-  Window_ResolutionEnhanced = ...
-    [LorentzToGauss(cutFidIndexREEnd, ...
-                    SeqOut.Spectro.FIDWindowResolutionEnhancedLB, ...
-                    SeqOut.Spectro.FIDWindowResolutionEnhancedWmax, ...
-                    SeqOut.AQ(SeqOut.Spectro.AQChannel).fSample(tr), 1); ...
-     zeros(size(FIDs,1)-cutFidIndexREEnd, 1)];
-  % Window_ResolutionEnhanced= LorentzToGauss(size(FIDs,1), -2/5*size(FIDs,1)/nSamples(tr), 1/10, SeqOut.AQ(SeqOut.Spectro.AQChannel).fSample(tr), 1);
-else
-  Window_ResolutionEnhanced = ...
-    [SeqOut.Spectro.FIDWindowResolutionEnhanced(cutFidIndexREEnd); ...
-     zeros(size(FIDs,1)-cutFidIndexREEnd,1)];
-end
-
 cutFidIndexEnd = find(myTime<=SeqOut.Spectro.FIDWindowDuration, 1, 'last');
 w = reshape([SeqOut.Spectro.FIDWindow(cutFidIndexEnd);
-             zeros(size(FIDs,1)-cutFidIndexEnd,1)] .* Window_ResolutionEnhanced .* FidCorr, ...
+             zeros(size(FIDs,1)-cutFidIndexEnd,1)] .* FidCorr, ...
             size(FIDs,1), 1);
+
+% figure(345); plot(Window_ResolutionEnhanced);
+
 if nAQX > 1
   % adjust phase in reference FID to center frequency of X nucleus
   w(:,1,2) = w .* ...
@@ -522,7 +559,7 @@ if SeqOut.Spectro.plot
 
     ax3(4) = subplot(4,1,4, 'Parent', hf3);
     plot(ax3(4), repmat(Omega1.',1,size(Hf1,2)), Hf1);
-    hold(ax3(4), 'all');
+    hold(ax3(4), 'on');
     plot(ax3(4), [Omega1(Omega1MinI); NaN(size(Omega1(Omega1MinI)))], ...
                  [Hf1(Omega1MinI+(0:size(Hf1,1):(size(Hf1,1)*(size(Hf1,2)-1)))); NaN(size(Omega1(Omega1MinI)))], 'x');
     hold(ax3(4), 'off');

@@ -16,7 +16,7 @@ function Seq = Start_PPGfast(Seq)
 % Seq.average
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2013-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2013-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %-------------------------------------------------------------------------------
 

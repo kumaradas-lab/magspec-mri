@@ -1,8 +1,8 @@
-function p = arrow(hSliderAxes, arrowDir, pos)
+function hArrow = arrow(hSliderAxes, arrowDir, pos, hArrow)
 %% Draw an arrow in hSliderAxes at position pos
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2016-2019 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -42,11 +42,16 @@ else
   pts(:,2) = pts(:,2)*fivep + pos;
 end
 
-% Create the patch and add app data
-p = patch('Vertices', pts, 'Faces', f, ...
-  'FaceColor', 'g', 'FaceAlpha', .5, 'EdgeColor', 'k', ...
-  'LineWidth', 1, 'Parent', hSliderAxes, 'Tag', 'sliceomaticarrow');
-setappdata(p, 'arrowcenter', pos);
-setappdata(p, 'motionpointer', mp);
+if nargin > 3
+  % use existing arrow
+  set(hArrow, 'Vertices', pts);
+else
+  % create patch and add app data
+  hArrow = patch('Vertices', pts, 'Faces', f, ...
+    'FaceColor', 'g', 'FaceAlpha', .5, 'EdgeColor', 'k', ...
+    'LineWidth', 1, 'Parent', hSliderAxes, 'Tag', 'sliceomaticarrow');
+  setappdata(hArrow, 'motionpointer', mp);
+end
+setappdata(hArrow, 'arrowcenter', pos);
 
 end

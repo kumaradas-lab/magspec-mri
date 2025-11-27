@@ -258,6 +258,11 @@ classdef HWClass < handleHidden
 %       class) with properties and interfaces to the control in a connected
 %       magnet.
 %
+%   SampleHeater
+%       Optionally, this is an object of type PD.SampleHeaterBase (or of a
+%       derived class) with properties and interfaces to the control in a
+%       connected sample heater device.
+%
 %   Piezo
 %       Structure with properties of an optionally connected Piezo element.
 %
@@ -346,12 +351,22 @@ classdef HWClass < handleHidden
 %       from the file given in HW.NetworkCalPath
 %
 %   Dummy
-%       Boolean value to indicate that OpenMatlab is running in dummy mode
-%       (i.e., without connected device). In this case, random numbers are
-%       returned instead of actual measurement data. To initiate dummy mode,
-%       call "LoadSystem dummy". To select settings for a specific device, set
-%       mySave.DummySerial to the serial number of the device for which the
-%       settings should be loaded.
+%       Vector the same length as the number of "connected" devices with the
+%       serial numbers of the devices for which the settings are loaded if
+%       OpenMatlab is using the respective device in dummy mode  (i.e.,
+%       without actually connected device) or zero otherwise. If non-zero,
+%       random numbers are returned instead of actual measurement data.
+%       To initiate dummy mode, call "LoadSystem dummy". To select settings
+%       for a specific device, set mySave.DummySerial to the serial number of
+%       the device for which the settings should be loaded, or append the
+%       serial number of the respective device to the command, e.g.,
+%       "LoadSystem dummy123". Changing the value of this property directly
+%       does not have any actual effect.
+%
+%   DummyFastForwardFactor
+%       If HW.Dummy is non-zero, this factor divides the time that is used for
+%       dummy measurements. This value is ignored if HW.Dummy is zero.
+%       (Default: 1)
 %
 %
 % METHODS:
@@ -364,7 +379,7 @@ classdef HWClass < handleHidden
 %
 %
 % ----------------------------------------------------------------------------
-% (C) Copyright 2015-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2015-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ----------------------------------------------------------------------------
 
@@ -384,8 +399,10 @@ end
 %#function LoadProbe_Standard
 %#function LoadRXTXCoil_Standard
 %#function LoadRXTX_Standard
+%#function LoadSampleHeater_Standard
 %#function PD.DICOM
 %#function PD.GradClass
+%#function PD.IgnoreWarning
 %#function PD.MMRT
 %#function PD.MPIClass
 %#function PD.RX

@@ -55,7 +55,7 @@ if isemptyfield(Seq, 'TXPower')
   if ~isempty(Seq.TXPowerdBm)
     Seq.TXPower = HW.TX(iDevice).dBm2Amp(HW, Seq.TXPowerdBm, 2);
   elseif ~isempty(Seq.TXPowerW)
-    Seq.TXPower = (Seq.TXPowerW.*HW.TX(iDevice).Rout)^0.5./HW.TX(iDevice).Amp2Ueff50(2);
+    Seq.TXPower = (Seq.TXPowerW.*HW.TX(iDevice).LoadRin(2))^0.5./HW.TX(iDevice).Amp2Ueff50(2);
   else
     Seq.TXPower = HW.TX(iDevice).AmpDef/1000;
   end

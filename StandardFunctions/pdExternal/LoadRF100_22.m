@@ -6,13 +6,13 @@ HW.TX.ExtRFType = 'RF100';  % string with type identifier
 HW.TX.ChannelDef = 2;         % Default TX Channel set to Tx2
 
 % Amplifier
-HW.TX.Uout2PaUout(2) = 50;       % 50x Amplification
-HW.TX.Max.PaUout(2) = 101;       % maximum PaUout(2)=100 V => 100 W
+HW.TX.Uout2PaUout(2) = 50;  % 50x Amplification
+HW.TX.Max.PaUout(2) = 130.6;  % maximum peak output voltage in V in calibration file @ 24.128 MHz - PaUout(2)=100 V => 100 W
 
-HW.TX.Def.PaUout(2) = 70;        % default PaUout(2)=50 V => 25 W
+HW.TX.Def.PaUout(2) = 70;  % default PaUout(2)=50 V => 25 W
 
-HW.TX.Max.Amplitude = [20,20]*1e-3;   % maximum B1+ in T
-HW.TX.Def.Amplitude = [20,20]*1e-3;   % default B1+ in T
+HW.TX.Max.Amplitude = [20, 20]*1e-3;  % maximum B1+ in T
+HW.TX.Def.Amplitude = [20, 20]*1e-3;  % default B1+ in T
 
 %% Coil 10mm
 HW.RX2TXdeadTime = 1e-6;         % Receiver deadtime before TX pulse in s

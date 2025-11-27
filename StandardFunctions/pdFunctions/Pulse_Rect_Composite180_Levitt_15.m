@@ -8,47 +8,64 @@ function [pulseData] = Pulse_Rect_Composite180_Levitt_15(HW, Center, Pulse, vara
 %   excitationAngleFactor = Pulse_Rect_Composite180_Levitt_15(HW, 'Amp')
 %   bandwidthFactor = Pulse_Rect_Composite180_Levitt_15(HW, 'Time')
 %
+% This is the composite pulse described in reference [15] of the chapter
+% "Composite Pulses" by Malcolm H. Levitt in "Encyclopedia of Nuclear Magnetic
+% Resonance, Volume 9 (Advances in NMR). (1996). United Kingdom: John Wiley.":
+%   S. Wimperis, J. Magn. Reson. A, 1994, 109, 221.
+% From Table 2 (Variable Rotation Composite 180 DEG pulses):
+%   rel. B1 bandwidth: {0.69, 1.31}   (1 is nominal)
+%   rel. B0 bandwidth: {-0.09, 0.09}  (0 is nominal)
+%
+%
 % INPUT:
-%   HW        HW structure
-%   Center    The center of the pulse in seconds (tRep).
-%   Pulse     A structure with the following fields (if omitted or empty,
-%             default values are used):
+%
+%   HW
+%       HW structure
+%   Center
+%       The center of the pulse in seconds (tRep).
+%   Pulse
+%       A structure with the following fields (if omitted or empty, default
+%       values are used): 
 %     FlipAngle
-%             The total (effective) flip angle of the pulse in radians (or the
-%             units defined by FlipAngleFullTurn). It is used to set an
-%             appropriate pulse amplitude (default: pi/2).
+%         The total (effective) flip angle of the pulse in radians (or the units
+%         defined by FlipAngleFullTurn). It is used to set an appropriate pulse
+%         amplitude (default: pi).
 %     FlipAngleFullTurn
-%             Value that defines a full turn in FlipAngle units (e.g. 360 for
-%             degrees, or 2*pi for radians, default: 2*pi).
+%         Value that defines a full turn in FlipAngle units (e.g. 360 for
+%         degrees, or 2*pi for radians, default: 2*pi).
 %     MaxNumberOfSegments
-%             Maximum number of segments of the pulse (default: 51).
+%         Maximum number of segments of the pulse (default: 51).
 %     MaxLength
-%             Maximum length of the pulse in seconds (default: Inf).
+%         Maximum length of the pulse in seconds (default: Inf).
 %     Frequency
-%             Frequency of the rf pulse in Hz (default: HW.fLarmor).
-%     Phase   "Local" RF phase of the pulse with respect to the overall sequence
-%             in degrees (default: 0).
+%         Frequency of the rf pulse in Hz (default: HW.fLarmor).
+%     Phase
+%         "Local" RF phase of the pulse with respect to the overall sequence in
+%         degrees (default: 0).
 %     Bandwidth
-%             Bandwidth of the pulse in Hz (default:
-%             max(FactorTime/Pulse.MaxLength, 2e3) where "FactorTime" is the
-%             multiplier compared to a simple rectangular pulse with the same
-%             flip angle.
+%         Bandwidth of the pulse in Hz (default:
+%         max(FactorTime/Pulse.MaxLength, 2e3) where "FactorTime" is the
+%         multiplier compared to a simple rectangular pulse with the same flip
+%         angle.
+%
 %
 % OUTPUT:
-%   pulseData A structure with the following fields:
-%     Start   Column vector with the start times of each component/block in
-%             seconds (tRep).
+%
+%   pulseData
+%       A structure with the following fields:
+%     Start
+%         Column vector with the start times of each component/block in seconds
+%         (tRep).
 %     Amplitude
-%             Column vector with the amplitudes of each component/block in
-%             Tesla.
+%         Column vector with the amplitudes of each component/block in Tesla.
 %     Duration
-%             Column vector with the durations of each component/block in
-%             seconds.
+%         Column vector with the durations of each component/block in seconds.
 %     Frequency
-%             Column vector with the frequencies of each component/block in Hz.
+%         Column vector with the frequencies of each component/block in Hz.
 %     Phase
-%             Column vector with the phases in degrees of each component/block
-%             with respect to the overall sequence.
+%         Column vector with the phases in degrees of each component/block with
+%         respect to the overall sequence.
+%
 %
 % The additional syntax is used to return the amplitude and bandwidth factors.
 % The "excitationAngleFactor" is the factor that must be applied to the
@@ -57,9 +74,10 @@ function [pulseData] = Pulse_Rect_Composite180_Levitt_15(HW, Center, Pulse, vara
 % the duration of the pulse to have the same bandwidth (FWHM) as a rect pulse.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2017-2020 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2017-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
+
 
 %% composite settings
 FlipAngleComposite = [180;     360;   180;     180];

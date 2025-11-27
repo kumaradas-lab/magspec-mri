@@ -6,8 +6,8 @@ function [rev_str, build_time] = openMatlabRevision()
 % DO NOT MODIFY!
 
 %%
-rev_str = '1387';
-build_time = 739560.669392;
+rev_str = '1443';
+build_time = 739938.697071;  % 17-Nov-2025 16:43:46
 
 end
 

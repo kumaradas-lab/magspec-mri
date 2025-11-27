@@ -86,7 +86,7 @@ function plotSeq(HW, Seq, AQ, TX, Grad)
 %   none
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -240,16 +240,23 @@ end
 OffsetWraps = reshape(Seq.Offset, [], plotSequence.wraps);
 
 if isemptyfield(TX(1), 'Device'), [TX(:).Device] = deal(1); end
-isPlotTX = false(1, numel(TX));
+hasTX_AmplitudeDC = mod(HW.MMRT(plotSequence.iDevice).FPGA_Firmware, 1e7) >= 0250312;
+isPlotTX = false(1, numel(TX)*(hasTX_AmplitudeDC+1));
 isPlotTX(plotSequence.plotTX) = true;  % only switch on selected TX structures
 isPlotTX([TX(:).Device] ~= plotSequence.iDevice) = false;  % switch off plotting TX for other devices
+if hasTX_AmplitudeDC
+  % same for DC amplitude in elements > numel(TX)
+  isPlotTX(numel(TX)+plotSequence.plotTX) = true;
+  isPlotTX([false(1, numel(TX)), [TX(:).Device] ~= plotSequence.iDevice]) = false;
+end
 TX = TX([TX(:).Device] == plotSequence.iDevice);
 
 talker = PD.Talker.GetInstance();
-if ((numel(talker) < plotSequence.iDevice) || talker(plotSequence.iDevice).Dummy || ...
-    (HW.MMRT(plotSequence.iDevice).FPGA_PPGeneratorType == 1 && ...
-    isprop(talker(plotSequence.iDevice).mySequency.mySequency.myHFPulsesCh0, 'AddChannel'))) && ...
-    mod(HW.MMRT(plotSequence.iDevice).FPGA_Firmware, 1e7) >= 0210511
+if ((numel(talker) < plotSequence.iDevice) || talker(plotSequence.iDevice).Dummy...
+    || ((HW.MMRT(plotSequence.iDevice).FPGA_PPGeneratorType == 1 ...
+         && isprop(talker(plotSequence.iDevice).mySequency.mySequency.myHFPulsesCh0, 'AddChannel'))) ...
+        || HW.MMRT(plotSequence.iDevice).FPGA_PPGeneratorType == 2) ...
+    && mod(HW.MMRT(plotSequence.iDevice).FPGA_Firmware, 1e7) >= 0210511
   % configuration allows mixing different signals to one channel
   mixedTX = true;
 else
@@ -262,10 +269,14 @@ for t = 1:length(TX)
   TX(t).Amplitude = TX(t).Amplitude(:,Seq.plotSeqStart:Seq.plotSeqEnd);
   TX(t).Frequency = TX(t).Frequency(:,Seq.plotSeqStart:Seq.plotSeqEnd);
   TX(t).Phase = TX(t).Phase(:,Seq.plotSeqStart:Seq.plotSeqEnd);
-  if mixedTX
+  if mixedTX && ~isscalar(TX(t).Channel)
     TX(t).Channel = TX(t).Channel(:,Seq.plotSeqStart:Seq.plotSeqEnd);
   end
+  if hasTX_AmplitudeDC && ~isemptyfield(TX(t), 'AmplitudeDC')
+    TX(t).AmplitudeDC = TX(t).AmplitudeDC(1,Seq.plotSeqStart:Seq.plotSeqEnd);
+  end
 end
+
 % remove channels with all NaN start from plot
 isAllNanTX = cellfun(@(x) all(isnan(x(:))), {TX(:).Start});
 TX(isAllNanTX) = [];
@@ -475,30 +486,26 @@ if isempty(hAxes) || any(~ishghandle(hAxes(requiredAxes), 'axes')) || ...
         hYLabel(iAxes) = ylabel(hAxes(iAxes), gradLabel);
       end
     else
-      AmpMax = HW.TX(plotSequence.iDevice).AmpMax;
-      if (isa(HW.TX, 'PD.TXClass') || isfield(HW.TX, 'CalibrationRfAmp')) && ...
-          isfield(HW.TX(plotSequence.iDevice).CalibrationRfAmp, 'TriScatteredAmp') && ...
-          ~isempty(HW.TX(plotSequence.iDevice).CalibrationRfAmp(HW.TX(plotSequence.iDevice).ChannelDef).TriScatteredAmp)
-        % FIXME: Do we really want to display the maximum possible amplitude?
-        % Or should that be the amplitude that results from the limits set in
-        % HW.TX.Max?
-        inputAmp = abs(HW.TX(plotSequence.iDevice).CalibrationRfAmp(HW.TX(plotSequence.iDevice).ChannelDef).InputAmplitude);
-        inputAmp(isnan(HW.TX(plotSequence.iDevice).CalibrationRfAmp(HW.TX(plotSequence.iDevice).ChannelDef).OutputAmplitude)) = -Inf;
-        [~, iMax] = max(inputAmp, [], 1, 'omitnan');
-        PaUoutMax = abs(HW.TX(plotSequence.iDevice).CalibrationRfAmp(HW.TX(plotSequence.iDevice).ChannelDef).OutputAmplitude(...
-          sub2ind(size(HW.TX(plotSequence.iDevice).CalibrationRfAmp(HW.TX(plotSequence.iDevice).ChannelDef).InputAmplitude), iMax, 1:numel(iMax))));
-        freq = HW.TX(plotSequence.iDevice).CalibrationRfAmp(HW.TX(plotSequence.iDevice).ChannelDef).Frequency(1,:);
-        AmpMax = interp1(freq(:), PaUoutMax(:), HW.fLarmor, 'linear') * ...
-          HW.TX(plotSequence.iDevice).PaUout2Amplitude(HW.TX(plotSequence.iDevice).ChannelDef);
+      % collect TX output channels used in pulse program
+      useTX = true(1, numel(TX));
+      for iTX = 1:numel(TX)
+        if ~any(TX(iTX).Amplitude(~isnan(TX(iTX).Start))) && ...
+            TX(iTX).ChannelOutput ~= HW.TX(plotSequence.iDevice).ChannelDef
+          % channel is probably used for (un-)blanking
+          useTX(iTX) = false;
+        end
       end
+      allTXChannels = unique(reshape(cat(1, TX(useTX).Channel), [], 1), 'sorted');
+      % FIXME: This does not work for pulses at fLarmorX.
+      AmpMax = HW.TX(plotSequence.iDevice).Max.AmplitudeCalibrated(allTXChannels);
       if plotSequence.stackTXRX
         % decoration for the stacked TX/RX axes
         % This label will be overwritten. But it is necessary to set it here to
         % get uniform subplots.
         hYLabel(iAxes) = ylabel(hAxes(iAxes), ...
           {[HW.RX(plotSequence.iDevice).fSampleName, ' in ', HW.RX(plotSequence.iDevice).fSampleUnit], ...
-          [HW.TX(plotSequence.iDevice).AmplitudeName, ' in ', HW.TX(plotSequence.iDevice).AmplitudeUnit], ...
-          sprintf('max %3.1f %s', AmpMax/HW.TX(plotSequence.iDevice).AmplitudeUnitScale, HW.TX(plotSequence.iDevice).AmplitudeUnit)});
+          [HW.TX(plotSequence.iDevice).AmplitudeName ' in ' HW.TX(plotSequence.iDevice).AmplitudeUnit], ...
+          sprintf('max %3.1f %s', AmpMax(1)/HW.TX(plotSequence.iDevice).AmplitudeUnitScale, HW.TX(plotSequence.iDevice).AmplitudeUnit)});
       else
         if iAxes == nGrads+1
           % decoration for the TX axes
@@ -506,9 +513,15 @@ if isempty(hAxes) || any(~ishghandle(hAxes(requiredAxes), 'axes')) || ...
           % get uniform subplots.
           % FIXME: It should be possible to use different amplitude names, units
           % and unit scales for signals on Tx1 and Tx2.
-          hYLabel(iAxes) = ylabel(hAxes(nGrads+1), ...
-            {[HW.TX(plotSequence.iDevice).AmplitudeName, ' in ', HW.TX(plotSequence.iDevice).AmplitudeUnit], ...
-            sprintf('max %3.1f %s (ch %d)', AmpMax/HW.TX(plotSequence.iDevice).AmplitudeUnitScale, HW.TX(plotSequence.iDevice).AmplitudeUnit, HW.TX(plotSequence.iDevice).ChannelDef)});
+          TXYLabelString = cell(numel(AmpMax)+1, 1);
+          TXYLabelString{1} = [HW.TX(plotSequence.iDevice).AmplitudeName, ' in ', HW.TX(plotSequence.iDevice).AmplitudeUnit];
+          for iTX = 1:numel(allTXChannels)
+            TXYLabelString{iTX+1} = sprintf('max %3.1f %s (ch %d)', ...
+              AmpMax(iTX)/HW.TX(plotSequence.iDevice).AmplitudeUnitScale, ...
+              HW.TX(plotSequence.iDevice).AmplitudeUnit, ...
+              allTXChannels(iTX));
+          end
+          hYLabel(iAxes) = ylabel(hAxes(nGrads+1), TXYLabelString);
         else % if iAxes == 6
           % decoration for RX axes
           hYLabel(iAxes) = ylabel(hAxes(nGrads+2), {HW.RX(plotSequence.iDevice).fSampleName, ['in ', HW.RX(plotSequence.iDevice).fSampleUnit]});
@@ -756,10 +769,16 @@ if any(PlotTX)
   % find lines in axes
   hKids = get(hAxes(nGrads+1), 'Children');
   hLines = flipud(findobj(hKids, 'flat', 'Type', 'line', '-not', 'Tag', 'plotSeqLineLegend'));
-  numLinesPre = numel(hLines);
   legendHandles = gobjects(1, TXLength);
 
-  for tt = reshape(PlotTX, 1, [])
+  for iTX = reshape(PlotTX, 1, [])
+    if iTX > numel(TX)
+      tt = iTX - numel(TX);
+      useAmplitudeDC = true;
+    else
+      tt = iTX;
+      useAmplitudeDC = false;
+    end
     if ~any(TX(tt).Amplitude(~isnan(TX(tt).Start))) && ...
         TX(tt).ChannelOutput ~= HW.TX(plotSequence.iDevice).ChannelDef
       % channel is probably used for (un-)blanking
@@ -771,11 +790,23 @@ if any(PlotTX)
 
     %  arrays for plotting
     t = ones(size(TX(tt).Start,1),1) * cumsum([0,Seq.tRep(1:end-1)]);
-    TX(tt).tTxPlot = reshape([    t(:).'+TX(tt).Start(:).'; ...
-                                  t(:).'+TX(tt).Start(:).'; ...
-                                  t(:).'+TX(tt).Start(:).'+TX(tt).Duration(:).'; ...
-                                  t(:).'+TX(tt).Start(:).'+TX(tt).Duration(:).'; ...
-                                  ], [size(TX(tt).Start,1)*4, size(TX(tt).Start,2), size(TX(tt).Start,3)])+tRepStart;
+    TX(tt).tTxPlot = reshape([t(:).'+TX(tt).Start(:).'; ...
+                              t(:).'+TX(tt).Start(:).'; ...
+                              t(:).'+TX(tt).Start(:).'+TX(tt).Duration(:).'; ...
+                              t(:).'+TX(tt).Start(:).'+TX(tt).Duration(:).'; ...
+                              ], [size(TX(tt).Start,1)*4, size(TX(tt).Start,2), size(TX(tt).Start,3)])+tRepStart;
+    if useAmplitudeDC
+      isTXidx = isfinite(TX(tt).Amplitude);
+      TX(tt).Amplitude = repmat(TX(tt).AmplitudeDC, size(TX(tt).Amplitude, 1), 1);
+      TX(tt).Phase(:) = 0;
+      TX(tt).Frequency(:) = 0;
+      TX(tt).Amplitude(~isTXidx) = NaN;
+      if all(TX(tt).Amplitude(isTXidx) == 0)
+        % all DC amplitudes are zero, so don't plot a line for it
+        TXLength = TXLength - 1;
+        continue;
+      end
+    end
     TX(tt).AmplitudeTxPlot = (1/HW.TX(plotSequence.iDevice).AmplitudeUnitScale)*reshape([ ...
                                   inf(size(TX(tt).Amplitude(:),1),1).'; ...
                                   TX(tt).Amplitude(:).'; ...
@@ -904,50 +935,76 @@ if any(PlotTX)
     end
 
     % replace or add new lines
-    if mixedTX
-      tagTX = sprintf('plotSeqLineTX%d', tt);
+    if useAmplitudeDC
+      tagTX_str = 'DC';
+      lineStyle = ':';
+      lineWidth = 2.5;
+      absFcn = @(x) x;  % no-op, i.e., allow negative values without "phase"
     else
-      tagTX = sprintf('plotSeqLineTX%d', TX(tt).Channel);
+      tagTX_str = '';
+      lineStyle = '-';
+      lineWidth = 2;
+      absFcn = @abs;
+    end
+    if mixedTX
+      tagTX = sprintf('plotSeqLineTX%d%s', tt, tagTX_str);
+    else
+      tagTX = sprintf('plotSeqLineTX%d%s', TX(tt).Channel, tagTX_str);
     end
     lastLine = min(numLinesReq, numLinesPre);
     set(hLines(numLinesTX+(1:lastLine)), {'XData'}, uniqueTimePre(1:lastLine), ...
-      {'YData'}, cellfun(@abs, uniqueAmpPre(1:lastLine), 'UniformOutput', false), ...
+      {'YData'}, cellfun(absFcn, uniqueAmpPre(1:lastLine), 'UniformOutput', false), ...
       'ZData', [], {'UserData'}, uniqueUserData(1:lastLine), ...
-      'Color', plotSequence.TXColors{tt,1}, 'LineWidth', 2, 'Tag', tagTX);
+      'Color', plotSequence.TXColors{tt,1}, 'LineWidth', lineWidth, 'LineStyle', lineStyle, ...
+      'Tag', tagTX);
     hl = line(uniqueTime(:,lastLine+1:end), ...
-      abs(uniqueAmp(:,lastLine+1:end)), ...
-      'Color', plotSequence.TXColors{tt,1}, 'LineWidth', 2, 'Tag', tagTX, 'Parent', hAxes(nGrads+1));
+      absFcn(uniqueAmp(:,lastLine+1:end)), ...
+      'Color', plotSequence.TXColors{tt,1}, 'LineWidth', lineWidth, 'LineStyle', lineStyle, ...
+      'Tag', tagTX, 'Parent', hAxes(nGrads+1));
     set(hl, {'UserData'}, uniqueUserData(lastLine+1:end));
     currentLineHandles = [hLines(numLinesTX+(1:lastLine)); hl];
-    legendHandles(tt) = currentLineHandles(1);
-    if plotSequence.showTXPhase
+    legendHandles(iTX) = currentLineHandles(1);
+    if plotSequence.showTXPhase && ~useAmplitudeDC
       lastLine2 = min(2*numLinesReq, numLinesPre);
       set(hLines(numLinesTX+(lastLine+1:lastLine2)), {'XData'}, uniqueTimePre(1:(lastLine2-numLinesReq)), ...
         {'YData'}, cellfun(@real, uniqueAmpPre(1:(lastLine2-numLinesReq)), 'UniformOutput', false), ...
         'ZData', [], {'UserData'}, uniqueUserData(1:(lastLine2-numLinesReq)), ...
-        'Color', plotSequence.TXColors{tt,2}, 'LineWidth', 0.5, 'Tag', tagTX);
+        'Color', plotSequence.TXColors{tt,2}, 'LineWidth', 0.5, 'LineStyle', '-', ...
+        'Tag', tagTX);
       hl = line(uniqueTime(:,max(1,lastLine2-numLinesReq+1):end), ...
         real(uniqueAmp(:,max(1,lastLine2-numLinesReq+1):end)), ...
-        'Color', plotSequence.TXColors{tt,2}, 'LineWidth', 0.5, 'Tag', tagTX, 'Parent', hAxes(nGrads+1));
+        'Color', plotSequence.TXColors{tt,2}, 'LineWidth', 0.5, 'LineStyle', '-', ...
+        'Tag', tagTX, 'Parent', hAxes(nGrads+1));
       set(hl, {'UserData'}, uniqueUserData(max(1,lastLine2-numLinesReq+1):end));
       lastLine3 = min(3*numLinesReq, numLinesPre);
       set(hLines(numLinesTX+(lastLine2+1:lastLine3)), {'XData'}, uniqueTimePre(1:(lastLine3-2*numLinesReq)), ...
         {'YData'}, cellfun(@imag, uniqueAmpPre(1:(lastLine3-2*numLinesReq)), 'UniformOutput', false), ...
         'ZData', [], {'UserData'}, uniqueUserData(1:(lastLine3-2*numLinesReq)), ...
-        'Color', plotSequence.TXColors{tt,3}, 'LineWidth', 0.5, 'Tag', tagTX);
+        'Color', plotSequence.TXColors{tt,3}, 'LineWidth', 0.5, 'LineStyle', '-', ...
+        'Tag', tagTX);
       hl = line(uniqueTime(:,max(1,lastLine3-2*numLinesReq+1):end), ...
         imag(uniqueAmp(:,max(1,lastLine3-2*numLinesReq+1):end)), ...
-        'Color', plotSequence.TXColors{tt,3}, 'LineWidth', 0.5, 'Tag', tagTX, 'Parent', hAxes(nGrads+1));
+        'Color', plotSequence.TXColors{tt,3}, 'LineWidth', 0.5, 'LineStyle', '-', ...
+        'Tag', tagTX, 'Parent', hAxes(nGrads+1));
       set(hl, {'UserData'}, uniqueUserData(max(1,lastLine3-2*numLinesReq+1):end));
     end
 
-    legendCell{tt} = ['TX Channel ', num2str(TX(tt).ChannelOutput)];
+    if useAmplitudeDC
+      tagTX_str = ' DC';
+    else
+      tagTX_str = '';
+    end
+    legendCell{iTX} = ['TX Channel ', num2str(TX(tt).ChannelOutput), tagTX_str];
     tempmax = max(tempmax, max(abs(TX(tt).AmpComplexTxPlot(:))));
     tempmin = min(tempmin, min(  min(imag(TX(tt).AmpComplexTxPlot(:))),    min(real(TX(tt).AmpComplexTxPlot(:)))  ));
-    numLinesTX = numLinesTX + (1+2*plotSequence.showTXPhase)*numLinesReq;
+    numLinesTX = numLinesTX + (1+2*(plotSequence.showTXPhase && ~useAmplitudeDC))*numLinesReq;
   end
 
-  if numLinesPre > numLinesTX
+  % Update TXLength in graphics object. Drawing some lines might have been
+  % skipped in the above loop.
+  setappdata(hParent, 'plotSeqTXLength', TXLength);
+
+  if numel(hLines) > numLinesTX
     if ~plotSequence.stackTXRX
       % delete surplus lines
       delete(hLines(numLinesTX+1:end));
@@ -969,21 +1026,31 @@ if any(PlotTX)
 
   % Re-set the axes decorations. They might have been deleted if a pulse program
   % included digital outputs but no rf pulses.
-  AmpMax = HW.TX(plotSequence.iDevice).AmpMax;
-  if (isa(HW.TX, 'PD.TXClass') || isfield(HW.TX, 'CalibrationRfAmp')) && ...
-      isfield(HW.TX(plotSequence.iDevice).CalibrationRfAmp, 'TriScatteredAmp') && ...
-      ~isempty(HW.TX(plotSequence.iDevice).CalibrationRfAmp(HW.TX(plotSequence.iDevice).ChannelDef).TriScatteredAmp)
-    PaUout = linspace(0, max(abs(HW.TX(plotSequence.iDevice).CalibrationRfAmp(HW.TX(plotSequence.iDevice).ChannelDef).OutputAmplitude(:))), 1000);
-    Uout = HW.TX(plotSequence.iDevice).CalibrationRfAmp(HW.TX(plotSequence.iDevice).ChannelDef).TriScatteredAmp(abs(HW.fLarmor)*ones(1,1000), PaUout);
-    AmpMax = PaUout(find(Uout == max(Uout, [], 'omitnan'),1,'first')) * HW.TX(plotSequence.iDevice).PaUout2Amplitude(HW.TX(plotSequence.iDevice).ChannelDef);
+  % collect TX output channels used in pulse program
+  useTX = true(1, numel(TX));
+  for iTX = 1:numel(TX)
+    if ~any(TX(iTX).Amplitude(~isnan(TX(iTX).Start))) && ...
+        TX(iTX).ChannelOutput ~= HW.TX(plotSequence.iDevice).ChannelDef
+      % channel is probably used for (un-)blanking
+      useTX(iTX) = false;
+    end
   end
+  allTXChannels = unique(reshape(cat(1, TX(useTX).Channel), [], 1), 'sorted');
+  % FIXME: This does not work for pulses at fLarmorX.
+  AmpMax = HW.TX(plotSequence.iDevice).Max.AmplitudeCalibrated(allTXChannels);
   if plotSequence.stackTXRX
     TXYLabelString = {[HW.RX(plotSequence.iDevice).fSampleName, ' in ', HW.RX(plotSequence.iDevice).fSampleUnit], ...
       [HW.TX(plotSequence.iDevice).AmplitudeName ' in ' HW.TX(plotSequence.iDevice).AmplitudeUnit], ...
-      sprintf('max(%d) %3.1f %s', HW.TX(plotSequence.iDevice).ChannelDef, AmpMax/HW.TX(plotSequence.iDevice).AmplitudeUnitScale, HW.TX(plotSequence.iDevice).AmplitudeUnit)};
+      sprintf('max(%d) %3.1f %s', allTXChannels(1), AmpMax(1)/HW.TX(plotSequence.iDevice).AmplitudeUnitScale, HW.TX(plotSequence.iDevice).AmplitudeUnit)};
   else
-    TXYLabelString = {[HW.TX(plotSequence.iDevice).AmplitudeName, ' in ', HW.TX(plotSequence.iDevice).AmplitudeUnit], ...
-      sprintf('max(%d) %3.1f %s', HW.TX(plotSequence.iDevice).ChannelDef, AmpMax/HW.TX(plotSequence.iDevice).AmplitudeUnitScale, HW.TX(plotSequence.iDevice).AmplitudeUnit)};
+    TXYLabelString = cell(numel(AmpMax)+1, 1);
+    TXYLabelString{1} = [HW.TX(plotSequence.iDevice).AmplitudeName, ' in ', HW.TX(plotSequence.iDevice).AmplitudeUnit];
+    for iTX = 1:numel(allTXChannels)
+      TXYLabelString{iTX+1} = sprintf('max %3.1f %s (ch %d)', ...
+        AmpMax(iTX)/HW.TX(plotSequence.iDevice).AmplitudeUnitScale, ...
+        HW.TX(plotSequence.iDevice).AmplitudeUnit, ...
+        allTXChannels(iTX));
+    end
   end
   oldTXYLabelString = getappdata(hAxes(nGrads+1), 'plotSeqYLabel');
   setappdata(hAxes(nGrads+1), 'plotSeqYLabel', TXYLabelString);

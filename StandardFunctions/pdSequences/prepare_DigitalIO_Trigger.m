@@ -53,7 +53,7 @@ function [HW, Seq, AQ, TX, Grad] = prepare_DigitalIO_Trigger(HW, Seq, AQ, TX, Gr
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2022-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2022-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -127,14 +127,14 @@ end
 [DigiOutTrigger(1:numTriggers).SetTime] = deal(NaN(1+any(~Seq.triggerSettings.keepOn), size(Seq.tRep,2)));
 [DigiOutTrigger(1:numTriggers).SetValue] = deal(NaN(size(DigiOutTrigger(1).SetTime)));
 for iTrigger = 1:numTriggers
-  if Seq.triggerSettings.keepOn
+  if Seq.triggerSettings.keepOn(iTrigger)
     if ~isemptyfield(Seq, {'AQSlice', 'EPIFactor'})  ... % Check for a field that doesn't exist for Spin Echo measurements.
         || Seq.triggerSettings.alwaysOn(iTrigger)
       % For FLASH or alwaysOn
       % keep trigger on during entire pulse program
       DigiOutTrigger(iTrigger).SetTime(1,1) = Seq.triggerSettings.onTime(iTrigger) + Seq.triggerSettings.referenceTime(iTrigger);
       DigiOutTrigger(iTrigger).SetValue(1,1) = 2^(Seq.triggerSettings.digiOutChannel(iTrigger)-1);
-      if isscalar(Seq.triggerSettings.UseAtRepetitionTime)
+      if isscalar(Seq.triggerSettings.UseAtRepetitionTime) && ~Seq.triggerSettings.keepOn(iTrigger)
         DigiOutTrigger(iTrigger).SetTime(2,1) = Seq.triggerSettings.offTime(iTrigger);
         DigiOutTrigger(iTrigger).SetValue(2,1) = 0;
       else
@@ -146,7 +146,7 @@ for iTrigger = 1:numTriggers
       % switch on before echo trains
       DigiOutTrigger(iTrigger).SetTime(1,Seq.triggerSettings.UseAtRepetitionTime) = Seq.triggerSettings.onTime(iTrigger) + Seq.triggerSettings.referenceTime(iTrigger);
       DigiOutTrigger(iTrigger).SetValue(1,Seq.triggerSettings.UseAtRepetitionTime) = 2^(Seq.triggerSettings.digiOutChannel(iTrigger)-1);
-      if isscalar(Seq.triggerSettings.UseAtRepetitionTime)
+      if isscalar(Seq.triggerSettings.UseAtRepetitionTime) && ~Seq.triggerSettings.keepOn(iTrigger)
         % switch off after echo trains
         DigiOutTrigger(iTrigger).SetTime(2,Seq.triggerSettings.UseAtRepetitionTime) = Seq.triggerSettings.offTime(iTrigger);
         DigiOutTrigger(iTrigger).SetValue(2,Seq.triggerSettings.UseAtRepetitionTime) = 0;

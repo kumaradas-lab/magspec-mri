@@ -4,7 +4,7 @@ classdef DummyMyRX < handle
 %   this = PD.DummyMyRX(talker)
 %
 % ----------------------------------------------------------------------------
-% (C) Copyright 2016-2019 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2016-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ----------------------------------------------------------------------------
 

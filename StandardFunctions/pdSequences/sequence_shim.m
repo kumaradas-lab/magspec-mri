@@ -124,7 +124,7 @@ function shimopt = sequence_shim(HW, Seq)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %-------------------------------------------------------------------------------
 
@@ -228,7 +228,7 @@ if HW.Grad(Seq.SliceSelect.iDevice).HoldShim || (Seq.RepetitionTime <= 2)
   Seq.CLTime = SeqOut.CLTime*0 + 10e-6;
   % Seq.tOffset = HW.Grad(Seq.SliceSelect.iDevice).tEC + HW.Grad(Seq.SliceSelect.iDevice).tRamp;
   Seq.Reinitialize = false;
-  Seq.IgnoreTimingError = false;
+  Seq.IgnoreTimingError = [];
   Seq.plotSeq = [];
   if Seq.use_nEchos_Frequency == 1
     iAQ = find([SeqOut.AQ(:).Device] == Seq.SliceSelect.iDevice, 1, 'first');  % FIXME: Support multi-channel?
@@ -340,6 +340,7 @@ end
 opt_maxtomeanEcho('reset');
 MagnetShimOld = HW.MagnetShim;
 fLarmorOld = HW.fLarmor;
+abort_guard = PD.UnwindProtectGuard(@() AbortMeasurement(HW));
 % optimization using fminsearch
 if Seq.useFminsearch
   warning('on', 'PD:OpenMatlab:UseFindFrequency');
@@ -373,6 +374,7 @@ else
   end
   shimopt = Seq.ShimStart;
 end
+abort_guard.isUnwindProtect = false;
 
 if Seq.use_nEchos_Frequency == 1
   clear global fOffsetFIDw

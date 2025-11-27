@@ -2,7 +2,7 @@ function [Network, SeqOut, NetworkCalSave] = sequence_Network(HW, Seq, dataRaw)
 %% Acquire Reflection on TRx Channel
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2013-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2013-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 

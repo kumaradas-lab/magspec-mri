@@ -101,7 +101,7 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %             pulses and the acquisition windows is adapted such that the Echo
 %             time is an integer multiple of its period. This should only be
 %             used in conjunction with slice selection. (Default: false)
-%             The acutally used frequency is returned in SeqOut.fLarmor.
+%             The actually used frequency is returned in SeqOut.fLarmor.
 %             See also "get_fLarmorFitTotEcho".
 %     SteadyState_PreShots180
 %             Number of Echoes without acquisition window at beginning of each
@@ -310,6 +310,53 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %     Slice.nRamp
 %             Number of steps in ramp. (default: 1)
 %
+%     AVERAGING SETTINGS:
+%     SeqAverage
+%             Structure with the following (optional) fields:
+%       average
+%               Number of times that the measurement for each preparation time
+%               is repeated. (default: 1)
+%       averageBreak
+%               Additional time in seconds after the block with a given
+%               preparation time was measured. (default: 0)
+%       SaveSeqAverageData
+%               Boolean value to indicate whether to sace data of all averages.
+%               (default: true)
+%       TXPhasePrepareIncrement
+%               Phase increment in degrees of preparation pulses (inversion or
+%               saturation). (default: [0, 0, 180, 0] if Seq.SeqAverage.average
+%               is a multiple of 4, 0 otherwise)
+%       TXPhaseExcitationIncrement
+%               Phase increment of excitation pulses (of CPMG) from one average
+%               to the next. (default: 180 for phase cycling)
+%       TXPhaseRefocusIncrement
+%               Phase increment of refocusing pulses (of CPMG) from one average
+%               to the next. (default: 0)
+%       AQPhaseIncrement
+%               Phase increment of acquisitions (at echoes of CPMG) from one
+%               average to the next.
+%               (default: Seq.SeqAverage.TXPhaseExcitationIncrement)
+%       RandomTXRXPhaseOffset
+%               Boolean value to indicate whether a random phase should be added
+%               to all rf pulses and acquisitions from one average to the next.
+%               (default: false)
+%       TXPhasePrepareOffset
+%               Additional phase offset of preparation pulses in degrees.
+%               (default: 0)
+%       TXPhaseExcitationOffset
+%               Additional phase offset of excitation pulses (of CPMG) in
+%               degrees. (default: 0)
+%       TXPhaseRefocusOffset
+%               Additional phase offset of refocusing pulses (of CPMG) in
+%               degrees. (default: 0)
+%       AQPhaseOffset
+%               Additional phase offset of acquisitions (at echoes of CPMG) in
+%               degrees. (default: 0)
+%       GetDataAfterAverages
+%               Collect the data that has been acquired so far immediately after
+%               the averages for a given preparation time are done.
+%
+%
 %     SAMPLE LIFT SETTINGS:
 %     Lift
 %             Structure with settings for a sample lift.
@@ -422,7 +469,7 @@ function [data, SeqOut, mySave] = sequence_RecoveryCPMG(HW, Seq, mySave)
 %           structure with updated fields
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012,2015-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012,2015-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -814,10 +861,12 @@ if Seq.PreProcessSequence
 
   if HW.Grad(iDevice).Inductance(HW.Grad(iDevice).Slice.channel) == 0 && ...
       Seq.Slice.nRamp > 1
-    warning('PD:RecoveryCPMG:ZeroInductance', ...
-      ['Number of segments for gradient ramps is >1 (%d). ', ...
-      'But the inductance of the used gradient channel is 0. ', ...
-      'Using a linear ramp with a single segment.'], Seq.Slice.nRamp);
+    if ~isinf(Seq.thicknessSlice)
+      warning('PD:RecoveryCPMG:ZeroInductance', ...
+        ['Number of segments for gradient ramps is >1 (%d). ', ...
+        'But the inductance of the used gradient channel is 0. ', ...
+        'Using a linear ramp with a single segment.'], Seq.Slice.nRamp);
+    end
     Seq.Slice.nRamp = 1;
   end
 
@@ -934,7 +983,7 @@ if Seq.PreProcessSequence
   end
   if isemptyfield(Seq.SeqAverage, 'AQPhaseIncrement')
     % phase increment between averages of acquisition window at Echoes
-    Seq.SeqAverage.AQPhaseIncrement = 180;
+    Seq.SeqAverage.AQPhaseIncrement = Seq.SeqAverage.TXPhaseExcitationIncrement;
   end
   if isemptyfield(Seq.SeqAverage, 'RandomTXRXPhaseOffset')
     % Boolean: randomize TX pulse and acquisition phase (why?)
@@ -967,6 +1016,12 @@ if Seq.PreProcessSequence
       Seq.SeqAverage.AQPhaseOffset = repmat(Seq.SeqAverage.AQPhaseOffset, 1, Seq.SeqAverage.average/numel(Seq.SeqAverage.AQPhaseOffset));
     end
   end
+
+  if isemptyfield(Seq.SeqAverage, 'GetDataAfterAverages')
+    % collect data before starting the next preparation time
+    Seq.SeqAverage.GetDataAfterAverages = false;
+  end
+
   if isemptyfield(Seq, 'ResetDDSPhaseAtExcitation')
     % reset phase of transmission and acquisition at excitation pulse
     % (i.e. after preparation pulse)
@@ -977,6 +1032,7 @@ if Seq.PreProcessSequence
   % preliminary layout: [actions x CPMG x nTau1]
   Seq.tRep = repmat([zeros(1,Seq.nTau1>0), Seq.tEcho/2, repmat(Seq.tEcho,1,Seq.nEcho), Seq.tRelax], [1, 1, max(1,Seq.nTau1)+Seq.nTau1SteadyState]) + ...
     reshape([Seq.Tau1All(:).'+Seq.tShiftPreparation; zeros(1+Seq.nEcho+1, max(1,Seq.nTau1) + Seq.nTau1SteadyState)], [1, (Seq.nEcho+2+(Seq.nTau1>0)), (max(1,Seq.nTau1)+Seq.nTau1SteadyState)]);
+  tRepsPerCMPG = size(Seq.tRep, 2);
   Seq.tOffset = zeros(size(Seq.tRep));
 
   [Grad(1:HW.Grad(iDevice).n).Time] = deal(NaN);
@@ -1712,7 +1768,7 @@ if Seq.PreProcessSequence
     size(AQ.Start, 1), []);
 
   for t = 1:HW.Grad(iDevice).n
-    if numel(Grad(t).Time) ~= 1
+    if ~isscalar(Grad(t).Time)
       if size(Grad(t).Time, 2) == 1, Grad(t).Time = repmat(Grad(t).Time(:,1), 1, size(Seq.tRep,2)); end
       if size(Grad(t).Amp, 2) == 1,  Grad(t).Amp  = repmat(Grad(t).Amp(:,1),  1, size(Seq.tRep,2)); end
 
@@ -1771,6 +1827,11 @@ if Seq.PreProcessSequence
   if Seq.GetDataEarly
     % also consider measurements without any echoes (only FID)
     AQ.GetData(end-(Seq.nEcho > 1)) = 1;
+  end
+  if Seq.SeqAverage.GetDataAfterAverages
+    % Mark the last acquisition of the last echo train that belongs to the same
+    % preparation time.
+    AQ.GetData(tRepsPerCMPG*(Seq.nTau1SteadyState+Seq.SeqAverage.average)-1:tRepsPerCMPG*Seq.SeqAverage.average:end) = 1;
   end
 
 
@@ -2122,28 +2183,41 @@ if SeqOut.PostProcessSequenceLocal
           SeqOut.fitExpCorr);
         data(iAQ).MeanEchoTau1PhaseCorrection(1,iTau1) = T2_corr.dataPhaseCorrection;
         % reverse correction
-        data(iAQ).MeanEchoTau1PhaseCorrected(:,iTau1) = T2_corr.dataPhaseCorrected * exp(1i*T2_corr.dataPhaseCorrection);
-        data(iAQ).MeanEchoTau1PhaseCorrectedTime(:,iTau1) = T2_corr.timeCorrected;
+        if iTau1 > 1 && all(isnan(T2_corr.dataPhaseCorrected))
+          % All data returned by fit_exp could be none if the postprocessing is
+          % done before all tau1 steps have been completed. Set the collected
+          % data to NaN in that case (irrespective of the dimensions).
+          data(iAQ).MeanEchoTau1PhaseCorrected(:,iTau1) = NaN;
+          data(iAQ).MeanEchoTau1PhaseCorrectedTime(:,iTau1) = NaN;
+        else
+          data(iAQ).MeanEchoTau1PhaseCorrected(:,iTau1) = T2_corr.dataPhaseCorrected * exp(1i*T2_corr.dataPhaseCorrection);
+          data(iAQ).MeanEchoTau1PhaseCorrectedTime(:,iTau1) = T2_corr.timeCorrected;
+        end
       end
 
       % apply average phase correction
       % data.MeanEchoTau1PhaseCorrected = data.MeanEchoTau1PhaseCorrected * exp(-1i * mean(unwrap(2*data.MeanEchoTau1PhaseCorrection)/2)); % Fixme *2 /2
       % data.MeanEchoTau1PhaseCorrected = data.MeanEchoTau1PhaseCorrected * exp(-1i * mean(unwrap(data.MeanEchoTau1PhaseCorrection)));
       if strcmp(Seq.Recovery, 'Decay')
-        % saturation or inversion
+        % decay
         % use phase of echo train with shortest preparation time as reference for all
         data(iAQ).MeanEchoTau1PhaseCorrected = data(iAQ).MeanEchoTau1PhaseCorrected * exp(-1i * data(iAQ).MeanEchoTau1PhaseCorrection(1,1)); % apply relaxed phase correction
         if real(mean(data(iAQ).MeanEchoTau1PhaseCorrected(1:max(1,floor(end/4)),1))) < 0
           % assume that there is signal at first Tau1
           data(iAQ).MeanEchoTau1PhaseCorrected = -data(iAQ).MeanEchoTau1PhaseCorrected;
+          data(iAQ).MeanEchoTau1PhaseCorrection(1,:) = ...
+            data(iAQ).MeanEchoTau1PhaseCorrection(1,:) + pi;
         end
       else
         % saturation or inversion
         % use phase of echo train with longest preparation time as reference for all
-        data(iAQ).MeanEchoTau1PhaseCorrected = data(iAQ).MeanEchoTau1PhaseCorrected * exp(-1i * data(iAQ).MeanEchoTau1PhaseCorrection(1,iTau1)); % apply relaxed phase correction
+        iRefPhase = min(iTau1, find(~isnan(data(iAQ).MeanEchoTau1PhaseCorrection), 1, 'last'));
+        data(iAQ).MeanEchoTau1PhaseCorrected = data(iAQ).MeanEchoTau1PhaseCorrected * exp(-1i * data(iAQ).MeanEchoTau1PhaseCorrection(1,iRefPhase)); % apply relaxed phase correction
         if real(mean(data(iAQ).MeanEchoTau1PhaseCorrected(1:max(1,floor(end/4)),end))) < 0
           % assume that last Tau1 is relaxed
           data(iAQ).MeanEchoTau1PhaseCorrected = -data(iAQ).MeanEchoTau1PhaseCorrected;
+          data(iAQ).MeanEchoTau1PhaseCorrection(1,:) = ...
+            data(iAQ).MeanEchoTau1PhaseCorrection(1,:) + pi;
         end
       end
     elseif SeqOut.nTau1 > 1
@@ -2329,7 +2403,7 @@ if SeqOut.PostProcessSequenceLocal
         clf(fh)
         set(fh, 'Name', 'T2 Fit');
         ax(1) = axes('Parent', fh);
-        hold(ax(1), 'all');
+        hold(ax(1), 'on');
       end
       if isemptyfield(SeqOut.fitExpT2, 'omitFirstnEchoes')
         SeqOut.fitExpT2.omitFirstnEchoes = SeqOut.fitExpCorr.omitFirstnEchoes;

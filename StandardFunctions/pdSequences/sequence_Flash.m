@@ -102,10 +102,11 @@ function [SeqLoop, mySave] = sequence_Flash(HW, Seq, AQ, TX, Grad, mySave)
 %               necessary, this offset is extented to acommodate for the
 %               excitation pulse (+ dead time) or the slice rephase
 %               gradient (+ eddy current time CorrectPhaseAQtEC). (Default: 0)
-% 
+%
 %       CorrectPhaseAQtEC
-%               eddy current time between the slice rephase and start of the
-%               acquisition window for Seq.CorrectPhase in seconds.
+%               Eddy current time between the end of the slice rephase gradient
+%               and start of the acquisition window for Seq.CorrectPhase in
+%               seconds. (Default: HW.Grad.tEC)
 %
 %       CorrectPhaseNRead
 %               Number of samples taken at the acquisition window used for
@@ -122,6 +123,20 @@ function [SeqLoop, mySave] = sequence_Flash(HW, Seq, AQ, TX, Grad, mySave)
 %               frequency tracking is inserted after each CorrectPhaseBlockSize
 %               excitations with image encoding.
 %               (Default: 4 if Seq.CorrectPhaseSeparate, 0 otherwise)
+%
+%       CorrectPhaseFrequencyGamma
+%               Gyromagnetic ratio in rad/s/T used to calculate the frequency
+%               that is used for the correction of a potential frequency drift.
+%               See Seq.CorrectPhase. If the set gyromagnetic ratio differs from
+%               HW.GammaDef, a dual-frequency rf pulse is used for the
+%               excitation pulse. (Default: HW.GammaDef)
+%
+%       CorrectPhaseFlipAngle
+%               Flip angle in degrees of the rf pulse that is used for frequency
+%               tracking. This only applies if the frequency used for frequency
+%               tracking differs from the frequency used for image acquisition
+%               (i.e., if Seq.CorrectPhaseFrequencyGamma does not equal
+%               HW.GammaDef). (Default: 90)
 %
 %       CorrectSliceRephase
 %               Boolean value. If true, a correction measurement is taken
@@ -149,12 +164,24 @@ function [SeqLoop, mySave] = sequence_Flash(HW, Seq, AQ, TX, Grad, mySave)
 %               the cell array.
 %               (Default: [])
 %
+%       Function_Find_Frequency
+%               A function handle to a function that adjusts the frequency
+%               with the following signature:
+%                     [HW, mySave] = @(HW, mySave, minTime)
+%               It is executed at the start of every loop if the duration set
+%               with Seq.Find_Frequency_interval is exceeded since the last time
+%               the frequency was adjusted.
+%               This could be set, e.g., to @Find_Frequency_Sweep or
+%               Find_Frequency_FID.
+%               (Default: @Find_Frequency_Sweep)
+%
 %       plotSeqAQ
 %               Plot the pulse program wrapped after each gradient echo (train)
 %               and zoomed in to a reasonable region. The value selects the
 %               gradient channels for which the pulse program is plotted. This
 %               overrides the settings for Seq.plotSeq (see set_sequence).
 %               (Default: [])
+%
 %       plotZTEEndPoints
 %               Plot graphics illustrating the end points of the acquired rays
 %               in k-space for ZTE measurements. (Default: false)
@@ -328,6 +355,12 @@ function [SeqLoop, mySave] = sequence_Flash(HW, Seq, AQ, TX, Grad, mySave)
 %                   rotation). "alfa" corresponds to a rotation around the
 %                   z''-axis (the prior z-axis after the previous rotations). By
 %                   default "alfa" rotated inside the plane of a 2d image.
+%
+%           nImagesSlice
+%                   Number of images that are acquired with separate excitation
+%                   pulse. For this, each line in k-space is acquired multiple
+%                   times immediately following each other.
+%                   (Default: 1)
 %
 %           nImages
 %                   scalar integer with number of images for each excitation
@@ -599,7 +632,7 @@ function [SeqLoop, mySave] = sequence_Flash(HW, Seq, AQ, TX, Grad, mySave)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2013-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2013-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 %-------------------------------------------------------------------------------
 %
@@ -773,6 +806,13 @@ if Seq.tEcho == 0
 else
   isZTE = false;
 end
+
+if isemptyfield(Seq, 'Function_Find_Frequency')
+  % function handle for frequency adjustments, e.g, between loops
+  Seq.Function_Find_Frequency = @Find_Frequency_Sweep;
+end
+
+
 if isemptyfield(Seq, 'CorrectPhase')
   % use (un-encoded) acquisitions to track magnet frequency
   Seq.CorrectPhase = 1;
@@ -796,6 +836,10 @@ Seq = set_EmptyField(Seq, 'CorrectPhaseDuration', 0.5e-3);
 Seq = set_EmptyField(Seq, 'CorrectPhaseAQtOffset', 0);
 Seq = set_EmptyField(Seq, 'CorrectPhaseAQtEC', HW.Grad(Seq.AQSlice(1).iDevice).tEC);
 Seq = set_EmptyField(Seq, 'CorrectPhaseNRead', 16);
+if isemptyfield(Seq, 'CorrectPhaseFrequencyGamma')
+  Seq.CorrectPhaseFrequencyGamma = HW.GammaDef;
+end
+
 Seq = set_EmptyField(Seq, 'CorrectSliceRephase', 0);
 Seq = set_EmptyField(Seq, 'CorrectReadRephase', 0);
 Seq = set_EmptyField(Seq, 'CorrectPlotFrequency', 0);
@@ -815,7 +859,18 @@ if isemptyfield(Seq.AQSlice(1), 'LengthUnitScale'), Seq.AQSlice(1).LengthUnitSca
 if isemptyfield(Seq.AQSlice(1), 'ReadCoordinate'), Seq.AQSlice(1).ReadCoordinate = 3; end
 if isemptyfield(Seq.AQSlice(1), 'PhaseCoordinate'), Seq.AQSlice(1).PhaseCoordinate = [1 2 3]; end
 if isemptyfield(Seq.AQSlice(1), 'SliceCoordinate'), Seq.AQSlice(1).SliceCoordinate = 1; end
-if isemptyfield(Seq.AQSlice(1), 'plotImageHandle'), Seq.AQSlice(1).plotImageHandle = 110; end
+if isemptyfield(Seq.AQSlice(1), 'plotImageHandle')
+  if ~isemptyfield(Seq.AQSlice(1), 'plotImage') ...
+      && ((isnumeric(Seq.AQSlice(1).plotImage) && Seq.AQSlice(1).plotImage ~= 1) ...  % numeric "figure handle"
+          || ((ishghandle(Seq.AQSlice(1).plotImage, 'figure') ...
+               || ishghandle(Seq.AQSlice(1).plotImage, 'uipanel')) ...
+              && isvalid(Seq.AQSlice(1).plotImage)))  % valid handle for an axes parent
+    % if appropriate, use the value of Seq.AQSlice(1).plotImage
+    Seq.AQSlice(1).plotImageHandle = Seq.AQSlice(1).plotImage;
+  else
+    Seq.AQSlice(1).plotImageHandle = 110;
+  end
+end
 if isemptyfield(Seq.AQSlice(1), 'UseAQWindow'), Seq.AQSlice(1).UseAQWindow = 1; end
 if isemptyfield(Seq.AQSlice(1), 'SliceGradTimeIntegralRephaseOffset'), Seq.AQSlice(1).SliceGradTimeIntegralRephaseOffset = 0; end
 if isemptyfield(Seq.AQSlice(1), 'ReadGradTimeIntegralOffset'), Seq.AQSlice(1).ReadGradTimeIntegralOffset = 0; end
@@ -848,6 +903,8 @@ if isemptyfield(Seq.CorrectB0Read, 'Get'), Seq.CorrectB0Read.Get = Seq.CorrectB0
 if isemptyfield(Seq.CorrectB0Read, 'Plot'), Seq.CorrectB0Read.Plot = false; end
 % echo time increment for second measurement in s
 if isemptyfield(Seq.CorrectB0Read, 'tEchoIncr'), Seq.CorrectB0Read.tEchoIncr = 1e-3; end
+% unwrap phase
+if isemptyfield(Seq.CorrectB0Read, 'unwrap'), Seq.CorrectB0Read.unwrap = true; end
 % maximum frequency offset of B0 map in Hz
 if isemptyfield(Seq.CorrectB0Read, 'MaxFreqOffset'), Seq.CorrectB0Read.MaxFreqOffset = 2000; end
 % minimum amplitude relative to maximum amplitude
@@ -1001,7 +1058,7 @@ else
   if Seq.AQSlice(1).nPhase(1)==0
     Seq.AQSlice(1).nPhase(1) = 1;
   end
-  if numel(Seq.AQSlice(1).nPhase)==1 || Seq.AQSlice(1).nPhase(2)==0
+  if isscalar(Seq.AQSlice(1).nPhase) || Seq.AQSlice(1).nPhase(2)==0
     Seq.AQSlice(1).nPhase(2) = 1;
   end
   if numel(Seq.AQSlice(1).nPhase)==2 || Seq.AQSlice(1).nPhase(3)==0
@@ -1020,7 +1077,7 @@ else
   if Seq.AQSlice(1).PhaseOS(1)==0
     Seq.AQSlice(1).PhaseOS(1) = 1;
   end
-  if numel(Seq.AQSlice(1).PhaseOS)==1 || Seq.AQSlice(1).PhaseOS(2)==0
+  if isscalar(Seq.AQSlice(1).PhaseOS) || Seq.AQSlice(1).PhaseOS(2)==0
     Seq.AQSlice(1).PhaseOS(2) = 1;
   end
   if numel(Seq.AQSlice(1).PhaseOS)==2 || Seq.AQSlice(1).PhaseOS(3)==0
@@ -1060,6 +1117,13 @@ end
 if Seq.AQSlice(1).nImages ~= round(Seq.AQSlice(1).nImages) || Seq.AQSlice(1).nImages < 1
   error('PD:sequence_Flash:NonIntegerImages', ...
     'Seq.AQSlice.nImages must be a positive integer.');
+end
+if isemptyfield(Seq.AQSlice(1), 'nImagesSlice')
+  Seq.AQSlice(1).nImagesSlice = 1;
+end
+if Seq.AQSlice(1).nImagesSlice ~= round(Seq.AQSlice(1).nImagesSlice) || Seq.AQSlice(1).nImagesSlice < 1
+  error('PD:sequence_Flash:NonIntegerImages', ...
+    'Seq.AQSlice.nImagesSlice must be a positive integer.');
 end
 
 % EPI factor and segments
@@ -1127,10 +1191,14 @@ if isemptyfield(Seq.AQSlice(1), 'oddEvenEchoes')
 end
 Seq.AQSlice(1).oddEvenEchoes = Seq.AQSlice(1).oddEvenEchoes > 0;
 
-
-if isemptyfield(Seq.AQSlice(1), 'kLineOrderType'), Seq.AQSlice(1).kLineOrderType = 'increasing';  end
 if isemptyfield(Seq.AQSlice(1), 'kLineOrder')
-  switch lower(Seq.AQSlice(1).kLineOrderType)
+  if isemptyfield(Seq.AQSlice(1), 'kLineOrderType')
+    Seq.AQSlice(1).kLineOrderType = 'increasing';
+  end
+  % FIXME: If an identifier is longer than 'MinToMaxEncoding', this might fail.
+  %        Maybe, use a if-elseif-else-ladder with additional checks if
+  %        applicable.
+  switch lower(Seq.AQSlice(1).kLineOrderType(1,1:min(numel(Seq.AQSlice(1).kLineOrderType),numel('MinToMaxEncoding'))))
     case 'increasing'
       Seq.AQSlice(1).kLineOrder = 1:numKLines;
 
@@ -1140,6 +1208,22 @@ if isemptyfield(Seq.AQSlice(1), 'kLineOrder')
       kLineOrder2 = reshape((cumsum((0:nKLinesPhase(2)-1) .* (-1).^(0:nKLinesPhase(2)-1)) + floor(nKLinesPhase(2)/2))*numel(kLineOrder1), 1,[],1);
       kLineOrder3 = reshape((cumsum((0:nKLinesPhase(3)-1) .* (-1).^(0:nKLinesPhase(3)-1)) + floor(nKLinesPhase(3)/2))*numel(kLineOrder1)*numel(kLineOrder2), 1,1,[]);
       Seq.AQSlice(1).kLineOrder = reshape(bsxfun(@plus, bsxfun(@plus, kLineOrder1, kLineOrder2), kLineOrder3), 1,[]);
+
+    case lower('MinToMaxEncoding')
+      % FIXME: Maybe use ndgrid and apply random jitter to each k-space
+      %        direction separately.
+      r=sqrt(...
+        bsxfun(@plus, permute(get_FFTGrid(Seq.AQSlice(1).nPhase(1)/Seq.AQSlice(1).sizePhase(1),Seq.AQSlice(1).nPhase(1) .* Seq.AQSlice(1).PhaseOS(1)),[1,2,3]).^2,...
+        bsxfun(@plus, permute(get_FFTGrid(Seq.AQSlice(1).nPhase(2)/Seq.AQSlice(1).sizePhase(2),Seq.AQSlice(1).nPhase(2) .* Seq.AQSlice(1).PhaseOS(2)),[3,1,2]).^2,...
+        permute(get_FFTGrid(Seq.AQSlice(1).nPhase(3)/Seq.AQSlice(1).sizePhase(3),Seq.AQSlice(1).nPhase(3) .* Seq.AQSlice(1).PhaseOS(3)),[2,3,1]).^2)));
+
+      if strncmpi(Seq.AQSlice(1).kLineOrderType,'MinToMaxEncodingRandn',numel('MinToMaxEncodingRandn'))
+        s=str2double(Seq.AQSlice(1).kLineOrderType(numel('MinToMaxEncodingRandn')+1:end)); % can add a number behind MinToMaxEncodingRandn e.g.: MinToMaxEncodingRandn0.1
+        if ~isscalar(s) || isnan(s) || s<0 || s>1e12; s=1;end
+        encodeStepSize=Seq.AQSlice(1).nPhase./Seq.AQSlice(1).sizePhase./(Seq.AQSlice(1).nPhase .* Seq.AQSlice(1).PhaseOS);
+        r=r+randn(size(r))*sqrt(sum(encodeStepSize.^2))*s;
+      end
+      [~,Seq.AQSlice(1).kLineOrder]=sort(reshape(r, 1,[]));
 
     case 'decreasing'
       Seq.AQSlice(1).kLineOrder = numKLines:-1:1;
@@ -1154,7 +1238,9 @@ if isemptyfield(Seq.AQSlice(1), 'kLineOrder')
   end
 else
   Seq.AQSlice(1).kLineOrder = unique(reshape(Seq.AQSlice(1).kLineOrder, 1, []), 'stable');
-  Seq.AQSlice(1).kLineOrderType = 'manual';
+  if isemptyfield(Seq.AQSlice(1), 'kLineOrderType')
+    Seq.AQSlice(1).kLineOrderType = 'manual';
+  end
   if numel(Seq.AQSlice(1).kLineOrder) > numKLines || ...
       ~isreal(Seq.AQSlice(1).kLineOrder) || ...
       any(Seq.AQSlice(1).kLineOrder < 1) || any(Seq.AQSlice(1).kLineOrder > numKLines) || ...
@@ -1242,14 +1328,21 @@ if (Seq.AQSlice(1).EPIFactor > 1 || Seq.AQSlice(1).nImages > 1) && ...
     'Echo time (spacing) is too short for selected EPI echo spacing and EPI factor.');
 end
 
-if isemptyfield(Seq, 'T1'), Seq.T1 = 100e-3; end
-if isemptyfield(Seq, 'FlipAngle'), Seq.FlipAngle = acosd(exp(-Seq.RepetitionTime/Seq.T1)); end
+if isemptyfield(Seq, 'T1')
+  Seq.T1 = 100e-3;
+end
+if isemptyfield(Seq, 'FlipAngle')
+  Seq.FlipAngle = acosd(exp(-Seq.RepetitionTime/Seq.T1));
+end
+if isemptyfield(Seq, 'CorrectPhaseFlipAngle')
+  Seq.CorrectPhaseFlipAngle = Seq.FlipAngle;
+end
 
-if ~isfield(Seq.AQSlice(1), 'SpoilFactor') || isempty(Seq.AQSlice(1).SpoilFactor);
+if isemptyfield(Seq.AQSlice(1), 'SpoilFactor')
   if Seq.AQSlice(1).nRead > 1
-    Seq.AQSlice(1).SpoilFactor = [0, 0, Inf]; % Spoil read direction
+    Seq.AQSlice(1).SpoilFactor = [0, 0, Inf];  % Spoil read direction
   else
-    Seq.AQSlice(1).SpoilFactor = [1, 1, 1]; % Spoil all phase directions
+    Seq.AQSlice(1).SpoilFactor = [1, 1, 1];  % Spoil all phase directions
   end
   if Seq.AQSlice(1).nPhase(1)==1 && Seq.AQSlice(1).thickness<1000
     Seq.AQSlice(1).SpoilFactor(1) = 8;
@@ -1257,7 +1350,7 @@ if ~isfield(Seq.AQSlice(1), 'SpoilFactor') || isempty(Seq.AQSlice(1).SpoilFactor
 end
 if ~isZTE
   % FIXME: Spoilers for ZTE?
-  if isemptyfield(Seq.AQSlice(1), 'sizePhaseSpoil'),
+  if isemptyfield(Seq.AQSlice(1), 'sizePhaseSpoil')
     if Seq.AQSlice(1).nRead > 1
       % Spoil read direction
       Seq.AQSlice(1).sizePhaseSpoil = ...
@@ -1344,7 +1437,7 @@ if ~isempty(Seq.plotSeqAQ)
       Seq.plotSeqStart = Seq.SteadyState_PreShots + 1;
     end
     if isemptyfield(Seq, 'plotSeqEnd')
-      Seq.plotSeqEnd = Seq.plotSeqStart + Seq.AQSlice(1).EPISegments ...
+      Seq.plotSeqEnd = Seq.plotSeqStart + Seq.AQSlice(1).EPISegments * Seq.AQSlice(1).nImagesSlice ...
         + nCorrectPhaseSeparate - 1;
     end
   else
@@ -1356,6 +1449,7 @@ if ~isempty(Seq.plotSeqAQ)
     if isemptyfield(Seq, 'plotSeqEnd')
       Seq.plotSeqEnd = Seq.plotSeqStart ...
         + (Seq.AQSlice(1).EPISegments + nCorrectPhaseSeparate) ...
+          * Seq.AQSlice(1).nImagesSlice ...
           * (Seq.AQSlice(1).EPIFactor * (Seq.AQSlice(1).oddEvenEchoes+1) * Seq.AQSlice(1).nImages + 1) ...
         - 1;
     end
@@ -1370,12 +1464,13 @@ if ~isempty(Seq.plotSeqAQ)
       Seq.plotSequence.xLim = [-Inf, 2/Seq.AQSlice(1).HzPerPixMin];
     else
       Seq.plotSequence.xLim = [-Inf, ...
-        (min([Seq.tEcho(end) ...
+        (min([Seq.RepetitionTime*(Seq.AQSlice(1).nImagesSlice-1) ...
+                + Seq.tEcho(end) ...
                 + (Seq.AQSlice(1).EPIEchoSpacing + Seq.tEcho(1)*(Seq.AQSlice(1).EPIEchoSpacing==0)) * ...
                   ((floor(Seq.AQSlice(1).EPIFactor/2) + 1) ...
                    + Seq.AQSlice(1).SpoilLengthFactor - Seq.AQSlice(1).DephaseLengthFactor) ...
                 + Seq.AQSlice(1).SpoilTimeOffset, ...
-              Seq.RepetitionTime]))];
+              Seq.RepetitionTime*Seq.AQSlice(1).nImagesSlice]))];
     end
   end
 end
@@ -1632,24 +1727,24 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
   end
   % assign number (in phase increment order) to each k-line that will be
   % acquired in this experiment and break dimensions such that
-  % oddEven x nImages x EPI segments x EPI factor
-  kLinesDim = reshape(1:numImages*numKLines, ...
+  % oddEven x nImages x nImagesSlice x EPI segments x EPI factor
+  kLinesDim = reshape(1:numImages*Seq.AQSlice(1).nImagesSlice*numKLines, ...
     Seq.AQSlice(1).oddEvenEchoes+1, Seq.AQSlice(1).nImages, ...
-    [], Seq.AQSlice(1).EPIFactor);
+    Seq.AQSlice(1).nImagesSlice, [], Seq.AQSlice(1).EPIFactor);
   if any(strcmp(Seq.LoopName{Seq.LoopNameCount}, {'normal', 'B0map_tEcho1', 'B0map_tEcho2'}))
     % reshape such that EPI segments and EPI trains share the same dimension
     kLinesDimTemp = reshape(kLinesDim, ...
-      (Seq.AQSlice(1).oddEvenEchoes+1), Seq.AQSlice(1).nImages, ...
+      (Seq.AQSlice(1).oddEvenEchoes+1), Seq.AQSlice(1).nImages, Seq.AQSlice(1).nImagesSlice, ...
       numKLines);
     % permute the order of the k-lines and reshape to the original dimensions
-    kLinesDimTemp = kLinesDimTemp(:,:,[Seq.AQSlice(1).kLineOrder, setdiff(1:numKLines, Seq.AQSlice(1).kLineOrder)]);
-    kLinesDimTemp = kLinesDimTemp(:,:,1:numel(Seq.AQSlice(1).kLineOrder),:);
+    kLinesDimTemp = kLinesDimTemp(:,:,:,[Seq.AQSlice(1).kLineOrder, setdiff(1:numKLines, Seq.AQSlice(1).kLineOrder)]);
+    kLinesDimTemp = kLinesDimTemp(:,:,:,1:numel(Seq.AQSlice(1).kLineOrder),:);
     % consider reduced size if some k-lines are skipped
-    szRed = [size(kLinesDim, 1), size(kLinesDim, 2), size(kLinesDim, 3), size(kLinesDim, 4)];
-    szRed(4) = szRed(4) / (numel(kLinesDim)/numel(kLinesDimTemp));
-    if szRed(4) < 1
-      szRed(3) = szRed(3) * szRed(4);
-      szRed(4) = 1;
+    szRed = [size(kLinesDim, 1), size(kLinesDim, 2), size(kLinesDim, 3), size(kLinesDim, 4), size(kLinesDim, 5)];
+    szRed(5) = szRed(5) / (numel(kLinesDim)/numel(kLinesDimTemp));
+    if szRed(5) < 1
+      szRed(4) = szRed(4) * szRed(5);
+      szRed(5) = 1;
     end
     if any(mod(szRed,1) ~= 0)
       error('PD:sequence_Echo_Standard:incompatibleReduction', ...
@@ -1660,17 +1755,17 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
     kLinesDimTemp = kLinesDim;
 
     % k-line order only applies for imaging loops
-    Seq.AQSlice(1).kLineOrder = 1:(numel(kLinesDimTemp)/Seq.AQSlice(1).nImages);
+    Seq.AQSlice(1).kLineOrder = 1:(numel(kLinesDimTemp)/Seq.AQSlice(1).nImages/Seq.AQSlice(1).nImagesSlice);
   end
 
   % chronological order in which k-lines are to be acquired:
   % k-lines in EPI segments x EPI segments
-  Seq.kLines = reshape(permute(kLinesDimTemp, [1, 4, 2, 3]), ...
+  Seq.kLines = reshape(permute(kLinesDimTemp, [1, 5, 2, 3, 4]), ...
     Seq.AQSlice(1).EPIFactor*Seq.AQSlice(1).nImages*(Seq.AQSlice(1).oddEvenEchoes+1), []);
   % order of those k-lines for image reconstruction:
   % kLines x nImages x corrections
-  Seq.kLinesImages = reshape(permute(kLinesDim, [3, 4, 2, 1]), ...
-    numKLines, Seq.AQSlice(1).nImages, []);
+  Seq.kLinesImages = reshape(permute(kLinesDim, [4, 5, 2, 3, 1]), ...
+    numKLines, Seq.AQSlice(1).nImages*Seq.AQSlice(1).nImagesSlice, []);
 
   if Seq.CorrectPhase && Seq.CorrectPhaseSeparate
     % calculate number of additional excitations for frequency tracking
@@ -1716,7 +1811,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
      + (ceil(Seq.AQSlice(1).EPIFactor/2)-1+Seq.AQSlice(1).oddEvenEchoes/4)*Seq.AQSlice(1).EPIEchoSpacing);
   % repeat for all EPI segments (as well as pre and post shots, and separate frequency tracking)
   Seq.tRep = repmat(Seq.tRep, 1, ...
-    Seq.AQSlice(1).EPISegments + Seq.SteadyState_PreShots + Seq.SteadyState_PostShots + nCorrectPhaseSeparate);
+    Seq.AQSlice(1).EPISegments*Seq.AQSlice(1).nImagesSlice + Seq.SteadyState_PreShots + Seq.SteadyState_PostShots + nCorrectPhaseSeparate);
 
   if isemptyfield(Seq.AQSlice(1), 'UsetRep')
     % k-lines x nImages x corrections
@@ -1730,16 +1825,22 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
     if isinf(Seq.Find_Frequency_interval) || ...
         (now*24*3600-mySave.lastTime < Seq.Find_Frequency_interval-0.01)
       % Use last results of frequency sweep (i.e. mySave.HW.B0)
-      [HW, mySave] = Find_Frequency_Sweep(HW, mySave, Inf);
+      [HW, mySave] = Seq.Function_Find_Frequency(HW, mySave, Inf);
     else
       if ~isempty(Seq.StartSequenceTime)
-        sleep(max(0, Seq.StartSequenceTime - now*24*3600));
+        % delay execution for timed loops
+        if ~isempty(HW.Dummy) && all(HW.Dummy ~= 0)
+          % optionally, speed up execution in dummy mode
+          sleep(max(0, (Seq.StartSequenceTime - now*24*3600)/HW.DummyFastForwardFactor));
+        else
+          sleep(max(0, Seq.StartSequenceTime - now*24*3600));
+        end
       end
 
       oldFindFrequencyPause = HW.FindFrequencyPause;
       hwGuard = onCleanup(@() setfield(HW, 'FindFrequencyPause', oldFindFrequencyPause));
       HW.FindFrequencyPause = 0;
-      [HW, mySave] = Find_Frequency_Sweep(HW, mySave, 0);  % Find magnet frequency
+      [HW, mySave] = Seq.Function_Find_Frequency(HW, mySave, 0);  % Find magnet frequency
       delete(hwGuard);
 
       Seq.StartSequenceTime = now*24*3600 + max([Seq.LoopsBreak, HW.FindFrequencyPause]);
@@ -1767,12 +1868,14 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
     Seq.Slice(1).Pulse.FlipAngleComposite = Seq.AQSlice(1).excitationFlipAngleComposite;
     Seq.Slice(1).Pulse.FlipPhaseComposite = Seq.AQSlice(1).excitationFlipPhaseComposite;
     Seq.Slice(1).Pulse.FlipAngle = Seq.FlipAngle;
+    % FIXME: Add support for different slice thickness and/or distance for
+    %        images acquired with Seq.AQSlice(1).nImagesSlice.
     Seq.Slice(1).Thickness = Seq.AQSlice(1).thickness;
     % Seq.Slice(1).Pulse.Phase = 360*rand(1,numel(Seq.tRep));
-    nPulses = Seq.SteadyState_PreShots + Seq.SteadyState_PostShots + Seq.AQSlice(1).EPISegments + nCorrectPhaseSeparate;
+    nPulses = Seq.SteadyState_PreShots + Seq.SteadyState_PostShots + Seq.AQSlice(1).EPISegments*Seq.AQSlice(1).nImagesSlice + nCorrectPhaseSeparate;
     Seq.Slice(1).Pulse.Phase = ...
-      360*rem(cumsum(((1:nPulses) - Seq.SteadyState_PreShots)) ./ nPulses*Seq.SweepPhase, 1) ...
-      + (0.5*Seq.SweepPhaseQuadratically *((1:nPulses).^2+(1:nPulses)+2));
+      360*mod((cumsum((1:nPulses))-sum(1:Seq.SteadyState_PreShots+1)) ./ Seq.AQSlice(1).EPISegments ./ Seq.AQSlice(1).nImagesSlice * Seq.SweepPhase, 1) ...  % fold artifacts out of center of image
+      + (0.5*Seq.SweepPhaseQuadratically *((1:nPulses).^2+(1:nPulses)+2));  % ??
     Seq.Slice(1).Pulse.PhaseIncrement = Seq.PhaseIncrement+Seq.PhaseIncrementLoop*(Loop-1);
     Seq.Slice(1).CenterOfPulse = 0;
     Seq.Slice(1).UseCoordinate = Seq.AQSlice(1).SliceCoordinate;
@@ -1798,9 +1901,15 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
       % FIXME: Would be nice to have a separate SliceRephaseLengthFactor
       Seq.Slice(1).GradRephaseLength = Inf;
     end
+    if abs(Seq.AQSlice(1).Gamma - Seq.CorrectPhaseFrequencyGamma) > 5*eps(Seq.AQSlice(1).Gamma)
+      % use dual frequency pulses to excite signal for both nuclei (tolerance for
+      % comparison of floating point numbers was chosen arbitrarily)
+      Seq.Slice(1).GammaX = Seq.CorrectPhaseFrequencyGamma;
+      Seq.Slice(1).Pulse.FlipAngleX = Seq.CorrectPhaseFlipAngle;
+    end
 
     % generate slice parameters
-    Seq = get_SliceParameter(Seq, HW);
+    Seq = get_SliceParameter(Seq, HW, 1);
 
     if (Seq.AQSlice(1).EPIFactor > 1 || Seq.AQSlice(1).nImages > 1) && ...
         (Seq.RepetitionTime + Seq.Slice(1).GradCenter - Seq.Slice(1).GradLength - Seq.CLTime - 10e-6) ...
@@ -1891,16 +2000,21 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
     if isempty(Seq.AQSlice(2).AmplitudeUnitScale), Seq.AQSlice(2).AmplitudeUnitScale = Seq.AQSlice(1).AmplitudeUnitScale; end
     if isempty(Seq.AQSlice(2).LengthUnit), Seq.AQSlice(2).LengthUnit = Seq.AQSlice(1).LengthUnit; end
     if isempty(Seq.AQSlice(2).LengthUnitScale), Seq.AQSlice(2).LengthUnitScale = Seq.AQSlice(1).LengthUnitScale; end
-        
-    if Seq.AQSlice(1).thickness < 1000
-      Seq.CorrectPhaseAQtOffset = ...
-        max(Seq.Slice(1).CenterOfRephase + Seq.Slice(1).GradRephaseLength/2 ...
-            + Seq.CorrectPhaseAQtEC, ...
-            Seq.CorrectPhaseAQtOffset);
-    else
-      Seq.CorrectPhaseAQtOffset = ...
-        max(get_DeadTimeTX2RX(HW, Seq.AQSlice(2).HzPerPixMin*Seq.AQSlice(2).nRead*Seq.AQSlice(2).ReadOS, Seq.AQSlice(1).iDevice), ...
-             Seq.CorrectPhaseAQtOffset);
+
+    if ~isZTE
+      if Seq.AQSlice(1).thickness < 1000
+        % keep minimum distance to end of slice rephasing gradient
+        Seq.CorrectPhaseAQtOffset = ...
+          max(Seq.Slice(1).CenterOfRephase + Seq.Slice(1).GradRephaseLength/2 ...
+              + Seq.CorrectPhaseAQtEC, ...
+              Seq.CorrectPhaseAQtOffset);
+      else
+        % keep minimum distance to end of rf pulse
+        Seq.CorrectPhaseAQtOffset = ...
+          max(Seq.Slice(1).CenterOfPulse + Seq.Slice(1).Pulse.MaxLength/2 ...
+              + get_DeadTimeTX2RX(HW, Seq.AQSlice(2).HzPerPixMin*Seq.AQSlice(2).nRead*Seq.AQSlice(2).ReadOS, Seq.AQSlice(1).iDevice), ...
+              Seq.CorrectPhaseAQtOffset);
+      end
     end
 
   end
@@ -2143,7 +2257,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
       hf = figure(1401); clf(hf);
       hax = axes(hf);  %#ok<LAXES>
       scatter3(hax, endpoints_k1(1,:), endpoints_k1(2,:), endpoints_k1(3,:), 'o');
-      hold(hax, 'all');
+      hold(hax, 'on');
       scatter3(hax, endpoints_k2(1,:), endpoints_k2(2,:), endpoints_k2(3,:), 'x');
       scatter3(hax, endpoints_k3(1,:), endpoints_k3(2,:), endpoints_k3(3,:), '+');
       axis(hax, 'equal');
@@ -2171,7 +2285,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
       hf = figure(1402); clf(hf);
       hax = axes(hf);  %#ok<LAXES>
       scatter3(hax, endpoints_k1_norm(1,:), endpoints_k1_norm(2,:), endpoints_k1_norm(3,:), 'o');
-      hold(hax, 'all');
+      hold(hax, 'on');
       scatter3(hax, endpoints_k2_norm(1,:), endpoints_k2_norm(2,:), endpoints_k2_norm(3,:), 'x');
       scatter3(hax, endpoints_k3_norm(1,:), endpoints_k3_norm(2,:), endpoints_k3_norm(3,:), '+');
       axis(hax, 'equal');
@@ -2205,7 +2319,8 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
       resolution_factor(3) ./ (1 + ...
       sqrt(1 - (endpoints_k3_norm(3,:) ./ sqrt(sum(endpoints_k3_norm.^2, 1))).^2)) .^ (sum(Seq.AQSlice(1).nPhase>1)-1)];
 
-    Seq.Read(1).kLineDir = [endpoints_k1_norm, endpoints_k2_norm, endpoints_k3_norm];
+    Seq.Read(1).kLineDir = repelem([endpoints_k1_norm, endpoints_k2_norm, endpoints_k3_norm], ...
+      1, Seq.AQSlice(1).nImagesSlice);
 
     % There is no read dephase for ZTE measurements.
     % Disable any checks for this gradient block.
@@ -2247,12 +2362,12 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
     -Seq.AQSlice(1).ReadGradSign(mod(Loop-1, numel(Seq.AQSlice(1).ReadGradSign)) + 1);
   Seq.Read(1).GradTimeIntegralOffset = Seq.AQSlice(1).ReadGradTimeIntegralOffset;
 
-  Seq = get_ReadParameter(Seq, HW);  % generate readout timings
+  Seq = get_ReadParameter(Seq, HW, 1);  % generate readout timings
 
   % multiplicate the length of the spoil and rephase to achieve shorter tEcho with reduced gradient amplitudes
   if Seq.AQSlice(1).SpoilTimeOffset
     Seq.Read(1).CenterOfRephase = Seq.Read(1).CenterOfRephase + Seq.AQSlice(1).SpoilTimeOffset;
-    Seq = get_ReadParameter(Seq, HW);  % generate readout timings
+    Seq = get_ReadParameter(Seq, HW, 1);  % generate readout timings
   end
 
   if ~isZTE && Seq.AQSlice(1).sizePhaseSpoil(3) == 0  % set spoiler amp equal to read gradient amplitude
@@ -2269,7 +2384,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
 
   if Seq.AQSlice(1).DephaseTimeOffset
     Seq.Read(1).CenterOfDephase = Seq.Read(1).CenterOfDephase - Seq.AQSlice(1).DephaseTimeOffset;
-    Seq = get_ReadParameter(Seq, HW);  % generate readout timings
+    Seq = get_ReadParameter(Seq, HW, 1);  % generate readout timings
   end
 
   if isZTE
@@ -2283,9 +2398,9 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
     Seq.Slice(1).GradAmp = [repmat(Seq.Slice(1).GradAmp(1), 1, Seq.SteadyState_PreShots), ...
       Seq.Slice(1).GradAmp, repmat(Seq.Slice(1).GradAmp(1), 1, nCorrectPhaseSeparate), ...
       repmat(Seq.Slice(1).GradAmp(end), 1, Seq.SteadyState_PostShots)];
-    nPulses = Seq.SteadyState_PreShots + Seq.SteadyState_PostShots + Seq.AQSlice(1).EPISegments + nCorrectPhaseSeparate;
+    nPulses = Seq.SteadyState_PreShots + Seq.SteadyState_PostShots + Seq.AQSlice(1).EPISegments*Seq.AQSlice(1).nImagesSlice + nCorrectPhaseSeparate;
     Seq.Slice(1).Pulse.Phase = ...
-      360*rem(cumsum(((1:nPulses) - Seq.SteadyState_PreShots)) ./ nPulses*Seq.SweepPhase, 1) ...
+      360*mod((cumsum((1:nPulses))-sum(1:Seq.SteadyState_PreShots+1)) ./ Seq.AQSlice(1).EPISegments ./ Seq.AQSlice(1).nImagesSlice * Seq.SweepPhase, 1) ... % Fould out
       + (0.5*Seq.SweepPhaseQuadratically *((1:nPulses).^2+(1:nPulses)+2));
     Seq.Slice(1).Pulse.PhaseIncrement = Seq.PhaseIncrement+Seq.PhaseIncrementLoop*(Loop-1);
     Seq.Slice(1).CenterOfPulse = 0;
@@ -2308,7 +2423,15 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
     Seq.Slice(1).GradRephaseLength = Inf;
 
     % generate slice parameters
-    Seq = get_SliceParameter(Seq, HW);
+    Seq = get_SliceParameter(Seq, HW, 1);
+
+    if Seq.CorrectPhase > 0
+      % keep minimum distance of frequency tracking window to end of rf pulse
+      Seq.CorrectPhaseAQtOffset = ...
+        max(Seq.Slice(1).CenterOfPulse + Seq.Slice(1).Pulse.MaxLength/2 ...
+            + get_DeadTimeTX2RX(HW, Seq.AQSlice(2).HzPerPixMin*Seq.AQSlice(2).nRead*Seq.AQSlice(2).ReadOS, Seq.AQSlice(1).iDevice), ...
+            Seq.CorrectPhaseAQtOffset);
+    end
 
     % adjust read-out
     % FIXME: Is it possible to extend the readout gradient only to the front?
@@ -2334,14 +2457,14 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
       numImages*Seq.AQSlice(1).EPIFactor, 1);
     Seq.Read(1).PhaseIncrement = Seq.Slice(1).Pulse.PhaseIncrement;
 
-    Seq = get_ReadParameter(Seq, HW);  % generate readout timings
+    Seq = get_ReadParameter(Seq, HW, 1);  % generate readout timings
 
     % Now that we have the final timings, calculate the k-space trajectory,
     % i.e., the start and end points of the rays in k-space
     % in m^(-1) if encoded; or in seconds if not encoded
-    encodingStrength = Seq.Read(1).Gamma/(2*pi) * Seq.Read(1).GradAmpNorm;
+    encodingStrength = Seq.Read(1).Gamma/(2*pi) * Seq.Read(1).GradAmpNorm(:,1:Seq.AQSlice(1).nImagesSlice:end);
     nonEncodedDirs = isinf(Seq.AQSlice(1).sizePhase) & (Seq.AQSlice(1).nPhase > 1);
-    encodingStrength(nonEncodedDirs,:) = Seq.Read(1).kLineDir(nonEncodedDirs,:);
+    encodingStrength(nonEncodedDirs,:) = Seq.Read(1).kLineDir(nonEncodedDirs,1:Seq.AQSlice(1).nImagesSlice:end);
     Seq.AQSlice(1).kLineStart = encodingStrength .* ...
       (Seq.Read(1).CenterOfReadout - Seq.Read(1).AcquisitionTime/2 + 1./(2*Seq.Read(1).fSample));
     Seq.AQSlice(1).kLineEnd = encodingStrength .* ...
@@ -2355,7 +2478,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
       Seq.Slice(1).GradRephaseLength = Seq.Read(1).GradDephaseLength;
       Seq.Slice(1).CenterOfRephase = Seq.Read(1).CenterOfDephase - Seq.Read(1).GradTimeDelayOffset(1);
       Seq.Slice(1).UseAtRepetitionTimeRephase = Seq.Slice(1).UseAtRepetitionTimeRephase + 1;
-      Seq = get_SliceParameter(Seq, HW);
+      Seq = get_SliceParameter(Seq, HW, 1);
     end
 
     % check if slice rephase interferes with readout window
@@ -2390,7 +2513,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
     Seq.Read(2).UseAtRepetitionTimeDephase = Seq.Read(2).UseAtRepetitionTime;
     Seq.Read(2).UseAtRepetitionTimeRephase = Seq.Read(2).UseAtRepetitionTime;
 
-    Seq = get_ReadParameter(Seq, HW);  % generate readout timings
+    Seq = get_ReadParameter(Seq, HW, 2);  % generate readout timings
   end
 
   Seq.AQSlice(1).AcquisitionTime = Seq.Read(1).AcquisitionTime;
@@ -2406,7 +2529,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
     Seq.Phase(1).sizePhase = Seq.AQSlice(1).sizePhase(1);
     Seq.Phase(1).nPhase = Seq.AQSlice(1).nPhase(1);
     Seq.Phase(1).PhaseOS = Seq.AQSlice(1).PhaseOS(1);
-    Seq.Phase(1).StepIncrement = Seq.AQSlice(1).nImages * (Seq.AQSlice(1).oddEvenEchoes+1);
+    Seq.Phase(1).StepIncrement = Seq.AQSlice(1).nImages * (Seq.AQSlice(1).oddEvenEchoes+1) * Seq.AQSlice(1).nImagesSlice;
     Seq.Phase(1).CenterOfDephase = Seq.Read(1).CenterOfDephase;
     Seq.Phase(1).CenterOfRephase = Seq.Read(1).CenterOfRephase;
     Seq.Phase(1).GradDephaseLength = Seq.Read(1).GradDephaseLength;
@@ -2516,7 +2639,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
       Seq.Slice(1).CenterOfRephase = Seq.Slice(1).CenterOfRephase + Seq.AQSlice(1).SliceRephaseTimeOffset;
 
       % generate slice timings
-      Seq = get_SliceParameter(Seq, HW);
+      Seq = get_SliceParameter(Seq, HW, 1);
     end
 
 
@@ -2530,7 +2653,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
     % apply all phase gradients to the same device
     [Seq.Phase(:).iDevice] = deal(Seq.AQSlice(1).iDevice);
 
-    Seq = get_PhaseParameter(Seq, HW);
+    Seq = get_PhaseParameter(Seq, HW, 1:6);
 
     if Seq.AQSlice(1).EPIGradientPhase
       Seq.Phase(1).CenterOfRephase = Seq.Phase(1).CenterOfRephase .* ones(size(Seq.Phase(1).UseAtRepetitionTimeRephase));
@@ -2568,7 +2691,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
       Seq.Phase(8).CenterOfDephase(:) = NaN;
       Seq.Phase(9).CenterOfDephase(:) = NaN;
 
-      Seq = get_PhaseParameter(Seq, HW);
+      Seq = get_PhaseParameter(Seq, HW, [1:3, 7:9]);
 
       for iPhase = 7:9
         for iChannel = 1:numel(Seq.Phase(iPhase).GradDephase)
@@ -2626,7 +2749,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
       Seq.Read(2).GradRephaseLength = Seq.Read(2).GradDephaseLength;
     end
 
-    Seq = get_ReadParameter(Seq, HW);  % generate readout timings
+    Seq = get_ReadParameter(Seq, HW, 1:4);  % generate readout timings
   end
 
   if ~isZTE
@@ -2637,7 +2760,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
               Seq.Phase(2).AQPhaseShift + ...
               Seq.Phase(3).AQPhaseShift, 1, [])/pi*180;
     % update readout timings
-    Seq = get_ReadParameter(Seq, HW);
+    Seq = get_ReadParameter(Seq, HW, 1);
   end
 
 
@@ -2662,9 +2785,12 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
       Seq.Read(Seq.CorrectPhaseRead).Phase = Seq.Slice(1).Pulse.Phase(:);
       Seq.Read(Seq.CorrectPhaseRead).UseAtRepetitionTime = Seq.AQSlice(2).UsetRep;
     end
+    if abs(Seq.Slice(1).Gamma - Seq.CorrectPhaseFrequencyGamma) > 5*eps(Seq.Slice(1).Gamma)
+      Seq.Read(Seq.CorrectPhaseRead).GammaX = Seq.CorrectPhaseFrequencyGamma;
+    end
 
     % generate readout timings
-    Seq = get_ReadParameter(Seq, HW);
+    Seq = get_ReadParameter(Seq, HW, Seq.CorrectPhaseRead);
 
     % Check for collision between phase correction readout and dephase gradient
     % pulse.
@@ -2731,9 +2857,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
     AQ = add_AQ(Seq.Read(Seq.CorrectPhaseRead).AQ, AQ);
   end
   % add TX pulses
-  for t = 1:length(Seq.Slice)
-    TX = add_TX(TX, Seq.Slice(t).TX);
-  end
+  TX = add_TX(TX, Seq.Slice(1).TX);
 
   if ~isZTE
     % add slice encoders
@@ -2747,7 +2871,6 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
   end
 
   % add read encoders
-  iLastRead = 1;
   Grad = add_Grad(Grad, Seq.Read(1).Grad);
   if ~isZTE
     Grad = add_Grad(Grad, Seq.Read(1).GradDephase);
@@ -2756,7 +2879,6 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
     end
   end
   if ~isempty(Seq.AQSlice(1).ReadPrePostIdx) && ~(Seq.CorrectPhase > 0 && Seq.CorrectPhaseSeparate)
-    iLastRead = max(iLastRead, Seq.AQSlice(1).ReadPrePostIdx);
     Grad = add_Grad(Grad, Seq.Read(Seq.AQSlice(1).ReadPrePostIdx).Grad);
     if ~isZTE
       Grad = add_Grad(Grad, Seq.Read(Seq.AQSlice(1).ReadPrePostIdx).GradDephase);
@@ -2767,13 +2889,11 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
   end
   if ~isZTE
     if ~isempty(Seq.AQSlice(1).EPIGradienReadIdx)
-      iLastRead = max(iLastRead, Seq.AQSlice(1).EPIGradienReadIdx);
       Grad = add_Grad(Grad, Seq.Read(Seq.AQSlice(1).EPIGradienReadIdx).GradDephase);
       if Seq.AQSlice(1).RephaseReadEncoding
         Grad = add_Grad(Grad, Seq.Read(Seq.AQSlice(1).EPIGradienReadIdx).GradRephase);
       end
       if ~isempty(Seq.AQSlice(1).EPIGradienReadPrePostIdx)
-        iLastRead = max(iLastRead, Seq.AQSlice(1).EPIGradienReadPrePostIdx);
         Grad = add_Grad(Grad, Seq.Read(Seq.AQSlice(1).EPIGradienReadPrePostIdx).GradDephase);
         if Seq.AQSlice(1).RephaseReadEncoding
           Grad = add_Grad(Grad, Seq.Read(Seq.AQSlice(1).EPIGradienReadPrePostIdx).GradRephase);
@@ -2782,7 +2902,6 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
     end
 
     % add phase encoders
-    iLastPhase = 6;
     Grad = add_Grad(Grad, Seq.Phase(1).GradDephase);
     Grad = add_Grad(Grad, Seq.Phase(2).GradDephase);
     Grad = add_Grad(Grad, Seq.Phase(3).GradDephase);
@@ -2791,7 +2910,6 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
       Grad = add_Grad(Grad, Seq.Phase(2).GradRephase);
       Grad = add_Grad(Grad, Seq.Phase(3).GradRephase);
       if Seq.AQSlice(1).EPIGradientPhase
-        iLastPhase = 9;
         Grad = add_Grad(Grad, Seq.Phase(7).GradRephase);
         Grad = add_Grad(Grad, Seq.Phase(8).GradRephase);
         Grad = add_Grad(Grad, Seq.Phase(9).GradRephase);
@@ -2800,22 +2918,6 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
     Grad = add_Grad(Grad, Seq.Phase(4).GradRephase);
     Grad = add_Grad(Grad, Seq.Phase(5).GradRephase);
     Grad = add_Grad(Grad, Seq.Phase(6).GradRephase);
-
-    % extra Gradients
-    for t = iLastPhase+1:numel(Seq.Phase)
-      Grad = add_Grad(Grad, Seq.Phase(t).GradDephase);
-      Grad = add_Grad(Grad, Seq.Phase(t).GradRephase);
-    end
-    for t = iLastRead+(Seq.CorrectPhase > 0)+1:numel(Seq.Read)
-      Grad = add_Grad(Grad, Seq.Read(t).Grad);
-      Grad = add_Grad(Grad, Seq.Read(t).GradDephase);
-      Grad = add_Grad(Grad, Seq.Read(t).GradRephase);
-    end
-    for t = (1 + (Seq.CorrectPhase>0 && Seq.CorrectPhaseSeparate) + 1):numel(Seq.Slice)
-      Grad = add_Grad(Grad, Seq.Slice(t).GradDephase);
-      Grad = add_Grad(Grad, Seq.Slice(t).Grad);
-      Grad = add_Grad(Grad, Seq.Slice(t).GradRephase);
-    end
   end
 
 
@@ -2921,6 +3023,14 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
         AQ(t).nSamples = AQ(t).nSamples(I);
         AQ(t).SamplingFactor = reshape(AQ(t).SamplingFactor, [], nPulses);
         AQ(t).SamplingFactor = AQ(t).SamplingFactor(I);
+        if ~isemptyfield(AQ(t), 'FrequencyX')
+          AQ(t).FrequencyX = reshape(AQ(t).FrequencyX, [], nPulses);
+          AQ(t).FrequencyX = AQ(t).FrequencyX(I);
+        end
+        if ~isemptyfield(AQ(t), 'PhaseX')
+          AQ(t).PhaseX = reshape(AQ(t).PhaseX, [], nPulses);
+          AQ(t).PhaseX = AQ(t).PhaseX(I);
+        end
         if ~isemptyfield(AQ(t), 'ResetPhases')
           AQ(t).ResetPhases = reshape(AQ(t).ResetPhases, [], nPulses);
           AQ(t).ResetPhases = any(AQ(t).ResetPhases(I), 1);
@@ -2937,6 +3047,12 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
         AQ(t).Phase(AllIsNaN,:) = [];
         AQ(t).nSamples(AllIsNaN,:) = [];
         AQ(t).SamplingFactor(AllIsNaN,:) = [];
+        if ~isemptyfield(AQ(t), 'FrequencyX')
+          AQ(t).FrequencyX(AllIsNaN,:) = [];
+        end
+        if ~isemptyfield(AQ(t), 'PhaseX')
+          AQ(t).PhaseX(AllIsNaN,:) = [];
+        end
       end
     end
     % "DigitalIO" is an optional field
@@ -2974,7 +3090,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
   % map AQ windows in tReps to k-lines of images
   Seq.AQSlice(1).UsetRep = zeros(size(Seq.kLinesImages));
   Seq.AQSlice(1).UseAQWindow = ones(size(Seq.kLinesImages)); % + Seq.CorrectPhase;
-  for iImage = 1:Seq.AQSlice(1).nImages
+  for iImage = 1:(Seq.AQSlice(1).nImages * Seq.AQSlice(1).nImagesSlice)
     % identify tReps (and AQ windows) of k-lines of current image
     for iParts = 1:size(Seq.kLinesImages, 3)
       [~, ikLines] = ismember(Seq.kLinesImages(:,iImage,iParts), Seq.kLines);
@@ -3159,7 +3275,7 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
 
     % in tRep indexing
     tRepNoPhase = reshape(SeqOut.kLinestReps(kLinesNoPhase), size(kLinesNoPhase));
-    if numel(Seq.AQSlice(1).UseAQWindow) == 1
+    if isscalar(Seq.AQSlice(1).UseAQWindow)
       AQNoPhase = Seq.AQSlice(1).UseAQWindow;
     else
       AQNoPhase = reshape(Seq.AQSlice(1).UseAQWindow(kLinesNoPhase), size(kLinesNoPhase));
@@ -3530,9 +3646,9 @@ for Loop = [CSRLoops, CRRLoops, CB0Loops, 1:Seq.Loops]
 % if Seq.LoopSaveAllData; SeqLoop.dataLoop(Loop).data=data.data; end
 % SeqLoop.dataLoop(Loop).Image=single(data.Image);
 % SeqLoop.dataLoop(Loop).StartSequenceTime=SeqOut.StartSequenceTime;
-% if isfield(SeqOut,'Correct_foffset'); SeqLoop.dataLoop(Loop).Correct_foffset=SeqOut.Correct_foffset;else SeqLoop.dataLoop(Loop).Correct_foffset=0;end
+% if isfield(SeqOut,'Correct_foffset'), SeqLoop.dataLoop(Loop).Correct_foffset=SeqOut.Correct_foffset;else SeqLoop.dataLoop(Loop).Correct_foffset=0;end
 % SeqLoop.dataLoop(Loop).Correct_fCenter=SeqOut.HW.fLarmor;
-% if and(Seq.CorrectPhase>0,Seq.LoopSaveAllData); SeqLoop.dataLoop(Loop).dataWithoutCorrectPhase=data.dataWithoutCorrectPhase; end;
+% if and(Seq.CorrectPhase>0,Seq.LoopSaveAllData), SeqLoop.dataLoop(Loop).dataWithoutCorrectPhase=data.dataWithoutCorrectPhase; end
 % SeqLoop.data.data=(SeqLoop.data.data*(Loop-1)+data.data)/Loop;
 % if or(Seq.LoopPlot,Seq.Loops==Loop)
 %   [SeqLoop.data]=get_kSpaceAndImage(SeqLoop.data,SeqLoop.AQSlice(1));

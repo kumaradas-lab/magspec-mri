@@ -10,7 +10,7 @@ function w = Hamming(L, sflag)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2018-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2018-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -29,11 +29,15 @@ if strcmp(sflag, 'sampled')
 else
   % L is number of equally spaced samples
   L = double(L);
-  if strcmp(sflag, 'periodic'), L = L+1; end;
+  if strcmp(sflag, 'periodic')
+    L = L+1;
+  end
   wp = (0:L-1).';
   w = + a ...
       - b .* cos(2.*pi.*wp./(L-1));
-  if strcmp(sflag, 'periodic'), w = w(1:end-1); end;
+  if strcmp(sflag, 'periodic')
+    w = w(1:end-1);
+  end
 end
 
 if isscalar(w)

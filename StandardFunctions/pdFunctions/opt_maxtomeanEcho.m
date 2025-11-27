@@ -34,7 +34,7 @@ function [absmean, lastData_1D] = opt_maxtomeanEcho(HW, Seq, Shim)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2012-2023 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2012-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -79,7 +79,9 @@ usedThermalGroup = HW.Grad(Seq.SliceSelect.iDevice).CoilThermalGroup(usedShims);
 usedShimsIdx = find(usedShims);
 for iCoilGroup = 1:max(usedThermalGroup)
   iGrad = usedShimsIdx(usedThermalGroup == iCoilGroup);
-  currentCurrent = currentShim .* HW.Grad(Seq.SliceSelect.iDevice).Amp2LoadIin(iGrad);
+  % HW.Grad.LoadIin2Amp is in gradient ordering
+  % HW.Grad.Amp2LoadIin is in channel ordering (for some reason)
+  currentCurrent = currentShim ./ HW.Grad(Seq.SliceSelect.iDevice).LoadIin2Amp(iGrad);
   powerGroup = sum(HW.Grad(Seq.SliceSelect.iDevice).LoadRin(iGrad) .* currentCurrent.^2);
   if powerGroup >= HW.Grad(Seq.SliceSelect.iDevice).CoilPowerDissipation(iCoilGroup)/2
     % Power due to shim is >=50% of the power that can be dissipated.

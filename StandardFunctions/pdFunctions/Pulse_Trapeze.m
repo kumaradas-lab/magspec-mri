@@ -63,7 +63,7 @@ function pulseData = Pulse_Trapeze(HW, Center, Pulse, varargin)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2018-2022 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2018-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -89,9 +89,9 @@ Pulse = set_EmptyField(Pulse, 'Phase', 0);
 Pulse = set_EmptyField(Pulse, 'Bandwidth', max(1/Pulse.MaxLength/bwFactor, 2e3)); % FIXME: Is this a sensible default?
 Pulse = set_EmptyField(Pulse, 'iDevice', 1);
 Pulse = set_EmptyField(Pulse, 'AmpRatio', HW.TX(Pulse.iDevice).AmpRatio);
-Pulse = set_EmptyField(Pulse, 'LinearRamp', 1); 
-Pulse = set_EmptyField(Pulse, 'CoilQ', HW.TX(Pulse.iDevice).CoilQ); 
-Pulse = set_EmptyField(Pulse, 'CoilQDamped', HW.TX(Pulse.iDevice).CoilQDamped); 
+Pulse = set_EmptyField(Pulse, 'LinearRamp', 1);
+Pulse = set_EmptyField(Pulse, 'CoilQ', HW.TX(Pulse.iDevice).CoilQ);
+Pulse = set_EmptyField(Pulse, 'CoilQDamped', HW.TX(Pulse.iDevice).CoilQDamped);
 
 
 %% short path
@@ -118,7 +118,7 @@ if Pulse.MaxNumberOfSegments < 1
 end
 
 % Q=Pulse.CoilQ;                 % quality factor of coil e.g: Q = 55
-% D = 1/(2*Q);          % damping 
+% D = 1/(2*Q);          % damping
 tau = 1 ./ (2*pi*HW.fLarmor./(2*Pulse.CoilQ));  % decay time: time untill amplitude = (1-1/exp(1)) * (final amp) = 63% * (final amp)
 % Q=Pulse.CoilQDamped;                 % quality factor of coil e.g: Q = 55
 if isempty(Pulse.CoilQDamped)
@@ -141,7 +141,7 @@ AmpMax=AmpDef*Pulse.AmpRatio;     % AmpMax over drive ratio
 
 
 t=(0:max([1,tau*50*HW.TX(Pulse.iDevice).fSample]))/HW.TX(Pulse.iDevice).fSample;
-nMax=max(1,(Pulse.MaxNumberOfSegments-1)/2); % nMax max number of steps for the Ramp 
+nMax=max(1,(Pulse.MaxNumberOfSegments-1)/2); % nMax max number of steps for the Ramp
 
 tRiseExp=-log(1-AmpDef/AmpMax)*tau;
 SlopeRiseMax=AmpMax*(1+exp(-tRiseExp/tau)/tau);
@@ -174,20 +174,20 @@ if AmpDef==AmpMax
   else
     nAmpDef=0;
   end
-  
+
   AmpAll=[Arise(1:IintMin),AmpDef*ones(1,nAmpDef), Adamp(IAmin(IintMin):end)];
   tPulse=(0:numel(AmpAll))/HW.TX(Pulse.iDevice).fSample;
   intAPulse=cumsum(AmpAll.*diff(tPulse(1:numel(AmpAll)+1)));
   tCenterI=find(intAPulse>=intAPulse(end)/2,1,'first');
   tStart=tPulse(tCenterI);
-  
+
   intARise=sum(Arise(1:IintMin))*diff(t(1:2));
   intAdamp=sum(Adamp(IAmin(IintMin):end))*diff(t(1:2));
   intAmpDef=AmpDef*nAmpDef*diff(t(1:2));
   intExact=DurationBW*AmpDef;
   AmpCorrection=intExact/(intARise+intAmpDef+intAdamp);
   AmpDefCorr=AmpDef*AmpCorrection;
-  
+
 %   durationRise=t(IintMin);
 %   durationDamp=t(end)-t(IAmin(IintMin));
   durationAmpDef=t(IintMin)+nAmpDef/HW.TX(Pulse.iDevice).fSample;
@@ -205,7 +205,7 @@ if AmpDef==AmpMax
 %   t=(0:tau*50*HW.TX(Pulse.iDevice).fSample)/HW.TX(Pulse.iDevice).fSample;
 %   plot(t(1:IintMin+numel(Arise)-IAmin(IintMin)+1)-tStart,[Arise(1:IintMin),Adamp(IAmin(IintMin):end)])
 %   grid on
-    
+
 elseif n==1
   AmpRise=AmpMax;
   Arise=AmpMax*(1-exp(-t/tau));
@@ -230,13 +230,13 @@ elseif n==1
   AiDamp=find(Adamp<AmpDef/100,1,'first');
   if isempty(AiDamp)||AiDamp<=2;AiDamp=3;end
   if Pulse.MaxNumberOfSegments==2
-    durationDamp=[]; 
+    durationDamp=[];
   else
     durationDamp=t(AiDamp);
   end
   intAdamp=sum(Adamp(1:AiDamp))*diff(t(1:2));
   tdampAdef=round(intAdamp/AmpDef*HW.TX(Pulse.iDevice).fSample)/HW.TX(Pulse.iDevice).fSample;
-  
+
   durationAmpDefExact=DurationBW-(triesAdef+tdampAdef);
   durationAmpDef=ceil((durationAmpDefExact-1e-12)*HW.TX(Pulse.iDevice).fSample/2)/HW.TX(Pulse.iDevice).fSample*2;
   AmpCorrection=(durationAmpDefExact+(triesAdef+tdampAdef))/(durationAmpDef+(triesAdef+tdampAdef));
@@ -334,13 +334,14 @@ end
 
 
 pulseData.Duration     = [durationRise.';durationAmpDef;durationDamp.'];          % duration of rf-pulse
-pulseData.Start        = cumsum([0;pulseData.Duration(1:end-1)])-tStart+Center;          % start time of rf-pulse % nan -> no rf-pulse  
+pulseData.Start        = cumsum([0;pulseData.Duration(1:end-1)])-tStart+Center;          % start time of rf-pulse % nan -> no rf-pulse
 pulseData.Frequency    = [zeros(numel(AmpRise),1);zeros(numel(AmpDefCorr),1);zeros(numel(AmpDamp),1)]+Pulse.Frequency;                    % frequency of rf-pulse
 pulseData.Phase        = [PhaseRise;zeros(numel(AmpDefCorr),1);sign(AmpDamp.')*90-90]+Pulse.Phase;          % phase of rf-pulse
 pulseData.Amplitude    = [AmpRise.';AmpDefCorr;abs(AmpDamp.')*1];                 % amplitude of B1p in T
 
 
-if Pulse.MaxLength < max([abs(pulseData.Start(1)-Center),abs(pulseData.Start(end)+pulseData.Duration(end)-Center)]*2);
+if Pulse.MaxLength < max([abs(pulseData.Start(1)-Center), ...
+                          abs(pulseData.Start(end)+pulseData.Duration(end)-Center)] * 2)
   error('maxLength of HF Pulse to short')
 end
 

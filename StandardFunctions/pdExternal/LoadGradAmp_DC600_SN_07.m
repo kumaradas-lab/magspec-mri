@@ -15,7 +15,7 @@ HW.Grad(iDevice).PaRin(1:4) = [24e3, 24e3, 24e3, 24e3];       % INA137 input imp
 HW.Grad(iDevice).PaOffsetU(1:4) = [0, 0, 0, 0];               % offset voltage in V
 HW.Grad(iDevice).PaOffsetI(1:4) = [-0.001748187, 0.0007014147, 0.006626038, -0.00250315];  % offset current in A, 03-Aug-2017 15:01:12 @ 42 deg C
 
-HW.Grad(iDevice).PaUin2PaIout(1:4) = ([0.3332023, 0.3349715, 0.3401493, 0.3309973] - HW.Grad.PaOffsetI(1:4)) ./ 1;  % amplification in A/V, 03-Aug-2017 15:03:37 @ 42 deg C
+HW.Grad(iDevice).PaUin2PaIout(1:4) = ([0.3332023, 0.3349715, 0.3401493, 0.3309973] - HW.Grad(iDevice).PaOffsetI(1:4)) ./ 1;  % amplification in A/V, 03-Aug-2017 15:03:37 @ 42 deg C
 
 HW.Grad(iDevice).PaPmaxInt(1:4) = [100, 100, 100, 100];       % maximum internal power dissipation in W
 

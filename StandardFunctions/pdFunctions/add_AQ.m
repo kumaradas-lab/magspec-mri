@@ -76,13 +76,30 @@ function AQ = add_AQ(AQ1, AQ2)
 %       Matrix (time steps x tReps) marking AQ windows that record digital input
 %       events.
 %
+%   DataMode
+%       NOTE: This is an experimental feature that is not supported by all
+%             configurations. Use with care!
+%       Matrix (time steps x tReps) selecting the mode for the bit-width of the
+%       data transferred via USB from the console to the PC.
+%         0: 1 AQ channel (mixer) with 48 bits for the real and imaginary parts,
+%            respectively.
+%         1: 2 AQ channels (mixers) with each 24 bits for the real and imaginary
+%            parts, respectively.
+%         2: 1 AQ channel (mixer) with 24 bits for the real and imaginary parts,
+%            respectively. This allows to approximately double the maximum
+%            sampling rate compared to data mode 0.
+%         3: 1 AQ channel (mixer) with 24 bits for the real part (discarding the
+%            imaginary part of the mixer output). This allows to approximately
+%            quadruple the maximum sampling rate compared to data mode 0.
+%
+%
 % OUTPUT:
 %
 % An AQ structure where the above fields are "merged".
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2011-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -95,6 +112,7 @@ hasDevice = isfield(AQ1, 'Device') || isfield(AQ2, 'Device');
 hasDualFreq = (isfield(AQ1, 'FrequencyX') && isfield(AQ1, 'PhaseX')) ...
   || (isfield(AQ2, 'FrequencyX') && isfield(AQ2, 'PhaseX'));
 hasGetDigitalInTime = isfield(AQ1, 'GetDigitalInTime') || isfield(AQ2, 'GetDigitalInTime');
+hasDataMode = isfield(AQ1, 'DataMode') || isfield(AQ2, 'DataMode');
 
 if hasResetPhases
   if ~isempty(AQ1) && ~isfield(AQ1, 'ResetPhases'), [AQ1.ResetPhases] = deal(0); end
@@ -127,6 +145,11 @@ end
 if hasGetDigitalInTime
   if ~isempty(AQ1) && ~isfield(AQ1, 'GetDigitalInTime'),  [AQ1.GetDigitalInTime] = deal([]);  end
   if ~isempty(AQ2) && ~isfield(AQ2, 'GetDigitalInTime'),  [AQ2.GetDigitalInTime] = deal([]);  end
+end
+
+if hasDataMode
+  if ~isempty(AQ1) && ~isfield(AQ1, 'DataMode'),  [AQ1.DataMode] = deal([]);  end
+  if ~isempty(AQ2) && ~isfield(AQ2, 'DataMode'),  [AQ2.DataMode] = deal([]);  end
 end
 
 
@@ -205,6 +228,9 @@ for t = 1:min(numel(AQ1), numel(AQ2))
     if hasGetDigitalInTime
       AQ1(t).GetDigitalInTime = AQ1(t).GetDigitalInTime * ones2AQ2;
     end
+    if hasDataMode
+      AQ1(t).DataMode = AQ1(t).DataMode * ones2AQ2;
+    end
     % AQ1(t).Gain = AQ1(t).Gain * ones2AQ2;
   end
   if size(AQ2(t).Start, 2) == 1
@@ -223,6 +249,9 @@ for t = 1:min(numel(AQ1), numel(AQ2))
     end
     if hasGetDigitalInTime
       AQ2(t).GetDigitalInTime = AQ2(t).GetDigitalInTime * ones2AQ1;
+    end
+    if hasDataMode
+      AQ2(t).DataMode = AQ2(t).DataMode * ones2AQ1;
     end
     % AQ2(t).Gain = AQ2(t).Gain * ones2AQ1;
   end
@@ -243,6 +272,11 @@ for t = 1:min(numel(AQ1), numel(AQ2))
       AQ1(t).GetDigitalInTime = ones1AQ1 * AQ1(t).GetDigitalInTime;
     end
   end
+  if hasDataMode
+    if size(AQ1(t).DataMode, 1) == 1
+      AQ1(t).DataMode = ones1AQ1 * AQ1(t).DataMode;
+    end
+  end
   % if size(AQ1(t).Gain,1)==1, AQ1(t).Gain = ones1AQ1 * AQ1(t).Gain; end  % 1D
 
   ones1AQ2 = ones(sizeAQ2(1), 1);
@@ -258,6 +292,11 @@ for t = 1:min(numel(AQ1), numel(AQ2))
   if hasGetDigitalInTime
     if size(AQ2(t).GetDigitalInTime, 1) == 1
       AQ2(t).GetDigitalInTime = ones1AQ2 * AQ2(t).GetDigitalInTime;
+    end
+  end
+  if hasDataMode
+    if size(AQ2(t).DataMode, 1) == 1
+      AQ2(t).DataMode = ones1AQ2 * AQ2(t).DataMode;
     end
   end
   % if size(AQ2(t).Gain,1)==1, AQ2(t).Gain = ones1AQ2 * AQ2(t).Gain; end  % 1D
@@ -291,6 +330,9 @@ for t = 1:min(numel(AQ1), numel(AQ2))
   if hasGetDigitalInTime
     AQ(t).GetDigitalInTime = [AQ1(t).GetDigitalInTime; AQ2(t).GetDigitalInTime];
   end
+  if hasDataMode
+    AQ(t).DataMode = [AQ1(t).DataMode; AQ2(t).DataMode];
+  end
   % AQ(t).Gain = [AQ1(t).Gain; AQ2(t).Gain];
 
   % Sort according to start times
@@ -307,6 +349,9 @@ for t = 1:min(numel(AQ1), numel(AQ2))
   end
   if hasGetDigitalInTime
     AQ(t).GetDigitalInTime = AQ(t).GetDigitalInTime(IX);
+  end
+  if hasDataMode
+    AQ(t).DataMode = AQ(t).DataMode(IX);
   end
   % AQ(t).Gain = AQ(t).Gain(IX);
 
@@ -325,6 +370,9 @@ for t = 1:min(numel(AQ1), numel(AQ2))
   end
   if hasGetDigitalInTime
     AQ(t).GetDigitalInTime(firstEmpty:end,:) = [];
+  end
+  if hasDataMode
+    AQ(t).DataMode(firstEmpty:end,:) = [];
   end
   % AQ(t).Gain(firstEmpty:end,:) = [];
 end

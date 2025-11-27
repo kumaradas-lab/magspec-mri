@@ -11,7 +11,7 @@ function [Seq, Grad] = check_GradientFuse(HW, Seq, Grad, iGrad, iDevice)
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2018-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2018-2025 Pure Devices GmbH, Wuerzburg, Germany
 %     www.pure-devices.com
 % ------------------------------------------------------------------------------
 

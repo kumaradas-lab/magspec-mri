@@ -46,7 +46,7 @@ switch 'PK2FVP2'
         HW.Piezo.CurrentAmplitudeMax=   4;                         % Max Current in Piezo in A
         HW.Piezo.Capacity=              21.5e-6;                   % Capacity of piezo
         HW.Piezo.OffsetVoltage=         20;                        % offset voltage  e.g. 20 V
-    case 'ccc'  
+    case 'ccc'
         HW.Piezo.DisplacementPerVolt=   44.8e-6/75;                 % Displacement in m/V
         HW.Piezo.VoltageAmplitudeMax=   32;                        % Max Voltage at Piezo in V
         HW.Piezo.CurrentAmplitudeMax=   2;                         % Max Current in Piezo in A
@@ -122,7 +122,9 @@ HW.Piezo.PostEmphasisRelativeTime=      [-1;    0;    1/2;                      
 HW.Piezo.UseAtRepetitionTime=           1;
 HW.Piezo.Samples=                       900;
 
-if numel(HW.Grad.SystemTimeDelay)==1; HW.Grad.SystemTimeDelay=ones(HW.Grad.n,1)*HW.Grad.SystemTimeDelay; end
+if isscalar(HW.Grad.SystemTimeDelay)
+  HW.Grad.SystemTimeDelay = ones(HW.Grad.n, 1) * HW.Grad.SystemTimeDelay;
+end
 HW.Grad.SystemTimeDelay(HW.Piezo.Channel)=18.0e-06;              % Time delay of grad amp at piezo channel
 HW.Grad.CoilMaxDcCurrent(HW.Piezo.Channel)=0.75*0.9*1;          % Fuse DC current in A
 HW.Grad.CoilCurrentSquareTime(HW.Piezo.Channel)=0.9*0.9;      % Fuse delay in A^2*sec
@@ -145,7 +147,7 @@ else
   if HW.Grad.PaCurrentControlled(HW.Piezo.Channel)
       HW.Grad.LoadIin2Amp(4)=HW.Piezo.DisplacementPerAmpere;
       HW.Grad.LoadRin(4)=HW.Piezo.Resistance;
-      
+
       switch 'A' % Seq.plotSeq in ampere or meter
       case 'A'
         HW.Grad.AmpUnit{4}='A';

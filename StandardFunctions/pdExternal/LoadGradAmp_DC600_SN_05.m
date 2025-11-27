@@ -22,19 +22,11 @@ HW.Grad(iDevice).PaPmaxInt(1:4) = [80, 80, 80, 80];           % maximum internal
 
 HW.Grad(iDevice).PaRout(1:4) = [15000, 15000, 15000, 15000];  % output impedance in Ohm
 
-HW.Grad(iDevice).tRamp = 18e-6;                               % minimum ramp time in s
+HW.Grad(iDevice).tRamp = 42e-6;                               % minimum ramp time in s
 HW.Grad(iDevice).tEC = 50e-6;                                 % eddy current time in s
-HW.Grad(iDevice).SystemTimeDelay(HW.Grad.xyzB(1:3)) = [51.614, 48.260, 37.014]*1e-6;  % time delay of gradient amplifier in s
+
+HW.Grad(iDevice).SystemTimeDelay(HW.Grad(iDevice).xyzB(1:3)) = [51.614, 48.260, 37.014]*1e-6;  % time delay of gradient amplifier in s
 HW.Grad(iDevice).MaxAmpSlice = 0.1;                           % maximum gradient amplitude for slice selection in T/m
 
 HW.Grad(iDevice).Status1 = 1;                                 % power supply of DC-600 ok
 HW.Grad(iDevice).Status2 = 1;                                 % gradient and temperature of DC-600 ok
-
-% Piezo
-HW.Grad.LoadRin(4) = 100;  % resistance parallel to Piezo in Ohm
-% name for Plot
-HW.Grad(iDevice).Name(4) = {'Piezo Current'};
-HW.Grad(iDevice).AmpUnit(4) = {'A'};
-HW.Grad(iDevice).AmpUnitScale(4) = 1;
-% efficiency
-HW.Grad(iDevice).LoadIin2Amp(4) = 1;  % 1 A per Ampere

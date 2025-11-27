@@ -1,4 +1,4 @@
-classdef MagnetBase < handle
+classdef MagnetBase < handle & matlab.mixin.Heterogeneous
 %% Class with the base properties for communication with the magnet (USB)
 %
 % A user should not create an instance of this class manually. Instead, it
@@ -19,6 +19,13 @@ classdef MagnetBase < handle
 %
 %   ipAddress
 %       Read-only. String with the IP address of the connected magnet.
+%
+%   DeviceSerial
+%       Serial number of the magnet. If empty or set an unknown serial number,
+%       the connection is attempted to the first connected Pure Devices
+%       control device. If set to a known serial number of a magnet, the
+%       connection is only established if the control device matches.
+%       (Default: 0)
 %
 %   minRuntime
 %       Minimum runtime in seconds before the magnet's temperature can be
@@ -82,7 +89,7 @@ classdef MagnetBase < handle
 %
 %
 % ----------------------------------------------------------------------------
-% (C) Copyright 2021-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2021-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ----------------------------------------------------------------------------
 

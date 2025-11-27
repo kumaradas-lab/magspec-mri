@@ -14,7 +14,7 @@ function [data, SeqOut] = get_CorrectedPhase(data, SeqOut)
 % determined from the acquired (non-encoded) FIDs.
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2014-2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2014-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -65,9 +65,16 @@ tRepAQCorr = find(~isnan(SeqOut.AQ(iAQ(2)).Start), 1, 'first');
 
 % support frequency tracking at secondary frequency to correct image at primary frequency
 echoFrequency = SeqOut.AQ(iAQ(1)).Frequency(SeqOut.AQSlice(1).UseAQWindow(1),SeqOut.AQSlice(1).UsetRep(1));
-fidFrequency = SeqOut.AQ(iAQ(2)).Frequency(tRepAQCorr);
-if abs(echoFrequency - fidFrequency) > 5*eps(echoFrequency)
-  % use x-frequency FID for correction
+if isemptyfield(SeqOut.AQ(iAQ(2)), 'FrequencyX') ...
+    || ~isfinite(SeqOut.AQ(iAQ(2)).FrequencyX(tRepAQCorr))
+  fidFrequency = SeqOut.AQ(iAQ(2)).Frequency(tRepAQCorr);
+  nucleusX = false;
+else
+  fidFrequency = SeqOut.AQ(iAQ(2)).FrequencyX(tRepAQCorr);
+  nucleusX = true;
+end
+if nucleusX
+  % use X-frequency FID for correction
   iData(2) = iData(2) + numel(SeqOut.AQ);
   % disp('Correction with X-frequency FID');
 end
@@ -88,34 +95,81 @@ if isemptyfield(SeqOut, 'CorrectPlot'), SeqOut.CorrectPlot = 0; end
 if isemptyfield(SeqOut, 'CorrectPlotFrequency'), SeqOut.CorrectPlotFrequency = 0; end
 if isemptyfield(SeqOut, 'LoopPlot'), SeqOut.LoopPlot = 1; end
 
-% create weights for sliding window average
-windowSize = (2*max(0, min(steadyState_PreShots, steadyState_PostShots-1))+1);
+if isemptyfield(SeqOut, 'CorrectPhase_maxPhaseOffset')
+  % FIXME: What is a good default value?
+  % FIXME: Add HW parameter for the default value
+  % maximum tolerated phase offset in rad due to standard error of frequency tracking
+  SeqOut.CorrectPhase_maxPhaseOffset = 2*pi/50;
+end
+
+
+%% step 1: Create "average FID"
+% The goal is to distinguish systematic phase changes (e.g., due to chemistry or
+% off-center signal) from statistic phase uncertainty. Only the statistic part
+% is used to ultimately determine the standard error of the frequency offset.
+freqTrackData = data(iData(2)).data(1:SeqOut.Correct_nSamples,SeqOut.Correct_FidAQWindow,SeqOut.AQSlice(2).UsetRep);
+% estimate frequency offset of all frequency tracking windows
+phaseDiffWeighted1 = get_MeanPhaseDiffWeighted(freqTrackData, 1, 'omitnan');
+% correct all frequency tracking windows to common frequency offset
+freqTrackDataCorrected = freqTrackData ...
+  .* exp(-1i * bsxfun(@times, phaseDiffWeighted1, reshape(1:SeqOut.Correct_nSamples, [], 1)));
+% get average frequency offset
+phaseMeanWeighted1 = get_MeanPhaseWeighted(freqTrackDataCorrected, 1);
+% correct average phase offset for "average FID"
+freqTrackDataMean = mean(bsxfun(@times, freqTrackDataCorrected, ...
+  exp(-1i * phaseMeanWeighted1)), 3);
+
+% use "average FID" as phase reference for every frequency tracking window
+freqTrackDataReferenced = bsxfun(@rdivide, freqTrackData, ...
+  exp(1i * angle(freqTrackDataMean)));
+
+
+%% step 2: Get (smoothed) frequency offset from (processed) tracking windows
+% create weights for sliding window (rolling) average
+windowSize = (2*max(0, min(steadyState_PreShots, steadyState_PostShots))+1);
 SeqOut.Correct_mywin = cos(linspace(-0.5*pi, 0.5*pi, windowSize+2)).^2;
 SeqOut.Correct_mywin = SeqOut.Correct_mywin(2:end-1);  % remove zeros
-SeqOut.Correct_mywin = SeqOut.Correct_mywin/sum(SeqOut.Correct_mywin(:));
-% sliding window average of the mean frequency derived from the FID
-[phaseDiffWeightedMean, phaseDiffWeightedStd] = get_MeanPhaseDiffWeighted(data(iData(2)).data(1:SeqOut.Correct_nSamples,SeqOut.Correct_FidAQWindow,SeqOut.AQSlice(2).UsetRep), 1, 'omitnan');
+SeqOut.Correct_mywin = SeqOut.Correct_mywin/sum(SeqOut.Correct_mywin(:));  % normalize
+% mean frequency (and standard error) derived from the FID
+[phaseDiffWeightedMean, phaseDiffWeightedStd] = ...
+  get_MeanPhaseDiffWeighted(freqTrackDataReferenced, 1, 'omitnan');
 phaseDiffWeightedMean = reshape(phaseDiffWeightedMean, 1, []);
 phaseDiffWeightedStd = reshape(phaseDiffWeightedStd, 1, []);
-phaseDiffSmoothed = conv(phaseDiffWeightedMean, SeqOut.Correct_mywin, 'same');
-% correct (start and end) of smoothed data for missing data in sliding window
-w = conv(ones(1, numel(phaseDiffWeightedMean)), SeqOut.Correct_mywin, 'same');
-SeqOut.Correct_foffset = phaseDiffSmoothed./w * SeqOut.AQ(iAQ(2)).fSample(tRepAQCorr) / 2/pi ...
+if all(phaseDiffWeightedStd > eps)
+  % use standard error of phase diff as inverse weight for rolling average
+  phaseDiffWeight = 1 ./ phaseDiffWeightedStd;
+else
+  % use uniform weights for rolling average
+  phaseDiffWeight = ones(1, numel(phaseDiffWeightedMean));
+end
+% rolling average of phase diff (weighted by standard error)
+phaseDiffSmoothed = ...
+  conv(phaseDiffWeightedMean .* phaseDiffWeight, SeqOut.Correct_mywin, 'same') ...
+  ./ conv(phaseDiffWeight, SeqOut.Correct_mywin, 'same');
+
+% calculate frequency offset from slope of phase
+SeqOut.Correct_foffset = phaseDiffSmoothed * SeqOut.AQ(iAQ(2)).fSample(tRepAQCorr) / 2/pi ...
   * echoFrequency / fidFrequency;
+% standard error propagation
+% from phase difference to (weighted) rolling average frequency offset
 if any(isnan(phaseDiffWeightedStd))
   SeqOut.Correct_foffsetStd = ...
-    sqrt(conv((phaseDiffWeightedMean-phaseDiffSmoothed./w).^2, SeqOut.Correct_mywin, 'same')) ...
+    sqrt(conv((phaseDiffWeightedMean - phaseDiffSmoothed).^2, ...
+              SeqOut.Correct_mywin, 'same')) ...
     * SeqOut.AQ(iAQ(2)).fSample(tRepAQCorr) / 2/pi ...
     * echoFrequency / fidFrequency;
 else
+  phaseDiffWeightSquared = phaseDiffWeight.^2;
   SeqOut.Correct_foffsetStd = ...
-    sqrt(conv(phaseDiffWeightedStd.^2 + ...
-              (phaseDiffWeightedMean-phaseDiffSmoothed./w).^2, SeqOut.Correct_mywin, 'same')) ...
+    sqrt(conv((phaseDiffWeightedStd.^2 + (phaseDiffWeightedMean - phaseDiffSmoothed).^2) ...
+              .* phaseDiffWeightSquared, SeqOut.Correct_mywin, 'same') ...
+         ./ conv(phaseDiffWeightSquared, SeqOut.Correct_mywin, 'same')) ...
     * SeqOut.AQ(iAQ(2)).fSample(tRepAQCorr) / 2/pi ...
     * echoFrequency / fidFrequency;
 end
 
 
+%% step 3: Get correction for rf pulse
 % mean time of AQ window of FID
 tRepStart = cumsum([0, SeqOut.tRep(1:end-1)]);
 SeqOut.Correct_tfoffset = SeqOut.AQ(iAQ(2)).Start(1,SeqOut.AQSlice(2).UsetRep) + ...
@@ -134,45 +188,61 @@ else
   % (interpolated) frequency offset at excitation pulse
   if isscalar(SeqOut.Correct_foffset)
     SeqOut.Correct_foffsetPulse = SeqOut.Correct_foffset;
+    foffsetPulseStd = SeqOut.Correct_foffsetStd;
   else
-    SeqOut.Correct_foffsetPulse = interp1(SeqOut.Correct_tfoffset, SeqOut.Correct_foffset, SeqOut.Correct_tPulse, 'linear', 'extrap');
+    SeqOut.Correct_foffsetPulse = ...
+      interp1(SeqOut.Correct_tfoffset, SeqOut.Correct_foffset, SeqOut.Correct_tPulse, 'linear', 'extrap');
+    foffsetPulseStd = ...
+      interp1(SeqOut.Correct_tfoffset, SeqOut.Correct_foffsetStd, SeqOut.Correct_tPulse, 'linear', 'extrap');
   end
 
   % phase correction (due to momentary frequency at excitation pulse)
   % Use mean frequency between pulse and AQ center to determine the magnitude of
   % the dephasing at the recorded FID due to the offset frequency.
   SeqOut.Correct_poffsetPulse = ...
-    (SeqOut.Correct_foffsetPulse + SeqOut.Correct_foffset)./2 .* ...
-    (2*pi) .* (SeqOut.Correct_tfoffset - SeqOut.Correct_tPulse);
-  % select pulses with image acquisition.
+    (SeqOut.Correct_foffsetPulse + SeqOut.Correct_foffset)./2 ...
+    .* (2*pi) .* (SeqOut.Correct_tfoffset - SeqOut.Correct_tPulse);
+  poffsetPulseStd = ...
+    (foffsetPulseStd + SeqOut.Correct_foffsetStd)./2 ...
+    .* (2*pi) .* (SeqOut.Correct_tfoffset - SeqOut.Correct_tPulse);  % select pulses with image acquisition.
   SeqOut.Correct_poffsetPulse = ...
     SeqOut.Correct_poffsetPulse(steadyState_PreShots+1:end-steadyState_PostShots);
+  poffsetPulseStd = ...
+    poffsetPulseStd(steadyState_PreShots+1:end-steadyState_PostShots);
 end
 
 
+%% step 4: Get frequency offset for each sample in k-space
 % data in ordering as acquired (not necessarily the same order as in the image)
 [imageUsetRep, b] = sort(SeqOut.AQSlice(1).UsetRep(:));
-if numel(SeqOut.AQSlice(1).UseAQWindow) == 1
+if isscalar(SeqOut.AQSlice(1).UseAQWindow)
   imageAQWindow = SeqOut.Correct_imageAQWindow;
 else
   imageAQWindow = reshape(SeqOut.Correct_imageAQWindow(b), size(b));
 end
 % time of samples in AQ windows (for image)
-szData = [size(data(iData(1)).time_all, 1), size(data(iData(1)).time_all, 2), size(data(iData(1)).time_all, 3)];
+szData = arrayfun(@(x) size(data(iData(1)).time_all, x), 1:3);
 AQnSamples = SeqOut.AQ(iAQ(1)).nSamples(SeqOut.Correct_imageAQWindow(1),imageUsetRep(1));
-if numel(SeqOut.AQSlice(1).UseAQWindow) == 1
-  SeqOut.Correct_tSamples = reshape(data(iData(1)).time_all(1:AQnSamples,imageAQWindow,imageUsetRep(:)), AQnSamples, []);
+if isscalar(SeqOut.AQSlice(1).UseAQWindow)
+  SeqOut.Correct_tSamples = ...
+    reshape(data(iData(1)).time_all(1:AQnSamples,imageAQWindow,imageUsetRep(:)), AQnSamples, []);
 else
-  SeqOut.Correct_tSamples = reshape(data(iData(1)).time_all(1:AQnSamples,sub2ind(szData(2:end), imageAQWindow(:), imageUsetRep(:))), AQnSamples, []);
+  SeqOut.Correct_tSamples = ...
+    reshape(data(iData(1)).time_all(1:AQnSamples,sub2ind(szData(2:end), imageAQWindow(:), imageUsetRep(:))), AQnSamples, []);
 end
 
 
 % (interpolated) frequency offset for each AQ sample
 SeqOut.Correct_foffsetSamples = zeros(size(SeqOut.Correct_tSamples));
+foffsetSamplesStd = zeros(size(SeqOut.Correct_tSamples));
 if isscalar(SeqOut.Correct_foffset)
   SeqOut.Correct_foffsetSamples(:) = SeqOut.Correct_foffset;
+  foffsetSamplesStd(:) = SeqOut.Correct_foffsetStd;
 else
-  SeqOut.Correct_foffsetSamples(:) = interp1(SeqOut.Correct_tfoffset, SeqOut.Correct_foffset, SeqOut.Correct_tSamples(:), 'linear', 'extrap');
+  SeqOut.Correct_foffsetSamples(:) = ...
+    interp1(SeqOut.Correct_tfoffset, SeqOut.Correct_foffset, SeqOut.Correct_tSamples(:), 'linear', 'extrap');
+  foffsetSamplesStd(:) = ...
+    interp1(SeqOut.Correct_tfoffset, SeqOut.Correct_foffsetStd, SeqOut.Correct_tSamples(:), 'linear', 'extrap');
 end
 
 % number of echoes in EPI segments
@@ -182,35 +252,59 @@ idxNoPrePost = (steadyState_PreShots+1):(numFIDs-steadyState_PostShots);
 
 if correctPhaseSeparate
   % interpolate to rf pulses with encoding
-  Correct_tfoffset = tRepStart(1,SeqOut.AQSlice(1).UsetRep);
-  Correct_foffset = ...
-    interp1(SeqOut.Correct_tfoffset, SeqOut.Correct_foffset, Correct_tfoffset);
+  tfoffset = sort(tRepStart(1,SeqOut.AQSlice(1).UsetRep));
+  foffset = ...
+    interp1(SeqOut.Correct_tfoffset, SeqOut.Correct_foffset, tfoffset);
+  foffsetStd = ...
+    interp1(SeqOut.Correct_tfoffset, SeqOut.Correct_foffsetStd, tfoffset);
 else
-  Correct_tfoffset = SeqOut.Correct_tfoffset(idxNoPrePost);
-  Correct_foffset = SeqOut.Correct_foffset(idxNoPrePost);
+  tfoffset = SeqOut.Correct_tfoffset(idxNoPrePost);
+  foffset = SeqOut.Correct_foffset(idxNoPrePost);
+  foffsetStd = SeqOut.Correct_foffsetStd(idxNoPrePost);
 end
 
-% phase correction (at each sample)
+
+%% step 5: Get phase correction at each sample for k-space
 % Use mean frequency between FID center and each sample in the AQ window for the
 % image to determine the magnitude of the dephasing at the samples.
-if isemptyfield(SeqOut, 'Correct_ZStorageDuration'), SeqOut.Correct_ZStorageDuration = 0; end
-if isemptyfield(SeqOut, 'Correct_ZStorageAtInversionNumber'), SeqOut.Correct_ZStorageAtInversionNumber = 1; end
-% if isemptyfield(SeqOut, 'Correct_ZStorageAtSpinEcho'), SeqOut.Correct_ZStorageAtSpinEcho = 0; end
+if isemptyfield(SeqOut, 'Correct_ZStorageDuration')
+  SeqOut.Correct_ZStorageDuration = 0;
+end
+if isemptyfield(SeqOut, 'Correct_ZStorageAtInversionNumber')
+  SeqOut.Correct_ZStorageAtInversionNumber = 1;
+end
+% if isemptyfield(SeqOut, 'Correct_ZStorageAtSpinEcho')
+%   SeqOut.Correct_ZStorageAtSpinEcho = 0;
+% end
 
 SeqOut.Correct_poffsetSamples = ...
-  (repelem(reshape(Correct_foffset,1,[]), size(SeqOut.Correct_foffsetSamples,1), numEchoes) + SeqOut.Correct_foffsetSamples)./2 .* ...  % mean frequency offset
-  (2*pi) .* (SeqOut.Correct_tSamples-SeqOut.Correct_ZStorageDuration - repelem(reshape(Correct_tfoffset,1,[]), size(SeqOut.Correct_foffsetSamples,1), numEchoes));
+  (repelem(reshape(foffset,1,[]), size(SeqOut.Correct_foffsetSamples,1), numEchoes) ...
+   + SeqOut.Correct_foffsetSamples) ./ 2 ...  % mean frequency offset
+  .* (2*pi) ...
+  .* (SeqOut.Correct_tSamples - SeqOut.Correct_ZStorageDuration ....
+      - repelem(reshape(tfoffset,1,[]), size(SeqOut.Correct_foffsetSamples,1), numEchoes));
+poffsetSamplesStd = ...
+  (repelem(reshape(foffsetStd,1,[]), size(foffsetSamplesStd,1), numEchoes) ...
+   + foffsetSamplesStd) ./ 2 ...  % mean frequency standard error
+  .* (2*pi) ...
+  .* (SeqOut.Correct_tSamples - SeqOut.Correct_ZStorageDuration ...
+      - repelem(reshape(tfoffset,1,[]), size(foffsetSamplesStd,1), numEchoes));
 if isGradEcho
   if correctPhaseSeparate
     SeqOut.Correct_poffsetBoth = SeqOut.Correct_poffsetSamples;
+    SeqOut.Correct_poffsetBothStd = poffsetSamplesStd;
   else
     % combined phase correction (i.e. the dephasing at each sample in the AQ window
     % for the image with respect to the respective pulse center)
     SeqOut.Correct_poffsetBoth = SeqOut.Correct_poffsetSamples ...
       + repelem(SeqOut.Correct_poffsetPulse, size(SeqOut.Correct_foffsetSamples,1), numEchoes);
+    SeqOut.Correct_poffsetBothStd = poffsetSamplesStd ...
+      + repelem(poffsetPulseStd, size(foffsetSamplesStd,1), numEchoes);
   end
 
 else
+  % FIXME: Check error propagation for phase of echoes
+
   % center of inversion pulse
   if SeqOut.SingletRep
     t_invPulse = SeqOut.singletRepStart(SeqOut.Slice(2).UseAtRepetitionTime);
@@ -221,21 +315,31 @@ else
   % (interpolated) frequency offset at inversion pulse
   if isscalar(SeqOut.Correct_foffset)
     fOffset_invPulse = SeqOut.Correct_foffset;
+    foffset_invPulseStd = SeqOut.Correct_foffsetStd;
   else
     fOffset_invPulse = interp1(SeqOut.Correct_tfoffset, SeqOut.Correct_foffset, t_invPulse, 'linear', 'extrap');
+    foffset_invPulseStd = interp1(SeqOut.Correct_tfoffset, SeqOut.Correct_foffsetStd, t_invPulse, 'linear', 'extrap');
   end
 
   % calculate phase offset from center of frequency tracking window to center of
   % inversion pulse
-  t_invPulseOffset=t_invPulse*0;
-  t_invPulseOffset(SeqOut.Correct_ZStorageAtInversionNumber+1:end,:)=t_invPulseOffset(SeqOut.Correct_ZStorageAtInversionNumber+1:end,:)+SeqOut.Correct_ZStorageDuration;
+  t_invPulseOffset = t_invPulse*0;
+  t_invPulseOffset(SeqOut.Correct_ZStorageAtInversionNumber+1:end,:) = ...
+    t_invPulseOffset(SeqOut.Correct_ZStorageAtInversionNumber+1:end,:) ...
+    + SeqOut.Correct_ZStorageDuration;
 
   pOffset_InvPulse = ...
-    bsxfun(@plus, fOffset_invPulse, SeqOut.Correct_foffset)./2 .* ...
-    (2*pi) .* bsxfun(@minus, t_invPulse-t_invPulseOffset, SeqOut.Correct_tfoffset);
+    bsxfun(@plus, fOffset_invPulse, SeqOut.Correct_foffset) ./ 2 ...  % mean frequency offset
+    .* (2*pi) ...
+    .* bsxfun(@minus, t_invPulse-t_invPulseOffset, SeqOut.Correct_tfoffset);
+  pOffset_InvPulseStd = ...
+    bsxfun(@plus, foffset_invPulseStd, SeqOut.Correct_foffsetStd) ./ 2 ...  % mean frequency standard error
+    .* (2*pi) ...
+    .* bsxfun(@minus, t_invPulse-t_invPulseOffset, SeqOut.Correct_tfoffset);
 
   % select inversion pulses with image acquisition.
   pOffset_InvPulse = pOffset_InvPulse(:,steadyState_PreShots+1:end-steadyState_PostShots);
+  pOffset_InvPulseStd = pOffset_InvPulseStd(:,steadyState_PreShots+1:end-steadyState_PostShots);
 
 
   % handle echo trains
@@ -243,57 +347,82 @@ else
   % calculate phase offset at each inversion pulse relative to center of
   % excitation pulse
   pOffset_InvPulse = bsxfun(@plus, pOffset_InvPulse, SeqOut.Correct_poffsetPulse);
+  pOffset_InvPulseStd = bsxfun(@plus, pOffset_InvPulseStd, poffsetPulseStd);
 
   % calculate steps at each inversion pulse in echo train
   signs = ones(size(pOffset_InvPulse));
   signs(2:2:end,:) = -1;
   pOffset_InvPulse_step = cumsum(2*pOffset_InvPulse.*signs, 1) .* signs;
+  pOffset_InvPulseStd_step = cumsum(2*pOffset_InvPulseStd.*signs, 1) .* signs;
 
   % select only inversion pulses with acquisition window
   pOffset_InvPulse_step = pOffset_InvPulse_step(SeqOut.SteadyState_PreShots180+1:end-SeqOut.SteadyState_PostShots180,:);
+  pOffset_InvPulseStd_step = pOffset_InvPulseStd_step(SeqOut.SteadyState_PreShots180+1:end-SeqOut.SteadyState_PostShots180,:);
 
   pOffset_InvPulse_step = bsxfun(@plus, -SeqOut.Correct_poffsetPulse, pOffset_InvPulse_step);
+  pOffset_InvPulseStd_step = bsxfun(@plus, -poffsetPulseStd, pOffset_InvPulseStd_step);
 
   % combined phase correction (i.e. the dephasing at each sample in the AQ
   % window for the image with respect to the respective excitation pulse center)
   SeqOut.Correct_poffsetBoth = SeqOut.Correct_poffsetSamples ...
     - repelem(reshape(pOffset_InvPulse_step,1,[]), size(SeqOut.Correct_poffsetSamples,1), 1);
+  SeqOut.Correct_poffsetBothStd = poffsetSamplesStd ...
+    - repelem(reshape(pOffset_InvPulseStd_step,1,[]), size(SeqOut.Correct_poffsetSamples,1), 1);
+end
+
+if any(any(abs(SeqOut.Correct_poffsetBothStd) > SeqOut.CorrectPhase_maxPhaseOffset))
+  maxDev = max(abs(SeqOut.Correct_poffsetBothStd(:)));
+  warning('PD:get_CorrectedPhase:UncertainFreqencyCorrection', ...
+    ['The standard error of the frequency tracking could lead to phase errors', ...
+    ' in the k-space that are larger than %.3f rad.\n', ...
+    'Expect phase correction errors in the order of %.3f rad.\n', ...
+    'Consider increasing Seq.CorrectPhaseDuration (from %.3f ms to approx. %.3f ms).'], ...
+    SeqOut.CorrectPhase_maxPhaseOffset, maxDev, ...
+    SeqOut.CorrectPhaseDuration*1e3, ...
+    ...  % assume linear dependency between standard error and duration of tracking window
+    SeqOut.CorrectPhaseDuration*1e3 * maxDev / SeqOut.CorrectPhase_maxPhaseOffset);
 end
 
 
+%% step 6 (optional): auxiliary plots
 if SeqOut.CorrectPlot
   % plot FID data
   hFigure = figure(29);
   clf(hFigure);
-  hax(1) = subplot(4,1,1, 'Parent', hFigure);
-  dt = reshape(data(iData(2)).data(1:SeqOut.Correct_nSamples,SeqOut.Correct_FidAQWindow,SeqOut.AQSlice(2).UsetRep), SeqOut.Correct_nSamples, []);
+  hax(1) = subplot(5,1,1, 'Parent', hFigure);
+  dt = reshape(freqTrackData, SeqOut.Correct_nSamples, []);
   time = reshape(data(iData(2)).time_of_tRep(1:SeqOut.Correct_nSamples,SeqOut.Correct_FidAQWindow,SeqOut.AQSlice(2).UsetRep), SeqOut.Correct_nSamples, []);
   plot(hax(1), time, abs(dt));
   ylabel(hax(1), 'Amp in T');
   title(hax(1), 'Frequency Tracking Windows');
   grid(hax(1), 'on');
-  hax(2) = subplot(4,1,2, 'Parent', hFigure);
+  hax(2) = subplot(5,1,2, 'Parent', hFigure);
   plot(hax(2), time, unwrap(angle(dt)));
   ylabel(hax(2), '\phi in rad');
   grid(hax(2), 'on');
-  hax(3) = subplot(4,1,3, 'Parent', hFigure);
-  hl = plot(hax(3), [(time(1:end-1,:) + time(2:end,:))/2; NaN(1,size(time,2))], ...
-    [diff(unwrap(angle(dt))); NaN(1,size(time,2))] * SeqOut.AQ(iAQ(2)).fSample(tRepAQCorr) / 2/pi);
+  phase_ref = unwrap(angle(reshape(freqTrackDataReferenced, SeqOut.Correct_nSamples, [])));
+  hax(3) = subplot(5,1,3, 'Parent', hFigure);
+  plot(hax(3), time, phase_ref);
+  ylabel(hax(3), '\phi (referenced) in rad');
+  grid(hax(3), 'on');
+  hax(4) = subplot(5,1,4, 'Parent', hFigure);
+  hl = plot(hax(4), [(time(1:end-1,:) + time(2:end,:))/2; NaN(1,size(time,2))], ...
+    [diff(phase_ref); NaN(1,size(time,2))] * SeqOut.AQ(iAQ(2)).fSample(tRepAQCorr) / 2/pi);
   if size(time,1) == 2
     set(hl, 'Marker', 'x');
   end
-  ylabel(hax(3), 'f_{Offset} in Hz');
-  xlabel(hax(3), 'time of tRep in s');
-  grid(hax(3), 'on');
+  ylabel(hax(4), 'f_{Offset} in Hz');
+  xlabel(hax(4), 'time of tRep in s');
+  grid(hax(4), 'on');
   linkaxes(hax, 'x');
 
-  hax = subplot(4,1,4, 'Parent', hFigure);
+  hax = subplot(5,1,5, 'Parent', hFigure);
   t_all = data(iData(2)).time_all(1:SeqOut.Correct_nSamples,SeqOut.Correct_FidAQWindow,SeqOut.AQSlice(2).UsetRep);
   t_center_corr = reshape(mean(t_all, 1), 1, []);
   hl(1) = plot(hax, t_center_corr, ...
     phaseDiffWeightedMean * SeqOut.AQ(iAQ(2)).fSample(1) / 2/pi);
   if ~isempty(idxNoPrePost)
-    hold(hax, 'all');
+    hold(hax, 'on');
     hl(2) = plot(hax, t_center_corr(idxNoPrePost), SeqOut.Correct_foffset(idxNoPrePost));
   end
   plot(hax, t_center_corr, ...
@@ -325,7 +454,7 @@ elseif SeqOut.LoopPlot && SeqOut.CorrectPlotFrequency
     reshape(phaseDiffWeightedMean,1,[]) * SeqOut.AQ(iAQ(2)).fSample(tRepAQCorr) / 2/pi, ...
     reshape(phaseDiffWeightedStd,1,[]) * SeqOut.AQ(iAQ(2)).fSample(tRepAQCorr) / 2/pi);
   if ~isempty(idxNoPrePost)
-    hold(hax, 'all');
+    hold(hax, 'on');
     errorbar(hax, squeeze(mean(t_all(:,idxNoPrePost), 1)), SeqOut.Correct_foffset(idxNoPrePost).', SeqOut.Correct_foffsetStd(idxNoPrePost).');
     hold(hax, 'off');
   end
@@ -384,7 +513,7 @@ if SeqOut.CorrectPlot
   plot(hax(2), t_center_image, ...
     reshape(mean_phase_diff, 1, []) * ...
     SeqOut.AQ(iAQ(1)).fSample(SeqOut.Correct_imageAQWindow(1),imageUsetRep(1)) / 2/pi, '-x');
-  hold(hax(2), 'all');
+  hold(hax(2), 'on');
   mean_phase_diff = unwrap(get_MeanPhaseDiffWeighted(squeeze(dt) .* exp(-1i*SeqOut.Correct_poffsetBoth), 1), [], 2);
   plot(hax(2), t_center_image, ...
     mean_phase_diff * ...
@@ -408,15 +537,16 @@ if SeqOut.CorrectPlot
 end
 
 
-% correct encoded data for frequency offset
+%% step 7: Apply phase correction due to frequency offset on k-space data
 if isscalar(imageAQWindow)
   data(iData(1)).data(1:AQnSamples,imageAQWindow,imageUsetRep(:)) = ...
-    data(iData(1)).data(1:AQnSamples,imageAQWindow,imageUsetRep(:)) .* ...
-    reshape(exp(-1i*SeqOut.Correct_poffsetBoth), [AQnSamples, numel(imageUsetRep)]);
+    data(iData(1)).data(1:AQnSamples,imageAQWindow,imageUsetRep(:)) ...
+    .* reshape(exp(-1i*SeqOut.Correct_poffsetBoth), [AQnSamples, numel(imageUsetRep)]);
 else
   data(iData(1)).data(1:AQnSamples,sub2ind(szData(2:end), imageAQWindow, imageUsetRep)) = ...
-    data(iData(1)).data(1:AQnSamples,sub2ind(szData(2:end), imageAQWindow, imageUsetRep)) .* ...
-    exp(-1i*SeqOut.Correct_poffsetBoth);
+    data(iData(1)).data(1:AQnSamples,sub2ind(szData(2:end), imageAQWindow, imageUsetRep)) ...
+    .* exp(-1i*SeqOut.Correct_poffsetBoth);
 end
+
 
 end

@@ -1,7 +1,7 @@
-function plot_iLaplace2D(data, Seq)
+function Seq = plot_iLaplace2D(data, Seq)
 %% Plot results of inverse Laplace 2D transform
 %
-%       plot_iLaplace2D(data, Seq)
+%       Seq = plot_iLaplace2D(data, Seq)
 %
 % This function can be used in combination with get_iLaplace2D to open figures
 % showing the results of the inverse Laplace 2D transform.
@@ -50,34 +50,42 @@ function plot_iLaplace2D(data, Seq)
 %
 %     plotT1T2Map
 %         Scalar number for the figure with the T1-T2 map or a graphics handle
-%         that can be a valid parent for the T1-T2 map. (Default: 84)
+%         that can be a valid parent for the T1-T2 map.
+%         (Default: 84)
 %
 %     plotAmp
 %         Scalar number for the figure showing the input amplitudes for the
-%         iLaplace2D fit. (Default: 83)
+%         iLaplace2D fit or a graphics handle that can be a valid parent for
+%         that plot.
+%         (Default: 83)
 %
 %     plotFitAmp
 %         Scalar number for the figure showing the amplitudes for the fit that
-%         corresponds to the iLaplace2D result. (Default: 85)
+%         corresponds to the iLaplace2D result.
+%         (Default: 85)
 %
 %     plotResAmp
 %         Scalar number for the figure showing the residuals of the input
-%         amplitudes with respect to the fit amplitudes. (Default: 86)
+%         amplitudes with respect to the fit amplitudes.
+%         (Default: 86)
 %
 %     FullScaleAmplitude
 %         The input to the iLaplace2D transform can be normalized by
 %         get_iLaplace2D. This value corresponds to the full scale amplitude
 %         before the normalization. The value is informational only and is shown
-%         in the title of T1-T2 map if is non-empty. (Default: [])
+%         in the title of T1-T2 map if it is non-empty.
+%         (Default: [])
 %
 %
 % OUTPUT:
 %
-%   None.
+%   Seq
+%       Same as input argument Seq but potentially with updated fields (figure
+%       handles).
 %
 %
 % ------------------------------------------------------------------------------
-% (C) Copyright 2024 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2024-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
 
@@ -106,26 +114,31 @@ if ~isfield(Seq.iLaplace2D, 'FullScaleAmplitude')
   Seq.iLaplace2D.FullScaleAmplitude = []; %max(abs(data.iLaplace2D.DataAmplitude(:)));
 end
 
-% full-scale amplitude of the T1-T2 spectrum (in an integral sense)
-FS = sum(data.iLaplace2D.SpectrumAmplitude(:));
-
-T1 = data.iLaplace2D.T1;
-T2 = data.iLaplace2D.T2;
-
 tau1 = data.iLaplace2D.tau1;
 tau2 = data.iLaplace2D.tau2;
 
 
 %% plot "measured" signals
-if Seq.iLaplace2D.plotAmp > 0
-  hf = figure(Seq.iLaplace2D.plotAmp);
-  clf(hf);
+if (isnumeric(Seq.iLaplace2D.plotAmp) && Seq.iLaplace2D.plotAmp > 0) ...
+    || ishghandle(Seq.iLaplace2D.plotAmp, 'figure') ...
+    || ishghandle(Seq.iLaplace2D.plotAmp, 'uipanel')
+  if isnumeric(Seq.iLaplace2D.plotAmp)
+    hf = figure(Seq.iLaplace2D.plotAmp);
+    clf(hf);
+  else
+    hf = Seq.iLaplace2D.plotAmp;
+    delete(get(hf, 'Children'));
+  end
   hax = axes(hf);
-  surf(hax, tau2*1000, tau1*1000, data.iLaplace2D.DataAmplitude.', 'LineStyle', 'none');
-  colormap(hf, 'jet');
-  title(hax, 'Measured Signal Amplitude');
-  ylabel(hax, 'Preparation Time [ms]');
-  xlabel(hax, 'Echo Time [ms]');
+  surf(hax, tau2, tau1, data.iLaplace2D.DataAmplitude.', 'LineStyle', 'none');
+  colormap(hax, 'jet');
+  if isempty(Seq.iLaplace2D.FullScaleAmplitude)
+    title(hax, 'Measured Signal Amplitude');
+  else
+    title(hax, ['Measured Signal Amplitude [% FS] (FS = ' num2str(Seq.iLaplace2D.FullScaleAmplitude*1e9) ' nT)']);
+  end
+  ylabel(hax, 'Preparation Time [s]');
+  xlabel(hax, 'Echo Time [s]');
 end
 
 
@@ -158,6 +171,12 @@ end
 if (isnumeric(Seq.iLaplace2D.plotT1T2Map) && Seq.iLaplace2D.plotT1T2Map > 0) ...
     || ishghandle(Seq.iLaplace2D.plotT1T2Map, 'figure') ...
     || ishghandle(Seq.iLaplace2D.plotT1T2Map, 'uipanel')
+  % full-scale amplitude of the T1-T2 spectrum (in an integral sense)
+  FS = sum(data.iLaplace2D.SpectrumAmplitude(:));
+
+  T1 = data.iLaplace2D.T1;
+  T2 = data.iLaplace2D.T2;
+
   if isnumeric(Seq.iLaplace2D.plotT1T2Map)
     hf = figure(Seq.iLaplace2D.plotT1T2Map);
     set(hf, 'Name', 'T1-T2-map');
@@ -208,6 +227,14 @@ if (isnumeric(Seq.iLaplace2D.plotT1T2Map) && Seq.iLaplace2D.plotT1T2Map > 0) ...
   ylim(ax(5), [0, 100]);
   grid(ax(5), 'on');
   set(ax(5), 'YAxisLocation', 'right', 'Tag', 'tau2_accum');
+
+  % Another callback function might have been queued that deletes these axes.
+  % Call "drawnow" here (instead of implicitly in "linkaxes" to avoid using
+  % references to deleted graphics object.
+  drawnow();
+  if ~all(ishghandle(ax, 'axes'))
+    return;
+  end
 
   linkaxes(ax([1,2,4]), 'y');
   linkaxeskeep(ax([1,3,5]), 'x');
