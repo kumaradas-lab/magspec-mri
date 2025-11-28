@@ -1,14 +1,14 @@
 clear all;
 close all;
 
-fName = 'exp1';
+%fName = 'exp1';
 % --- Set up save directory in Google Drive ---
 baseFolder = 'G:\My Drive\MR_Thermometry\My runs';             % main directory on Google Drive, can change this to match the path in your Google Drive
 todayFolder = datestr(now, 'yyyy-mm-dd');           % folder named with today's date
 saveDir = fullfile(baseFolder, todayFolder);         % full path for today's run
 
 if ~exist(saveDir, 'dir')
-    mkdir(saveDir);                                 % create folder if it doesn't exist
+   mkdir(saveDir);                                 % create folder if it doesn't exist
 end
 
 timestamp = datestr(now, 'HHMMSS');
@@ -28,9 +28,9 @@ LoadSystem; % Load system parameters (reset to default: HW Seq AQ TX Grad)
 Seq.Loops = 1; % Number of loop averages
 
 % Define parameters
-Seq.T1 = 100e-3;
-Seq.tEcho = 15e-3; % try for 3, 5, 20
-Seq.tRep = 200e-3;    % try higher to stabilize the phase
+Seq.T1 = 2.8;    %change for water 
+Seq.tEcho = 12e-3; % try for 3, 5, 20
+Seq.tRep = 100e-3;    % try higher to stabilize the phase
 resolution = 32; % original 32x32
 thickness = 0.002; % original 0.002
 pausetime = 2;
@@ -84,9 +84,10 @@ Seq.AQSlice(1).plotPhase = 0;
 % Extra safety flags (PD code checks these too)
 Seq.plot = 0;
 Seq.AQPlot = 0;
-Seq.AQSlice(1).PlotImage = 0;
-Seq.AQSlice(1).PlotPhase = 0;
+%Seq.AQSlice(1).PlotImage = 0;
+%Seq.AQSlice(1).PlotPhase = 0;
 Seq.AQSlice(1).PlotkSpace = 0;
+
 Seq.AQSlice(1).ZeroFillWindowSize = 1.4;
 Seq.AQSlice(1).ZeroFillFactor = 4;
 Seq.AQSlice(1).ThicknessPos = [0 0 -0.01]; % position of the slice
@@ -94,6 +95,7 @@ Seq.AQSlice(1).ThicknessPos = [0 0 -0.01]; % position of the slice
 Seq.CorrectSliceRephase = 0;                        % Correct SliceGradTimeIntegralOffset
 Seq.CorrectReadRephase = 0;                         % Correct ReadGradTimeIntegralOffset
 Seq.CorrectPhase = 1;
+Seq.CorrectPhaseDuration = 1.5e-3;
 
 % Initialize data storage
 i = 0;
@@ -128,6 +130,7 @@ while true
   % else
   %   deltaphase = Imagephase - Referencephase;
   % end
+  
   %% Trying using 3x3 ROI innstead of single pixel for phase
   roiSize = 3;
   x1 = position - floor(roiSize/2);
@@ -148,7 +151,6 @@ while true
       unwrapped = unwrap(raw);
     deltaphase = unwrapped(end)-unwrapped(1);
   end
-  
   Deltaphase(i) = deltaphase;
   
   % Plot phase difference over time

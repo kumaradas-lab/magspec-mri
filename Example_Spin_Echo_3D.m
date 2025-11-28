@@ -31,9 +31,9 @@ Seq.AQSlice(1).TurboFactor = 1;                 % number of image k-lines per ex
 % Seq.AQSlice(1).TurboBreak = Seq.RepetitionTime;  % break between last echo and next excitation
 
 % % Orientation in space %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Seq.AQSlice(1).alfa = 0.0*pi;                   % 1st rotation around x axis in RAD
-Seq.AQSlice(1).phi = 0.0*pi;                    % 2nd rotation around y axis in RAD
-Seq.AQSlice(1).theta = 0.0*pi;                  % 3rd rotation around z axis in RAD
+Seq.AQSlice = get_AlphaPhiTheta(Seq.AQSlice, 'xyz');  % image encoding directions (slice/phase(1), phase(2), read/phase(3))
+% Seq.AQSlice = get_AlphaPhiTheta(Seq.AQSlice, 'yzx');  % image encoding directions (slice/phase(1), phase(2), read/phase(3))
+% Seq.AQSlice = get_AlphaPhiTheta(Seq.AQSlice, 'zxy');  % image encoding directions (slice/phase(1), phase(2), read/phase(3))
 
 % % Plot        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Seq.plotSeq = 1:3;                              % plot sequence on real timeline, plot RF, AQ and Grad (1==x, 2==y, 3==z, 0 no gradient)
@@ -72,6 +72,6 @@ end
 
 
 %% -----------------------------------------------------------------------------
-% (C) Copyright 2011-2020 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2024 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------

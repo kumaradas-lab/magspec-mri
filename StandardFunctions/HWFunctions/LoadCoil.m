@@ -21,6 +21,7 @@
 %#function LoadCoil_MultiCore_09
 %#function LoadCoil_MultiCore_10
 %#function LoadCoil_MultiCore_11
+%#function LoadCoil_MultiCore_12
 %#function LoadCoil_MultiCore_IDCycLIB
 %#function LoadCoil_RoPS_01
 %#function PD.Talker

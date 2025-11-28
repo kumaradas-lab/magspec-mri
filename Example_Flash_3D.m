@@ -6,9 +6,9 @@ LoadSystem;                                     % load system parameters (reset 
 
 Seq.Loops = 1;                                  % number of loop averages 1...
 
-Seq.T1 = 100e-3;                                % T1 of sample; excitation angle is acos(exp(-Seq.tRep/Seq.T1))/pi*180
+Seq.T1 = 110e-3;                                % T1 of sample; excitation angle is acos(exp(-Seq.tRep/Seq.T1))/pi*180
 Seq.tEcho = 3e-3;                               % echo time in seconds e.g. 4e-3
-Seq.tRep = 8e-3;                               % repetition time in seconds (default is Seq.tEcho*2)
+Seq.tRep = 16e-3;                               % repetition time in seconds (default is Seq.tEcho*2) changed from 8 because of the warning
 
 % % Pixels and size %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Seq.AQSlice(1).nRead = 32;                      % number of pixels in read direction

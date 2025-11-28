@@ -11,42 +11,58 @@ function [SpectrumTime, SpectrumAmplitudeOut, Seq] = get_iLaplace1D(DataTime, Da
 %
 %   DataTime
 %       Row vector with the independent variable (time).
+%
 %   DataAmplitude
-%       Row vector (or 2D matrix of row vectors) with the dependent variable
+%       Row vector (or 2-d matrix of row vectors) with the dependent variable
 %       (amplitude).
+%
 %   data
 %       Structure with the fields "DataTime" and "DataAmplitude" (see above).
+%
 %   Seq
 %       Structure with the field "iLaplace1D" containing the following fields:
+%
 %     QualityFactor
-%         Quality factor (Q-Factor) determining width of peaks in ILT spectrum
-%         (default: 50)
+%         Quality factor (Q-Factor) determining width of peaks in ILT spectrum.
+%         (Default: 50)
+%
 %     nSpectrum
-%         number of fit functions for the spectrum (default: 1000)
+%         number of fit functions for the spectrum
+%         (Default: 1000)
+%
 %     SpectrumTimeStart
 %         lowest decay constant in the fit functions for the spectrum
-%         (default: DataTime(1)/2)
+%         (Default: DataTime(1)/2)
+%
 %     SpectrumTimeEnd
 %         highest decay constant in the fit functions for the spectrum
-%         (default: max(DataTime)*10)
+%         (Default: max(DataTime)*10)
+%
 %     SpectrumTime
 %         vector with decay constants in the fit functions for the spectrum
-%         (default: logspace(log10(Seq.iLaplace1D.SpectrumTimeStart), ...
+%         (Default: logspace(log10(Seq.iLaplace1D.SpectrumTimeStart), ...
 %                            log10(Seq.iLaplace1D.SpectrumTimeEnd), ...
 %                            Seq.iLaplace1D.nSpectrum);)
+%
 %     SpectrumWeight
 %         vector with weights for the model function for each decay constant
-%         (default: ones(numel(iLaplace1D.SpectrumTime), 1);)
+%         (Default: ones(numel(iLaplace1D.SpectrumTime), 1);)
+%
 %     SpectrumTimeStartCut
 %         Cut (ignore) decay constants below this value in the resulting
-%         spectrum (default: Seq.iLaplace1D.SpectrumTimeStart)
+%         spectrum.
+%         (Default: Seq.iLaplace1D.SpectrumTimeStart)
+%
 %     SpectrumTimeEndCut
 %         Cut (ignore) decay constants above this value in the resulting
-%         spectrum (default: Seq.iLaplace1D.SpectrumTimeEnd)
+%         spectrum.
+%         (Default: Seq.iLaplace1D.SpectrumTimeEnd)
+%
 %     Problem
 %         Type of fit functions: 'Saturation' or 'Inversion' or 'Decay' or
 %         'ProblemFunctionHandle'.
 %         (Default: 'Decay')
+%
 %     ProblemFunctionHandle
 %         Handle to a function that is used to generate the base matrix for the
 %         inversion if Seq.iLaplace1D.Problem is set to 'ProblemFunctionHandle'.
@@ -58,29 +74,52 @@ function [SpectrumTime, SpectrumAmplitudeOut, Seq] = get_iLaplace1D(DataTime, Da
 %         get_iLaplace1D, and "A" is the base matrix for the inversion. "A" must
 %         be of the size (numel(DataTime)) x (numel(SpectrumTime)) containing
 %         the amplitudes of the bas functions for the generalized discrete
-%         inverse Laplace transform. (Default: [])
+%         inverse Laplace transform.
+%         (Default: [])
+%
 %     DataWeight
 %         Vector of the same size as DataTime with weights for a weighted
 %         (non-negative) least squares fit used in the (generalized) inverse
-%         Laplace transform. (Default: 1)
+%         Laplace transform.
+%         (Default: 1)
+%
 %     Plot
-%         Boolean (default: true)
+%         Plot figures with the result of the inverse Laplace transform.
+%         (Default: true)
+%
 %     hParent
 %         Handle to a parent (figure or uipanel) for the plot with the Laplace
-%         spectrum. If empty, figure 222 is used.
+%         spectrum.
+%         (If empty, figure 222 is used.)
+%
 %     raiseFigure
 %         If false and the figure already exists, the figure is not raised above
 %         other windows and doesn't steal the focus when plotted.
-%         (default: true)
+%         (Default: true)
+%
 %     IgnoreFirstEcho
-%         Ignore n first datapoints in DataTime and DataAmplitudes (default: 0)
+%         Ignore n first datapoints in DataTime and DataAmplitudes.
+%         (Default: 0)
+%
 %     AllowDataOffset
 %         Allow a global offset in DataAmplitude that is removed by the
-%         inversion algorithm. (default: true)
+%         inversion algorithm.
+%         (Default: true)
+%
 %     QFactorPreFitThreshold
 %         For smaller Q-Factors than this threshold, fit without regularization
 %         first. Then re-grid the data on a looser logarithmic grid for a second
-%         fit with the actual Q-Factor. (default: 50)
+%         fit with the actual Q-Factor.
+%         (Default: 50)
+%
+%     PenalizeStepHeight
+%         The discrete inverse Laplace transform is ill-conditioned in general.
+%         Two regularization approaches are implemented to improve the condition
+%         of the inversion.
+%         If true, the step height between neighboring bins in the output
+%         spectrum is penalized as a means of regularization. If false, the
+%         absolute spectrum amplitude is penalized.
+%         (Default: false)
 %
 %
 % OUTPUT:
@@ -117,12 +156,11 @@ function [SpectrumTime, SpectrumAmplitudeOut, Seq] = get_iLaplace1D(DataTime, Da
 %         handles to the axes in hParent with the results.
 %         (In data.axHandle if called with 2 input arguments.)
 %
+%
 % ------------------------------------------------------------------------------
 % (C) Copyright 2015-2025 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
-
-% 11.12.2015
 
 %% convert deprecated syntax to new syntax
 
@@ -140,8 +178,8 @@ if ~isfield(Seq, 'iLaplace1D')
 end
 iLaplace1D = Seq.iLaplace1D;
 
-% Quality factor (Q-Factor) determining width of peaks in ILT spectrum
 if isemptyfield(iLaplace1D, 'QualityFactor')
+  % Quality factor (Q-Factor) determining width of peaks in ILT spectrum
   iLaplace1D.QualityFactor = 50;
 end
 if ~isemptyfield(iLaplace1D, 'SpectrumTime')
@@ -151,48 +189,85 @@ if ~isemptyfield(iLaplace1D, 'SpectrumTime')
   iLaplace1D.SpectrumTimeStart = min(iLaplace1D.SpectrumTime);
   iLaplace1D.SpectrumTimeEnd = max(iLaplace1D.SpectrumTime);
 end
-% number of fit functions for the spectrum
 if isemptyfield(iLaplace1D, 'nSpectrum')
+  % number of fit functions for the spectrum
   iLaplace1D.nSpectrum = 1000;
 end
-% lowest decay constant in the fit functions for the spectrum
 if isemptyfield(iLaplace1D, 'SpectrumTimeStart')
+  % lowest decay constant in the fit functions for the spectrum
   iLaplace1D.SpectrumTimeStart = DataTime(1)/2;
 end
-% highest decay constant in the fit functions for the spectrum
 if isemptyfield(iLaplace1D, 'SpectrumTimeEnd')
+  % highest decay constant in the fit functions for the spectrum
   iLaplace1D.SpectrumTimeEnd = max(DataTime)*10;
 end
-% vector with decay constants in the fit functions for the spectrum
 if isemptyfield(iLaplace1D, 'SpectrumTime')
+  % vector with decay constants in the fit functions for the spectrum
   % span of T2 values (logarithmic)
   iLaplace1D.SpectrumTime = ...
     logspace(log10(iLaplace1D.SpectrumTimeStart), ...
              log10(iLaplace1D.SpectrumTimeEnd), ...
              iLaplace1D.nSpectrum);
 end
-% vector with weights for the model function for each decay constant
 if isemptyfield(iLaplace1D, 'SpectrumWeight')
+  % vector with weights for the model function for each decay constant
   iLaplace1D.SpectrumWeight = ones(numel(iLaplace1D.SpectrumTime), 1);
 end
 
-iLaplace1D = set_EmptyField(iLaplace1D, 'SpectrumTimeStartCut',   iLaplace1D.SpectrumTimeStart*1);    % T2 start cut
-iLaplace1D = set_EmptyField(iLaplace1D, 'SpectrumTimeEndCut',     iLaplace1D.SpectrumTimeEnd*1);      % T2 grid stop
-iLaplace1D = set_EmptyField(iLaplace1D, 'Problem',                'Decay');                           % 'Saturation' or 'Inversion' or 'Decay' or 'ProblemFunctionHandle'
-iLaplace1D = set_EmptyField(iLaplace1D, 'ProblemFunctionHandle',  []);                                % ProblemFunctionHandle for A and AFit
-iLaplace1D = set_EmptyField(iLaplace1D, 'Plot',                   1);                                 % Plot
-iLaplace1D = set_EmptyField(iLaplace1D, 'hParent',                222);                               % handle to parent
-iLaplace1D = set_EmptyField(iLaplace1D, 'raiseFigure',            true);                              % raise figure each time function is called
-iLaplace1D = set_EmptyField(iLaplace1D, 'IgnoreFirstEcho',        0);                                 % Ignore First x Echoes
-iLaplace1D = set_EmptyField(iLaplace1D, 'DataWeight',             1);                                 % weighing factors for fit
-% allow an offset in the input data
+if isemptyfield(iLaplace1D, 'SpectrumTimeStartCut')
+  % T2 start cut
+  iLaplace1D.SpectrumTimeStartCut = iLaplace1D.SpectrumTimeStart*1;
+end
+if isemptyfield(iLaplace1D, 'SpectrumTimeEndCut')
+  % T2 grid stop
+  iLaplace1D.SpectrumTimeEndCut = iLaplace1D.SpectrumTimeEnd*1;
+end
+if isemptyfield(iLaplace1D, 'Problem')
+  % 'Saturation' or 'Inversion' or 'Decay' or 'ProblemFunctionHandle'
+  iLaplace1D.Problem = 'Decay';
+end
+if isemptyfield(iLaplace1D, 'ProblemFunctionHandle')
+  % ProblemFunctionHandle for A and AFit
+  iLaplace1D.ProblemFunctionHandle = [];
+end
+if isemptyfield(iLaplace1D, 'Plot')
+  % plot
+  iLaplace1D.Plot = 1;
+end
+if isemptyfield(iLaplace1D, 'hParent')
+  % handle to parent
+  iLaplace1D.hParent = 222;
+end
+if isemptyfield(iLaplace1D, 'raiseFigure')
+  % raise figure each time function is called
+  iLaplace1D.raiseFigure = true;
+end
+if isemptyfield(iLaplace1D, 'IgnoreFirstEcho')
+  % ignore first x echoes
+  iLaplace1D.IgnoreFirstEcho = 0;
+end
+if isemptyfield(iLaplace1D, 'DataWeight')
+  % weighting factors for fit
+  iLaplace1D.DataWeight = 1;
+end
 if isemptyfield(iLaplace1D, 'AllowDataOffset')
+  % allow an offset in the input data
   iLaplace1D.AllowDataOffset = true;
 end
 
-iLaplace1D = set_EmptyField(iLaplace1D, 'QFactorPreFitThreshold', 50);                                % For smaller Q-Factors: Fit without Q-Factor first and re-grid the data for second fit with Q-Factor
+if isemptyfield(iLaplace1D, 'QFactorPreFitThreshold')
+  % For smaller Q-Factors: Fit without Q-Factor first and re-grid the data for
+  % second fit with Q-Factor
+  iLaplace1D.QFactorPreFitThreshold = 50;
+end
+if isemptyfield(iLaplace1D, 'PenalizeStepHeight')
+  iLaplace1D.PenalizeStepHeight = false;
+end
+
 Seq.iLaplace1D = iLaplace1D;
 
+
+%%
 if Seq.iLaplace1D.IgnoreFirstEcho > 0
   DataAmplitude = DataAmplitude(Seq.iLaplace1D.IgnoreFirstEcho+1:end,:,:,:,:,:);
   DataTime = DataTime(Seq.iLaplace1D.IgnoreFirstEcho+1:end);
@@ -295,14 +370,14 @@ end
 
 
 %% Solve linear equations
-sizeDataAmplitude = [size(DataAmplitude,1),size(DataAmplitude,2),size(DataAmplitude,3),size(DataAmplitude,4),size(DataAmplitude,5)];
-SpectrumAmplitudeOut=       zeros([numel(SpectrumTime)-2*double(strcmp(Seq.iLaplace1D.Problem,'Inversion')),sizeDataAmplitude(2:end)]);
-SpectrumAmplitudeOffsetOut= zeros([1,sizeDataAmplitude(2:end)]);
-FitAmplitudeOut=            zeros(size(FitTime));
-FitAmplitudeAtDataTimeOut=  zeros(size(DataAmplitude));
-FitResidualOut=             zeros(size(DataAmplitude));
-FSOut=                      zeros([1,sizeDataAmplitude(2:end)]);
-DataAmplitudeOut=           DataAmplitude;
+sizeDataAmplitude = [size(DataAmplitude,1), size(DataAmplitude,2), size(DataAmplitude,3), size(DataAmplitude,4), size(DataAmplitude,5)];
+SpectrumAmplitudeOut = zeros([numel(SpectrumTime)-2*double(strcmp(Seq.iLaplace1D.Problem,'Inversion')), sizeDataAmplitude(2:end)]);
+SpectrumAmplitudeOffsetOut = zeros([1, sizeDataAmplitude(2:end)]);
+FitAmplitudeOut = zeros(size(FitTime));
+FitAmplitudeAtDataTimeOut = zeros(size(DataAmplitude));
+FitResidualOut = zeros(size(DataAmplitude));
+FSOut = zeros([1, sizeDataAmplitude(2:end)]);
+DataAmplitudeOut = DataAmplitude;
 
 maxQFactor = 1e6;
 if (Seq.iLaplace1D.QualityFactor < Seq.iLaplace1D.QFactorPreFitThreshold) && ...
@@ -314,28 +389,87 @@ end
 
 G = cell(1, numel(QualityFactor));
 
-for t=1:numel(DataAmplitudeOut)/size(DataAmplitudeOut,1)
+% loop over pixels or voxels in input for map
+for t = 1:numel(DataAmplitudeOut)/size(DataAmplitudeOut,1)
   DataAmplitude = DataAmplitudeOut(:,t);
   DataAmplitudeFit = double(DataAmplitude);
   for iQF = 1:numel(QualityFactor)
     if QualityFactor(iQF) < maxQFactor
       if t == 1
+        % create matrix with coefficients for linear system of equations for
+        % first pixel or voxel only. It can be re-used for all other pixels or
+        % voxels in the map.
+
         % include regularization in design matrix
         if iLaplace1D.AllowDataOffset
           SpectrumWeightWithOffset = [iLaplace1D.SpectrumWeight, 1, 1];
+          SpectrumTimeWithOffset = [SpectrumTime, 1, 1];
         else
           SpectrumWeightWithOffset = iLaplace1D.SpectrumWeight;
+          SpectrumTimeWithOffset = SpectrumTime;
         end
-        penalty = (1/QualityFactor(iQF)^4 * (sum(abs(A),1) ./ SpectrumWeightWithOffset)).^0.5;
-        if iLaplace1D.AllowDataOffset
-          % reduce penalty for offset
-          penalty(end-1:end) = penalty(end-1:end)*1e-6;
+        if iLaplace1D.PenalizeStepHeight
+          % penalize large steps between neighboring bins in output spectrum
+
+          % The more different the model function for neighboring bins are, the
+          % lower is the penalty.
+          % Additionally, rescale with amplitude of model functions to have
+          % similar effect of QualitiyFactor to other branch.
+          diffAWeighted =  conv(SpectrumWeightWithOffset, [0.5, 0.5], 'valid') ...
+            ./ sqrt(mean(diff(abs(A), [], 2).^2, 1)) ...
+            .* conv(mean(abs(A), 1), [0.5, 0.5], 'valid');
+          % neighborPenalty = (1/QualityFactor(iQF)^4 * sum(diffAWeighted, 1)).^0.5;
+          neighborPenalty = (1/QualityFactor(iQF)^4 * diffAWeighted).^0.5;
+          % Allow higher steps if neighboring bins in spectrum are further
+          % apart.
+          spectrumStep = diff(SpectrumTimeWithOffset);
+          meanSpectrumStep = mean(spectrumStep(1:(numel(SpectrumTime)-1)));
+          neighborPenalty = neighborPenalty ./ sqrt(spectrumStep / meanSpectrumStep);
+          G{iQF} = [A; diag([neighborPenalty,0])-diag(neighborPenalty, 1)];
+          if iLaplace1D.AllowDataOffset
+            % remove line with "step height" from last model function to
+            % positive offset
+            G{iQF}(end-2,:) = [];
+            G{iQF}(end-1:end,:) = 0;
+            % set penalty for offset on last two diagonal elements
+            penaltyOffset = ...
+              mean(neighborPenalty(1:(numel(SpectrumTime)-1))) ...
+              * meanSpectrumStep / numel(SpectrumTime);
+            G{iQF}(end-1,end-1) = penaltyOffset;
+            G{iQF}(end,end) = penaltyOffset;
+          else
+            % remove line with "step height" from last model function to nothing
+            G{iQF}(end,:) = [];
+          end
+        else
+          % penalize large amplitudes of bins in output spectrum
+          penalty = (1/QualityFactor(iQF)^4 * (sum(abs(A),1) ./ SpectrumWeightWithOffset)).^0.5;
+          if iLaplace1D.AllowDataOffset
+            % reduce penalty for offset
+            penalty(end-1:end) = penalty(end-1:end)*1e-6;
+          end
+          G{iQF} = [A; diag(penalty)];
         end
-        G{iQF} = [A; diag(penalty)];
       end
-      d = [DataAmplitudeFit; zeros(size(A,2),1)]; % include zeros in signal-vector
+
+      % include zeros in signal-vector
+      if iLaplace1D.PenalizeStepHeight
+        d = [DataAmplitudeFit; zeros(size(A, 2)-1, 1)];
+      else
+        d = [DataAmplitudeFit; zeros(size(A, 2), 1)];
+      end
     else
-      if t==1, G{iQF} = A; end     % no regularization term in design matrix
+      % no regularization in design matrix for very high QualityFactor
+      % This might be the first step of the iQF loop that is only used to reduce
+      % number of data along input time dimension (see below).
+      if t == 1
+        % create matrix with coefficients for linear system of equations for
+        % first pixel or voxel only. It can be re-used for all other pixels or
+        % voxels in the map.
+
+        % no regularization term in design matrix
+        G{iQF} = A;
+      end
       d = DataAmplitudeFit;  % no zeros in signal-vector
     end
 
@@ -347,27 +481,35 @@ for t=1:numel(DataAmplitudeOut)/size(DataAmplitudeOut,1)
       lsqnonneg(G{iQF}, double(d), options);
 
     if iQF == 1 && length(QualityFactor) > 1
-      % re-grid DataAmplitude with fitted data on reduced logarithmic timegrid
-      DataTimeReduced = logspace(log10(min(DataTime)), log10(max(DataTime)), Seq.iLaplace1D.nSpectrum).';
-      if strcmp(Seq.iLaplace1D.Problem, 'Inversion')
-        % Inversion Problem
-        A = 1 - 2*exp(-(DataTimeReduced)*(1./SpectrumTime));
-      elseif strcmp(Seq.iLaplace1D.Problem, 'Saturation')
-        % Saturation Problem
-        A = 1 - 1*exp(-(DataTimeReduced)*(1./SpectrumTime));
-      elseif strcmp(Seq.iLaplace1D.Problem, 'Decay')
-        % Decay Problem
-        A = exp(-(DataTimeReduced)*(1./SpectrumTime));
-      elseif strcmp(Seq.iLaplace1D.Problem, 'ProblemFunctionHandle')
-        % ProblemFunctionHandle Problem
-        A = Seq.iLaplace1D.ProblemFunctionHandle(DataTimeReduced,SpectrumTime,Seq);
-      else
-        error('Seq.iLaplace1D.Problem must be ''Saturation'', ''Inversion'', ''Decay'' or ''ProblemFunctionHandle''.');
-      end
-      A = bsxfun(@times, A, iLaplace1D.SpectrumWeight);
-      if iLaplace1D.AllowDataOffset
-        % separate pos and neg offset for lsqnonneg
-        A = [A, ones(size(A,1),1), -ones(size(A,1),1)];  %#ok<AGROW>
+      % reduce number of data along input time dimension to reduce computational
+      % cost
+      if t == 1
+        % create matrix with coefficients for linear system of equations for
+        % first pixel or voxel only. It can be re-used for all other pixels or
+        % voxels in the map.
+
+        % re-grid DataAmplitude with fitted data on reduced logarithmic timegrid
+        DataTimeReduced = logspace(log10(min(DataTime)), log10(max(DataTime)), Seq.iLaplace1D.nSpectrum).';
+        if strcmp(Seq.iLaplace1D.Problem, 'Inversion')
+          % Inversion Problem
+          A = 1 - 2*exp(-(DataTimeReduced)*(1./SpectrumTime));
+        elseif strcmp(Seq.iLaplace1D.Problem, 'Saturation')
+          % Saturation Problem
+          A = 1 - 1*exp(-(DataTimeReduced)*(1./SpectrumTime));
+        elseif strcmp(Seq.iLaplace1D.Problem, 'Decay')
+          % Decay Problem
+          A = exp(-(DataTimeReduced)*(1./SpectrumTime));
+        elseif strcmp(Seq.iLaplace1D.Problem, 'ProblemFunctionHandle')
+          % ProblemFunctionHandle Problem
+          A = Seq.iLaplace1D.ProblemFunctionHandle(DataTimeReduced,SpectrumTime,Seq);
+        else
+          error('Seq.iLaplace1D.Problem must be ''Saturation'', ''Inversion'', ''Decay'' or ''ProblemFunctionHandle''.');
+        end
+        A = bsxfun(@times, A, iLaplace1D.SpectrumWeight);
+        if iLaplace1D.AllowDataOffset
+          % separate pos and neg offset for lsqnonneg
+          A = [A, ones(size(A,1),1), -ones(size(A,1),1)];  %#ok<AGROW>
+        end
       end
       DataAmplitudeFit = A * SpectrumAmplitude;
    end
@@ -393,7 +535,7 @@ for t=1:numel(DataAmplitudeOut)/size(DataAmplitudeOut,1)
   %% plot results
   FitAmplitudeAtDataTime = ...
     G{1}(1:length(DataAmplitude),...
-         1:end-(2*Seq.iLaplace1D.AllowDataOffset)) * SpectrumAmplitude ./ Seq.iLaplace1D.DataWeight...
+         1:end-(2*Seq.iLaplace1D.AllowDataOffset)) * SpectrumAmplitude ./ Seq.iLaplace1D.DataWeight ...
     + SpectrumAmplitudeOffset;
   FitAmplitude = AFit * SpectrumAmplitude + SpectrumAmplitudeOffset;
   FitResidual = DataAmplitude - FitAmplitudeAtDataTime;
@@ -447,6 +589,9 @@ for t=1:numel(DataAmplitudeOut)/size(DataAmplitudeOut,1)
     subplot(4,1,4, ax(4));
     drawnow expose;
   end
+
+  % reverse effect of weighting on spectrum amplitudes
+  SpectrumAmplitude = SpectrumAmplitude .* iLaplace1D.SpectrumWeight.';
 
   if strcmp(Seq.iLaplace1D.Problem, 'Inversion')
     if t == numel(DataAmplitudeOut)/size(DataAmplitudeOut,1)
