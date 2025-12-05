@@ -28,7 +28,7 @@ LoadSystem; % Load system parameters (reset to default: HW Seq AQ TX Grad)
 Seq.Loops = 1; % Number of loop averages
 
 % Define parameters
-Seq.T1 = 2.8;    %change for water 
+Seq.T1 = 2.6;    %change for water 
 Seq.tEcho = 12e-3; % try for 3, 5, 20
 Seq.tRep = 100e-3;    % try higher to stabilize the phase
 resolution = 32; % original 32x32
@@ -84,10 +84,7 @@ Seq.AQSlice(1).plotPhase = 0;
 % Extra safety flags (PD code checks these too)
 Seq.plot = 0;
 Seq.AQPlot = 0;
-%Seq.AQSlice(1).PlotImage = 0;
-%Seq.AQSlice(1).PlotPhase = 0;
 Seq.AQSlice(1).PlotkSpace = 0;
-
 Seq.AQSlice(1).ZeroFillWindowSize = 1.4;
 Seq.AQSlice(1).ZeroFillFactor = 4;
 Seq.AQSlice(1).ThicknessPos = [0 0 -0.01]; % position of the slice
@@ -95,17 +92,20 @@ Seq.AQSlice(1).ThicknessPos = [0 0 -0.01]; % position of the slice
 Seq.CorrectSliceRephase = 0;                        % Correct SliceGradTimeIntegralOffset
 Seq.CorrectReadRephase = 0;                         % Correct ReadGradTimeIntegralOffset
 Seq.CorrectPhase = 1;
-Seq.CorrectPhaseDuration = 1.5e-3;
+Seq.CorrectPhaseDuration = 2.5e-3;
 
 % Initialize data storage
 i = 0;
 tStart = tic;
-Referencephase = 0;
-phase_diff_figure = figure('Name', 'Phase Difference vs. Time');
+roiSize = 3;
+Timedata = [];
+TemperatureData = [];
+Phasedata = [];
+Acquisitiondata = {};
 
 while true
   i = i + 1;
-  disp("Acquisition of Image " + num2str(i));
+  fprintf ("Acquisition of Imege %d\n", i)
   
   time = toc(tStart);
   Timedata(i) = time;
@@ -115,87 +115,57 @@ while true
   
   % Run MRI acquisition sequence
   [SeqLoop, mySave] = sequence_Flash(HW, Seq, AQ, TX, Grad, mySave);
-  Acquisitiondata(i) = SeqLoop;
+  Acquisitiondata{i} = SeqLoop;
   
-  % Extract phase data from acquired image
-  Imagephase = unwrap(angle(SeqLoop.data.Image(position, 1, position)));
-  Phasedata(i) = Imagephase;
+  % Trying using 3x3 ROI innstead of single pixel for phase
   
-  % Compute phase difference
-  % if i < 4
-  %   deltaphase = 0;
-  % elseif i == 5
-  %   Referencephase = Phasedata(5);
-  %   deltaphase = 0;
-  % else
-  %   deltaphase = Imagephase - Referencephase;
-  % end
-  
-  %% Trying using 3x3 ROI innstead of single pixel for phase
-  roiSize = 3;
   x1 = position - floor(roiSize/2);
   x2 = position + floor(roiSize/2);
-  roi = SeqLoop.data.Image (x1:x2, 1, x1:x2);
-  roi_mean_phase = angle(mean(roi(:)));
+  roi = SeqLoop.data.Image (x1:x2, 1, x1:x2);   %3x3 ROI in central slice
 
+  roi_mean_phase = angle(mean(roi(:)));
   Phasedata(i)=roi_mean_phase;
-  %%
-  %Compute phase difference
-  if i < 4
-    deltaphase = 0;
-  elseif i == 5
-    Referencephase = roi_mean_phase;
-    deltaphase = 0;
-  else
-      raw= [Referencephase roi_mean_phase];
-      unwrapped = unwrap(raw);
-    deltaphase = unwrapped(end)-unwrapped(1);
-  end
-  Deltaphase(i) = deltaphase;
-  
-  % Plot phase difference over time
-  figure(phase_diff_figure);
-  hold on;
-  plot(gca, time, deltaphase, '-o');
-  xlabel('Time (s)');
-  ylabel('Phase difference (rad)');
-  title('Phase difference Vs Time');
-  
-  pause(2); % Pausing for next acquisition
   
   % Stop acquisition if measurement time is exceeded
   if Timedata(i) > measurement_time
     break;
   end
 end
+%% ---- POST PROCESSING: unwrap and reference substraction
+Phasedata_unwrapped = unwrap(Phasedata);
+refIdx =5;
+Referencephase = Phasedata_unwrapped(refIdx);
+
+Deltaphase = Phasedata_unwrapped -Referencephase;
+
+phase_diff_figure = figure ('Name', 'Last Image: Magnitude & Phase');
+plot(Timedata, Deltaphase, '-o');
+xlabel('Time(s)');
+ylabel('Phase difference (rad)');
+title('Phase Difference vs Time');
+grid on;
 
 % plot image and phase of the last image acquired
-figure5 = figure('Name', 'Delta Phase over time');
-figure(figure5)
+figure5 = figure('Name', 'Last Imgae: Magnitude & Phase');
 subplot(1,2,1)
-
-% Imagemangnitude = abs(reshape(SeqLoop.data.Image(:,1,:), [[],32]));
-% % changed by Isabella
-Imagemangnitude = squeeze(abs(SeqLoop.data.Image(:, 1, :)));
+Imagemangnitude = squeeze(abs(SeqLoop.data.Image(:, 1, :)));  %changed by Isabella
 imagesc(Imagemangnitude)
-colorbar
-axis equal
+axis equal tight;
+colorbar;
 title('Magnitude of the Image')
 
 subplot(1,2,2)
-% Imagephases = angle(reshape(SeqLoop.data.Image(:,1,:), [[],32]));
-% % changed by Isabella
-Imagephases = squeeze(angle(SeqLoop.data.Image(:, 1, :)));
+Imagephases = squeeze(angle(SeqLoop.data.Image(:, 1, :))); % changed by Isabella
 imagesc(Imagephases)
-colorbar 
-axis equal
+axis equal tight;
+colorbar;
 title('Image Phasemap')
 % Save full figure after both subplots are drawn
 saveas(figure5, fullfile(saveDir, ['Image_Magnitude_Phase_' timestamp '.png']));
 
 
 % Save all data
-save([fName '.mat'], 'Timedata', 'TemperatureData', 'Phasedata', 'Deltaphase', 'Acquisitiondata');
+save([fName '.mat'], 'Timedata', 'TemperatureData', 'Phasedata', 'Phasedata_unwrapped', 'Deltaphase', 'Acquisitiondata');
 csvwrite([fName '.csv'], [Timedata' TemperatureData' Phasedata' Deltaphase']);
 saveas(phase_diff_figure, [fName '.png']);
 
@@ -210,11 +180,13 @@ xlabel('Temperature (°C)');
 ylabel('Phase Difference (rad)');
 title('Phase Difference vs Temperature');
 grid on;
+
 p = polyfit(TemperatureData, Deltaphase, 1);
 yfit = polyval(p, TemperatureData);
 hold on;
 plot(TemperatureData, yfit, '--r');
 legend('Data', sprintf('Fit: y = %.3fx + %.3f', p(1), p(2)));
+
 saveas(gcf, fullfile(saveDir, ['Phase_vs_Temperature' timestamp '.png']));
 
 save(fullfile(saveDir, ['Trial5_Res32_TR300_RoomTemp_oil_Apr9' timestamp '.mat']));
