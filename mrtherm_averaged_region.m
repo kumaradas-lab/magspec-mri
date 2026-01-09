@@ -28,9 +28,9 @@ LoadSystem; % Load system parameters (reset to default: HW Seq AQ TX Grad)
 Seq.Loops = 1; % Number of loop averages
 
 % Define parameters
-Seq.T1 = 2.6;    %change for water 
-Seq.tEcho = 12e-3; % try for 3, 5, 20
-Seq.tRep = 100e-3;    % try higher to stabilize the phase
+Seq.T1 = 3000e-3;    %change for water 
+Seq.tEcho = 5e-3; % try for 3, 5, 20
+Seq.tRep = 200e-3;    % try higher to stabilize the phase
 resolution = 32; % original 32x32
 thickness = 0.002; % original 0.002
 pausetime = 2;
