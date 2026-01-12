@@ -35,7 +35,7 @@ resolution = 32; % original 32x32
 thickness = 0.002; % original 0.002
 pausetime = 2;
 position = resolution / 2;
-measurement_time = 300; % Run time in seconds
+measurement_time = 100; % Run time in seconds
 
 
 % % Pixels and size %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
