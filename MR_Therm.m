@@ -25,7 +25,7 @@ resolution = 32;
 thickness = 0.002;     
 pausetime = 2;         
 position = resolution/2; 
-measurement_time = 300; % s
+measurement_time = 200; % s
 
 %% --- Acquisition parameters ---
 Seq.AQSlice(1).nRead = resolution;
@@ -108,6 +108,14 @@ B0 = 0.55;             % T
 alpha = -0.01e-6;      % ppm/°C
 TE = Seq.tEcho;         % s
 DeltaT = Deltaphase / (gamma * alpha * B0 * TE);
+
+%%---Plot temperature difference calculated from the phase ---
+figure; 
+plot(Timedata, DeltaT, '-o');
+xlabel('Time (s)');
+ylabel('Temperature Change');
+title('MR Thermometry Temperature vs Time');
+grid on;
 
 %% --- Plot phase difference over time ---
 figure('Name','Phase Difference vs Time');
