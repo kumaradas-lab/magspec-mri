@@ -6,9 +6,9 @@ LoadSystem;                                     % load system parameters (reset 
 
 Seq.Loops = 1;                                  % number of loop averages 1...
 
-Seq.T1 = 110e-3;                                % T1 of sample; excitation angle is acos(exp(-Seq.tRep/Seq.T1))/pi*180
+Seq.T1 = 3;                                % T1 of sample; excitation angle is acos(exp(-Seq.tRep/Seq.T1))/pi*180
 Seq.tEcho = 3e-3;                               % echo time in seconds e.g. 4e-3
-Seq.tRep = 16e-3;                               % repetition time in seconds (default is Seq.tEcho*2) changed from 8 because of the warning
+Seq.tRep = 200e-3;                               % repetition time in seconds (default is Seq.tEcho*2) changed from 8 because of the warning
 
 % % Pixels and size %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Seq.AQSlice(1).nRead = 32;                      % number of pixels in read direction
@@ -37,7 +37,7 @@ Seq.plotSeq = 1:3;                              % plot sequence on real timeline
 Seq.LoopPlot = 1;                               % plot every loop
 Seq.AQSlice(1).plotkSpace = 0;                  % plot k-space
 Seq.AQSlice(1).plotImage = 1;                   % plot image
-Seq.AQSlice(1).plotPhase = 0;                   % plot phase of k-space or image
+Seq.AQSlice(1).plotPhase = 1;                   % plot phase of k-space or image
 Seq.AQSlice(1).plotB0ppm = 0;                   % plot B0 ppm (only 3D)
 Seq.AQSlice(1).plotB0Hz = 0;                    % plot B0 Hz
 Seq.AQSlice(1).ZeroFillWindowSize = 1.4;        % zero fill window size (high k-space values are damped by a cos^2 law)
