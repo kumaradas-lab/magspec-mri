@@ -20,12 +20,12 @@ Seq.Loops = 1;
 Seq.T1 = 3;          % T1 for water (s)
 Seq.tEcho = 3e-3;     % TE (s)
 Seq.tRep = 200e-3;     % TR (s)
-Seq.CorrectPhaseDuration = 0.9e-3;  % s
+Seq.CorrectPhaseDuration = 0.6e-3;  % s
 resolution = 32;       
 thickness = 0.002;     
 %pausetime = 2;         
 position = resolution/2; 
-measurement_time = 540; % s
+measurement_time = 420; % s
 
 %% --- Acquisition parameters ---
 Seq.AQSlice(1).nRead = resolution;
@@ -64,7 +64,7 @@ TemperatureData = [];
 Phasedata = [];
 Acquisitiondata = {};
 roiSize = 3;
-
+%Seq.CorrectPhase =0;
 %% --- Start acquisition ---
 tStart = tic;
 i = 0;
@@ -101,29 +101,31 @@ Phasedata_unwrapped = unwrap(Phasedata); % unwrap entire series
 refIdx = 5; % baseline image (ignore first few transient images)
 Referencephase = Phasedata_unwrapped(refIdx);
 Deltaphase = Phasedata_unwrapped - Referencephase;
+idx = refIdx:length(Timedata);
 
-%% --- Optional: convert phase difference to temperature ---
-gamma = 2*pi*42.58e6; % rad/T/s
-B0 = 0.55;             % T
-alpha = -0.01e-6;      % ppm/°C
-TE = Seq.tEcho;         % s
-ReferenceT = TemperatureData (refIdx);
-DeltaTemp_sensor = TemperatureData - ReferenceT; 
-DeltaT = Deltaphase / (gamma * alpha * B0 * TE);
-figure; plot(Timedata, DeltaT, '-o'); xlabel('Time (s)'); ylabel('Temperature Change'); title('MR Thermometry Temperature vs Time'); grid on;
+Timedata_p = Timedata(idx);
+TemperatureData_p = TemperatureData(idx);
+Deltaphase_p = Deltaphase(idx);
+
 
 %% --- Plot phase difference over time ---
 figure('Name','Phase Difference vs Time');
-plot(Timedata, Deltaphase, '-o','LineWidth',1.5);
+plot(Timedata_p, Deltaphase_p, '-o','LineWidth',1.5);
 xlabel('Time (s)'); ylabel('Phase Difference (rad)');
 title('Phase Difference vs Time'); grid on;
 saveas(gcf, fullfile(saveDir, ['Phase_vs_Time_' timestamp '.png']));
 
 %% --- Plot phase difference over Osensa Temperature ---
 figure('Name','Phase Difference vs Temperature');
-plot(Timedata, Deltaphase, '-o','LineWidth',1.5);
+plot(TemperatureData_p, Deltaphase_p, '-o','LineWidth',1.5);
 xlabel('Temperature(°C)'); ylabel('Phase Difference (rad)');
 title('Phase Difference vs Temperature'); grid on;
+pT = polyfit(TemperatureData_p, Deltaphase_p, 1);
+yfitT = polyval(pT, TemperatureData_p);
+hold on;
+plot(TemperatureData_p, yfitT, '--r');
+
+legend('Data', sprintf('Fit: y = %.3fx + %.3f', pT(1), pT(2)));
 saveas(gcf, fullfile(saveDir, ['Phase_vs_Temperature_' timestamp '.png']));
 
 
@@ -148,24 +150,42 @@ csvwrite([fName '.csv'], [Timedata' TemperatureData' Phasedata' Deltaphase']);
 osensa_dev.close();
 disp('Osensa Transmitter OFF');
 
+%% ---- ΔPhase vs ΔTemperature (PRF thermometry + alpha estimate) ----
+ReferenceT = TemperatureData(refIdx);
+DeltaTemp = TemperatureData - ReferenceT;
+DeltaTemp_p = DeltaTemp(idx);
+Deltaphase_p = Deltaphase(idx);
+
 figure;
-plot(DeltaTemp_sensor, Deltaphase, 'o','LineWidth',1.5);
+plot(DeltaTemp_p, Deltaphase_p, 'o','LineWidth',1.5);
 xlabel('\Delta Temperature (°C)');
 ylabel('\Delta Phase (rad)');
 title('PRF Thermometry: \Delta\phi vs \DeltaT');
 grid on;
 hold on;
 
-p = polyfit(DeltaTemp_sensor, Deltaphase, 1); % slope = rad / °C
-plot(DeltaTemp_sensor, polyval(p,DeltaTemp_sensor), '--r');
+% Linear fit: slope = rad / °C
+p = polyfit(DeltaTemp_p, Deltaphase_p, 1);
+plot(DeltaTemp_p, polyval(p, DeltaTemp_p), '--r');
 
+%% ---- Estimate alpha ----
 gamma = 2*pi*42.58e6;   % rad/T/s
-B0 = 0.55;              % T
-TE = Seq.tEcho;         % s
+B0 = 0.55;              % Tesla
+TE = Seq.tEcho;         % seconds
 
-alpha_est = p(1) / (gamma * B0 * TE); % ppm/°C (in fractional units)
+alpha_est = p(1) / (gamma * B0 * TE);   % fractional / °C
+alpha_ppm = alpha_est * 1e6;            % ppm / °C
 
-legend('Data', sprintf('\\alpha = %.3e /°C', alpha_est));
+%% ---- Display results ----
+fprintf('Estimated PRF coefficient alpha:\n');
+fprintf('  alpha = %.3e /°C (%.3f ppm/°C)\n', alpha_est, alpha_ppm);
+
+legend('Data', ...
+       sprintf('\\Delta\\phi = %.3f\\DeltaT + %.3f', p(1), p(2)), ...
+       'Location','best');
+
+saveas(gcf, fullfile(saveDir, ['DeltaPhase_vs_DeltaTemp_' timestamp '.png']));
+
 
 %% --- Save EVERYTHING (workspace snapshot, safe for big files) ---
 save([fName '_ALL.mat'], '-v7.3');
