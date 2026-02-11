@@ -7,7 +7,7 @@
 
 %% Echo Multi Freq Drift
 % Preparations
-LoadSystem;                                                   % load system parameters
+%LoadSystem;                                                   % load system parameters
 [HW, mySave] = Find_Frequency_Sweep(HW, mySave, 0, [], 1);    % find magnet frequency
 
 
@@ -98,14 +98,24 @@ for loop = 1:Seq.loops
     if loop == 1
       hl = plot(hax, LoopData.StartTime(1:loop)-LoopData.StartTime(1), ...
         LoopData.fLarmor(1:loop)/1e6);
+      hlfit = plot(hax, LoopData.StartTime(1:loop)-LoopData.StartTime(1), ...
+        LoopData.fLarmor(1:loop)/1e6);
     else
       set(hl, 'XData', LoopData.StartTime(1:loop)-LoopData.StartTime(1), ...
         'YData', LoopData.fLarmor(1:loop)/1e6);
+      A = [ones(size(LoopData.StartTime(1:loop))), (LoopData.StartTime(1:loop) - LoopData.StartTime(1))];
+      lin_regress = A \ LoopData.fLarmor.';
+      set(hlfit, 'XData', LoopData.StartTime(1:loop)-LoopData.StartTime(1), ...
+        'YData', A * lin_regress / 1e6);
     end
   end
 end
 
+
+fprintf('average linear frequency drift: %.3f Hz/s\n', lin_regress(2));
+
+
 %% -----------------------------------------------------------------------------
-% (C) Copyright 2011-2021 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2026 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------
