@@ -25,7 +25,7 @@ resolution = 32;
 thickness = 0.002;     
 %pausetime = 2;         
 position = resolution/2; 
-measurement_time = 420; % s
+measurement_time = 100; % s
 
 %% --- Acquisition parameters ---
 Seq.AQSlice(1).nRead = resolution;
