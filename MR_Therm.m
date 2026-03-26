@@ -25,7 +25,7 @@ resolution = 32;
 thickness = 0.002;     
 %pausetime = 2;         
 position = resolution/2; 
-measurement_time = 100; % s
+measurement_time = 500; % s
 
 %% --- Acquisition parameters ---
 Seq.AQSlice(1).nRead = resolution;
@@ -167,6 +167,37 @@ hold on;
 % Linear fit: slope = rad / °C
 p = polyfit(DeltaTemp_p, Deltaphase_p, 1);
 plot(DeltaTemp_p, polyval(p, DeltaTemp_p), '--r');
+%% phase difference map
+%% phase difference map
+refIdx = 5;
+lateIdx = length(Acquisitiondata);
+
+refImage  = squeeze(Acquisitiondata{refIdx}.data.Image(:,1,:));
+lateImage = squeeze(Acquisitiondata{lateIdx}.data.Image(:,1,:));
+
+magRef  = abs(refImage);
+phiRef  = angle(refImage);
+phiLate = angle(lateImage);
+
+DeltaPhi = angle(exp(1i*(phiLate - phiRef)));
+
+figure('Name','Magnitude, Phase, and Phase Difference');
+
+subplot(1,3,1);
+imagesc(magRef); axis equal tight; colorbar;
+title(sprintf('Magnitude (frame %d)', refIdx));
+
+subplot(1,3,2);
+imagesc(phiRef); axis equal tight; colorbar;
+title(sprintf('Phase (frame %d)', refIdx));
+
+subplot(1,3,3);
+imagesc(DeltaPhi); axis equal tight; colorbar;
+title('\Delta\phi = \phi_{late} - \phi_{ref}');
+
+saveas(gcf, fullfile(saveDir, ['Mag_Phase_DeltaPhi_' timestamp '.png']));
+
+
 
 %% ---- Estimate alpha ----
 gamma = 2*pi*42.58e6;   % rad/T/s
