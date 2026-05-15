@@ -27,7 +27,7 @@ measurement_time = 500; % s
 %% --- Naming convention ---
 dateStr = datestr (now, 'yyyymmdd');
 TE_ms = round(Seq.tEcho*1e3);
-TR_ms = round(Seq.tEcho*1e3);
+TR_ms = round(Seq.tRep*1e3);
 sample = 'water';                  %<-- change if needed
 orientation ='zx';
 
@@ -41,7 +41,7 @@ while true
     end
     runNum = runNum+1;
 end 
-runID = sprintf('run&02d', runNum);
+runID = sprintf('run%02d', runNum);
 
 baseName = sprintf('%s_%s_TE%dms_TR%dms_RES%d_%s_%s', ...
     dateStr, sample, TE_ms, TR_ms, resolution, orientation, runID);
@@ -164,7 +164,8 @@ saveas(gcf, fullfile(saveDir, ['LastImage_MagPhase_' baseName '.png']));
 
 %% --- Save data ---
 save([fName '.mat'], 'Timedata','TemperatureData','Phasedata','Phasedata_unwrapped','Deltaphase','Acquisitiondata');
-csvwrite([fName '.csv'], [Timedata' TemperatureData' Phasedata' Deltaphase']);
+writematrix([Timedata_p' TemperatureData_p' DeltaT_Osensa' DeltaT_MRI' Deltaphase_p'], ...
+    [fName '_processed.csv']);
 
 %% --- Close Osensa ---
 osensa_dev.close();
@@ -215,7 +216,7 @@ subplot(1,3,3);
 imagesc(DeltaPhi); axis equal tight; colorbar;
 title('\Delta\phi = \phi_{late} - \phi_{ref}');
 
-saveas(gcf, fullfile(saveDir, ['Mag_Phase_DeltaPhi_' timestamp '.png']));
+saveas(gcf, fullfile(saveDir, ['Mag_Phase_DeltaPhi_' baseName '.png']));
 
 
 
@@ -225,7 +226,50 @@ B0 = 0.55;              % Tesla
 TE = Seq.tEcho;         % seconds
 
 alpha_est = p(1) / (gamma * B0 * TE);   % fractional / °C
-alpha_ppm = alpha_est * 1e6;            % ppm / °C
+alpha_ppm = alpha_est * 1e6;            % / °C
+
+% Compute MRI temperature change
+DeltaT_MRI = Deltaphase_p ./ (gamma * alpha_used * B0 * TE);
+
+% Reference Osensa the same way
+ReferenceT = TemperatureData(refIdx);
+DeltaT_Osensa = TemperatureData_p - ReferenceT;
+
+figure;
+plot(Timedata_p, DeltaT_Osensa, '-o','LineWidth',1.5); hold on;
+plot(Timedata_p, DeltaT_MRI, '-s','LineWidth',1.5);
+
+xlabel('Time (s)');
+ylabel('\Delta Temperature (°C)');
+title('MRI vs Osensa Temperature Change');
+legend('Osensa','MRI');
+grid on;
+
+saveas(gcf, fullfile(saveDir, ['TempComparison_' baseName '.png']));
+
+%% --- Correlation plot ---
+figure;
+plot(DeltaT_Osensa, DeltaT_MRI, 'o','LineWidth',1.5);
+xlabel('Osensa \DeltaT (°C)');
+ylabel('MRI \DeltaT (°C)');
+title('MRI vs Osensa Temperature Correlation');
+grid on;
+hold on;
+
+p_corr = polyfit(DeltaT_Osensa, DeltaT_MRI, 1);
+plot(DeltaT_Osensa, polyval(p_corr, DeltaT_Osensa), '--r');
+
+legend('Data', sprintf('y = %.2fx + %.2f', p_corr(1), p_corr(2)));
+
+saveas(gcf, fullfile(saveDir, ['TempCorrelation_' baseName '.png']));
+
+%% --- Final Delta T MRI computation ---
+DeltaT_final_MRI = DeltaT_MRI(end);
+DeltaT_final_Osensa = DeltaT_Osensa(end);
+
+fprintf('\nFinal Temperature Change:\n');
+fprintf('MRI: %.3f °C\n', DeltaT_final_MRI);
+fprintf('Osensa: %.3f °C\n', DeltaT_final_Osensa);
 
 %% ---- Display results ----
 fprintf('Estimated PRF coefficient alpha:\n');
