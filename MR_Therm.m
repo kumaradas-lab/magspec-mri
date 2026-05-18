@@ -16,13 +16,13 @@ LoadSystem;
 %% --- Sequence parameters ---
 Seq.Loops = 1;        % s
 Seq.T1 = 3;           % T1 for water (s)
-Seq.tEcho = 3e-3;     % TE (s)
+Seq.tEcho = 16e-3;     % TE (s)
 Seq.tRep = 200e-3;    % TR (s)
-Seq.CorrectPhaseDuration = 0.6e-3;  % s
+Seq.CorrectPhaseDuration = 10e-3;  % s
 resolution = 32;       
 thickness = 0.002;            
 position = resolution/2; 
-measurement_time = 500; % s
+measurement_time = 300; % s
 
 %% --- Naming convention ---
 dateStr = datestr (now, 'yyyymmdd');
@@ -84,8 +84,8 @@ Timedata = [];
 TemperatureData = [];
 Phasedata = [];
 Acquisitiondata = {};
-%roiSize = 3;
-%Seq.CorrectPhase =0;
+roiSize = 3;
+
 %% --- Start acquisition ---
 tStart = tic;
 i = 0;
@@ -115,8 +115,8 @@ while true
 end
 
 %% --- Post-processing: unwrap & reference subtraction ---
-Phasedata_unwrapped = unwrap(Phasedata); % unwrap entire series
-refIdx = 5; % baseline image (ignore first few transient images)
+Phasedata_unwrapped = unwrap(Phasedata);
+refIdx = 5; % baseline image
 
 Referencephase = Phasedata_unwrapped(refIdx);
 Deltaphase = Phasedata_unwrapped - Referencephase;
@@ -126,7 +126,6 @@ Timedata_p = Timedata(idx);
 TemperatureData_p = TemperatureData(idx);
 Deltaphase_p = Deltaphase(idx);
 
-
 %% --- Plot phase difference over time ---
 figure('Name','Phase Difference vs Time');
 plot(Timedata_p, Deltaphase_p, '-o','LineWidth',1.5);
@@ -134,20 +133,17 @@ xlabel('Time (s)'); ylabel('Phase Difference (rad)');
 title('Phase Difference vs Time'); grid on;
 saveas(gcf, fullfile(saveDir, ['Phase_vs_Time_' baseName '.png']));
 
-%% --- Plot phase difference over Osensa Temperature ---
+%% --- Plot phase difference vs Osensa Temperature ---
 figure('Name','Phase Difference vs Temperature');
 plot(TemperatureData_p, Deltaphase_p, '-o','LineWidth',1.5);
 xlabel('Temperature(°C)'); ylabel('Phase Difference (rad)');
 title('Phase Difference vs Temperature'); grid on;
 
 pT = polyfit(TemperatureData_p, Deltaphase_p, 1);
-%yfitT = polyval(pT, TemperatureData_p);
 hold on;
 plot(TemperatureData_p, polyval(pT, TemperatureData_p), '--r');
-
 legend('Data', sprintf('Fit: y = %.3fx + %.3f', pT(1), pT(2)));
 saveas(gcf, fullfile(saveDir, ['Phase_vs_Temperature_' baseName '.png']));
-
 
 %% --- Plot last acquired image ---
 figure('Name','Last Image Magnitude & Phase');
@@ -162,125 +158,72 @@ imagesc(Imagephase); axis equal tight; colorbar;
 title('Phase');
 saveas(gcf, fullfile(saveDir, ['LastImage_MagPhase_' baseName '.png']));
 
-%% --- Save data ---
-save([fName '.mat'], 'Timedata','TemperatureData','Phasedata','Phasedata_unwrapped','Deltaphase','Acquisitiondata');
-writematrix([Timedata_p' TemperatureData_p' DeltaT_Osensa' DeltaT_MRI' Deltaphase_p'], ...
-    [fName '_processed.csv']);
+%% ---- Estimate alpha & constants ----
+gamma_val = 2*pi*42.58e6;   % rad/T/s
+B0 = 0.55;                  % Tesla
+TE = Seq.tEcho;             % seconds
 
-%% --- Close Osensa ---
-osensa_dev.close();
-disp('Osensa Transmitter OFF');
+% Linear fit for PRF coefficient
+DeltaTemp = TemperatureData_p - TemperatureData_p(1);
+p = polyfit(DeltaTemp, Deltaphase_p, 1);
+alpha_est = p(1) / (gamma_val * B0 * TE);   % fractional / °C
+alpha_ppm = alpha_est * 1e6;                % ppm/°C
+alpha_used = alpha_est;                     % ensure consistency
 
-%% ---- ΔPhase vs ΔTemperature (PRF thermometry + alpha estimate) ----
-ReferenceT = TemperatureData(refIdx);
-DeltaTemp = TemperatureData - ReferenceT;
-DeltaTemp_p = DeltaTemp(idx);
-Deltaphase_p = Deltaphase(idx);
-
-figure;
-plot(DeltaTemp_p, Deltaphase_p, 'o','LineWidth',1.5);
-xlabel('\Delta Temperature (°C)');
-ylabel('\Delta Phase (rad)');
-title('PRF Thermometry: \Delta\phi vs \DeltaT');
-grid on;
-hold on;
-
-% Linear fit: slope = rad / °C
-p = polyfit(DeltaTemp_p, Deltaphase_p, 1);
-plot(DeltaTemp_p, polyval(p, DeltaTemp_p), '--r');
-
-%% phase difference map
-refIdx = 5;
-lateIdx = length(Acquisitiondata);
-
+%% --- Final Delta T MRI computation ---
 refImage  = squeeze(Acquisitiondata{refIdx}.data.Image(:,1,:));
-lateImage = squeeze(Acquisitiondata{lateIdx}.data.Image(:,1,:));
+lateImage = squeeze(Acquisitiondata{end}.data.Image(:,1,:));
 
-magRef  = abs(refImage);
 phiRef  = angle(refImage);
 phiLate = angle(lateImage);
 
-DeltaPhi = angle(exp(1i*(phiLate - phiRef)));
+DeltaPhi = angle(exp(1i*(phiLate - phiRef)));  % phase difference map
 
-figure('Name','Magnitude, Phase, and Phase Difference');
+DeltaT_final_MRI_map = DeltaPhi ./ (gamma_val * alpha_used * B0 * TE);
 
-subplot(1,3,1);
-imagesc(magRef); axis equal tight; colorbar;
-title(sprintf('Magnitude (frame %d)', refIdx));
+% Extract pixel / mean
+DeltaT_final_MRI_pixel = DeltaT_final_MRI_map(position, position);
+DeltaT_final_MRI_mean  = mean(DeltaT_final_MRI_map(:), 'all');
 
-subplot(1,3,2);
-imagesc(phiRef); axis equal tight; colorbar;
-title(sprintf('Phase (frame %d)', refIdx));
+% Osensa ΔT
+DeltaT_final_Osensa = TemperatureData(end) - TemperatureData(refIdx);
 
-subplot(1,3,3);
-imagesc(DeltaPhi); axis equal tight; colorbar;
-title('\Delta\phi = \phi_{late} - \phi_{ref}');
+fprintf('\nFinal Temperature Change:\n');
+fprintf('MRI (pixel): %.3f °C\n', DeltaT_final_MRI_pixel);
+fprintf('MRI (mean ROI): %.3f °C\n', DeltaT_final_MRI_mean);
+fprintf('Osensa: %.3f °C\n', DeltaT_final_Osensa);
 
-saveas(gcf, fullfile(saveDir, ['Mag_Phase_DeltaPhi_' baseName '.png']));
-
-
-
-%% ---- Estimate alpha ----
-gamma = 2*pi*42.58e6;   % rad/T/s
-B0 = 0.55;              % Tesla
-TE = Seq.tEcho;         % seconds
-
-alpha_est = p(1) / (gamma * B0 * TE);   % fractional / °C
-alpha_ppm = alpha_est * 1e6;            % / °C
-
-% Compute MRI temperature change
-DeltaT_MRI = Deltaphase_p ./ (gamma * alpha_used * B0 * TE);
-
-% Reference Osensa the same way
-ReferenceT = TemperatureData(refIdx);
-DeltaT_Osensa = TemperatureData_p - ReferenceT;
+%% --- Plot MRI vs Osensa ΔT ---
+DeltaT_MRI = Deltaphase_p ./ (gamma_val * alpha_used * B0 * TE);
+DeltaT_Osensa = TemperatureData_p - TemperatureData_p(1);
 
 figure;
 plot(Timedata_p, DeltaT_Osensa, '-o','LineWidth',1.5); hold on;
 plot(Timedata_p, DeltaT_MRI, '-s','LineWidth',1.5);
-
-xlabel('Time (s)');
-ylabel('\Delta Temperature (°C)');
-title('MRI vs Osensa Temperature Change');
-legend('Osensa','MRI');
-grid on;
-
+xlabel('Time (s)'); ylabel('\Delta Temperature (°C)');
+title('MRI vs Osensa Temperature Change'); legend('Osensa','MRI'); grid on;
 saveas(gcf, fullfile(saveDir, ['TempComparison_' baseName '.png']));
 
 %% --- Correlation plot ---
 figure;
 plot(DeltaT_Osensa, DeltaT_MRI, 'o','LineWidth',1.5);
-xlabel('Osensa \DeltaT (°C)');
-ylabel('MRI \DeltaT (°C)');
-title('MRI vs Osensa Temperature Correlation');
-grid on;
-hold on;
+xlabel('Osensa \DeltaT (°C)'); ylabel('MRI \DeltaT (°C)');
+title('MRI vs Osensa Temperature Correlation'); grid on; hold on;
 
 p_corr = polyfit(DeltaT_Osensa, DeltaT_MRI, 1);
 plot(DeltaT_Osensa, polyval(p_corr, DeltaT_Osensa), '--r');
-
 legend('Data', sprintf('y = %.2fx + %.2f', p_corr(1), p_corr(2)));
-
 saveas(gcf, fullfile(saveDir, ['TempCorrelation_' baseName '.png']));
 
-%% --- Final Delta T MRI computation ---
-DeltaT_final_MRI = DeltaT_MRI(end);
-DeltaT_final_Osensa = DeltaT_Osensa(end);
-
-fprintf('\nFinal Temperature Change:\n');
-fprintf('MRI: %.3f °C\n', DeltaT_final_MRI);
-fprintf('Osensa: %.3f °C\n', DeltaT_final_Osensa);
-
-%% ---- Display results ----
+%% --- Display PRF coefficient ---
 fprintf('Estimated PRF coefficient alpha:\n');
 fprintf('  alpha = %.3e /°C (%.3f ppm/°C)\n', alpha_est, alpha_ppm);
 
-legend('Data', ...
-       sprintf('\\Delta\\phi = %.3f\\DeltaT + %.3f', p(1), p(2)), ...
-       'Location','best');
+%% --- Close Osensa ---
+osensa_dev.close();
+disp('Osensa Transmitter OFF');
 
-saveas(gcf, fullfile(saveDir, ['DeltaPhase_vs_DeltaTemp_' timestamp '.png']));
-
-
-%% --- Save EVERYTHING (workspace snapshot, safe for big files) ---
-save([fName '_ALL.mat'], '-v7.3');
+%% --- Save data ---
+save([fName '.mat'], 'Timedata','TemperatureData','Phasedata','Phasedata_unwrapped','Deltaphase','Acquisitiondata');
+writematrix([Timedata_p' TemperatureData_p' DeltaT_Osensa' DeltaT_MRI' Deltaphase_p'], ...
+    [fName '_processed.csv']);
