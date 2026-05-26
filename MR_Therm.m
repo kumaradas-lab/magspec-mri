@@ -16,9 +16,9 @@ LoadSystem;
 %% --- Sequence parameters ---
 Seq.Loops = 1;        % s
 Seq.T1 = 3;           % T1 for water (s)
-Seq.tEcho = 16e-3;     % TE (s)
+Seq.tEcho = 3e-3;     % TE (s)
 Seq.tRep = 200e-3;    % TR (s)
-Seq.CorrectPhaseDuration = 10e-3;  % s
+Seq.CorrectPhaseDuration = 0.6e-3;  % s %try 0.6 for te 3ms and 13 ms for te 15 ms)
 resolution = 32;       
 thickness = 0.002;            
 position = resolution/2; 
@@ -105,8 +105,15 @@ while true
     % --- Extract ROI phase ---
     x1 = position - floor(roiSize/2);
     x2 = position + floor(roiSize/2);
-    roi = SeqLoop.data.Image(x1:x2, 1, x1:x2);
-    Phasedata(i) = angle(SeqLoop.data.Image(position, 1, position));
+    roi = SeqLoop.data.Image(x1:x2, x1:x2);
+    % Store Full Complex ROI over time
+    if i==1
+        roi_complex_time= zeros([size(roi),length(Timedata)]);
+    end
+    roi_complex_time(:,:,i) = roi;
+
+    % Also store single pixel (for comparison)
+    Phasedata(i) = angle(SeqLoop.data.Image(position, position));
     
     % Stop acquisition if measurement time exceeded
     if Timedata(i) > measurement_time
@@ -115,16 +122,29 @@ while true
 end
 
 %% --- Post-processing: unwrap & reference subtraction ---
-Phasedata_unwrapped = unwrap(Phasedata);
+Phasedata_unwrapped = unwrap(Phasedata);  % single pixel
+
+roi_complex_mean = squeeze(mean(mean(roi_complex_time,1),2)); 
+roi_phase_mean = angle(roi_complex_mean);
+roi_phase_mean_unwrapped = unwrap(roi_phase_mean);
+
+
 refIdx = 5; % baseline image
 
+%--- single pixel ---
 Referencephase = Phasedata_unwrapped(refIdx);
 Deltaphase = Phasedata_unwrapped - Referencephase;
+
+%--- ROI per pixel ---
+roi_ref = roi_phase_mean_unwrapped(refIdx);
+Deltaphase_roi_mean = roi_phase_mean_unwrapped - roi_ref;
+disp(std(Deltaphase_roi_mean))
 idx = refIdx:length(Timedata);
 
 Timedata_p = Timedata(idx);
 TemperatureData_p = TemperatureData(idx);
 Deltaphase_p = Deltaphase(idx);
+Deltaphase_roi_mean_p = Deltaphase_roi_mean(idx);
 
 %% --- Plot phase difference over time ---
 figure('Name','Phase Difference vs Time');
@@ -177,14 +197,11 @@ lateImage = squeeze(Acquisitiondata{end}.data.Image(:,1,:));
 phiRef  = angle(refImage);
 phiLate = angle(lateImage);
 
-DeltaPhi = angle(exp(1i*(phiLate - phiRef)));  % phase difference map
+DeltaPhi_pixel = Deltaphase (end);
+DeltaPhi_roi = Deltaphase_roi_mean(end);
 
-DeltaT_final_MRI_map = DeltaPhi ./ (gamma_val * alpha_used * B0 * TE);
-
-% Extract pixel / mean
-DeltaT_final_MRI_pixel = DeltaT_final_MRI_map(position, position);
-DeltaT_final_MRI_mean  = mean(DeltaT_final_MRI_map(:), 'all');
-
+DeltaT_final_MRI_pixel = DeltaPhi_pixel  / (gamma_val * alpha_used * B0 * TE);
+DeltaT_final_MRI_mean  = DeltaPhi_roi  / (gamma_val * alpha_used * B0 * TE);
 % Osensa ΔT
 DeltaT_final_Osensa = TemperatureData(end) - TemperatureData(refIdx);
 
@@ -194,26 +211,34 @@ fprintf('MRI (mean ROI): %.3f °C\n', DeltaT_final_MRI_mean);
 fprintf('Osensa: %.3f °C\n', DeltaT_final_Osensa);
 
 %% --- Plot MRI vs Osensa ΔT ---
-DeltaT_MRI = Deltaphase_p ./ (gamma_val * alpha_used * B0 * TE);
+DeltaT_MRI_pixel = Deltaphase_p ./ (gamma_val * alpha_used * B0 * TE);
+DeltaT_MRI_roi = Deltaphase_roi_mean(idx) ./ (gamma_val * alpha_used * B0 * TE);
 DeltaT_Osensa = TemperatureData_p - TemperatureData_p(1);
+
+fprintf('\nDEBUG:\n');
+fprintf('DeltaPhi_pixel (last): %.4f rad\n', DeltaPhi_pixel);
+fprintf('Code DeltaT: %.4f °C\n', DeltaT_final_MRI_pixel);
+
 
 figure;
 plot(Timedata_p, DeltaT_Osensa, '-o','LineWidth',1.5); hold on;
-plot(Timedata_p, DeltaT_MRI, '-s','LineWidth',1.5);
+plot(Timedata_p, DeltaT_MRI_pixel, '-s','LineWidth',1.5);
+plot(Timedata_p, DeltaT_MRI_roi, '-d','LineWidth',1.5);
+legend('Osensa', 'MRI pixel', 'MRI ROI');
 xlabel('Time (s)'); ylabel('\Delta Temperature (°C)');
-title('MRI vs Osensa Temperature Change'); legend('Osensa','MRI'); grid on;
+title('MRI vs Osensa Temperature Change'); legend('Osensa','MRI pixel', 'MRI ROI'); grid on;
 saveas(gcf, fullfile(saveDir, ['TempComparison_' baseName '.png']));
 
 %% --- Correlation plot ---
 figure;
-plot(DeltaT_Osensa, DeltaT_MRI, 'o','LineWidth',1.5);
+plot(DeltaT_Osensa, DeltaT_MRI_pixel, 'o','LineWidth',1.5);
 xlabel('Osensa \DeltaT (°C)'); ylabel('MRI \DeltaT (°C)');
-title('MRI vs Osensa Temperature Correlation'); grid on; hold on;
+title('MRI pixel vs Osensa Temperature Correlation'); grid on; hold on;
 
-p_corr = polyfit(DeltaT_Osensa, DeltaT_MRI, 1);
+p_corr = polyfit(DeltaT_Osensa, DeltaT_MRI_pixel, 1);
 plot(DeltaT_Osensa, polyval(p_corr, DeltaT_Osensa), '--r');
 legend('Data', sprintf('y = %.2fx + %.2f', p_corr(1), p_corr(2)));
-saveas(gcf, fullfile(saveDir, ['TempCorrelation_' baseName '.png']));
+saveas(gcf, fullfile(saveDir, ['TempCorrelation(pixel)_' baseName '.png']));
 
 %% --- Display PRF coefficient ---
 fprintf('Estimated PRF coefficient alpha:\n');
@@ -225,5 +250,17 @@ disp('Osensa Transmitter OFF');
 
 %% --- Save data ---
 save([fName '.mat'], 'Timedata','TemperatureData','Phasedata','Phasedata_unwrapped','Deltaphase','Acquisitiondata');
-writematrix([Timedata_p' TemperatureData_p' DeltaT_Osensa' DeltaT_MRI' Deltaphase_p'], ...
-    [fName '_processed.csv']);
+minLen = min([length(Timedata_p), length(TemperatureData_p), ...
+              length(DeltaT_Osensa), length(DeltaT_MRI_pixel), ...
+              length(DeltaT_MRI_roi), length(Deltaphase_p)]);
+
+data_out = [ ...
+    Timedata_p(1:minLen)', ...
+    TemperatureData_p(1:minLen)', ...
+    DeltaT_Osensa(1:minLen)', ...
+    DeltaT_MRI_pixel(1:minLen)', ...
+    DeltaT_MRI_roi(1:minLen)', ...
+    Deltaphase_p(1:minLen)' ];
+
+writematrix(data_out, [fName '_processed.csv']);
+

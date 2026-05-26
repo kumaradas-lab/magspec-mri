@@ -9,7 +9,7 @@ Seq.AQSlice(1).sizeRead    = 0.010;
 Seq.AQSlice(1).sizePhase(2)= 0.010;
 Seq.AQSlice(1).thickness   = 0.005;
 
-Seq.tEcho = 5e-3;   % TE (s)  <-- set to your TE
+Seq.tEcho = 3e-3;   % TE (s)  <-- set to your TE
 Seq.tRep  = 50e-3;  % TR (s)  <-- set to your TR (must be > TE)
 Seq.average = 1;
 
