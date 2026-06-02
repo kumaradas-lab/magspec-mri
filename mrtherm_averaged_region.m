@@ -29,13 +29,13 @@ Seq.Loops = 1; % Number of loop averages
 
 % Define parameters
 Seq.T1 = 3000e-3;    %change for water 
-Seq.tEcho = 5e-3; % try for 3, 5, 20
+Seq.tEcho = 3e-3; % try for 3, 5, 20
 Seq.tRep = 200e-3;    % try higher to stabilize the phase
 resolution = 32; % original 32x32
 thickness = 0.002; % original 0.002
 pausetime = 2;
 position = resolution / 2;
-measurement_time = 100; % Run time in seconds
+measurement_time = 300; % Run time in seconds
 
 
 % % Pixels and size %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
