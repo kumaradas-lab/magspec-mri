@@ -89,7 +89,8 @@ roiSize = 9;
 %% --- Start acquisition ---
 tStart = tic;
 i = 0;
-
+[HW, mySave] = Find_Frequency_Sweep(HW, mySave, 0);
+HW.FindFrequencySweep.maxTime = 600;
 while true
     i = i + 1;
     fprintf('Acquisition of Image %d\n', i);
