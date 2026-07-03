@@ -20,3 +20,8 @@ HW.TX(1).PaUout2Amplitude = [36.581896, 33.000000]*1e-6;  % 2026-05-26T12:52:39 
 HW.TX(1).PaUout2Amplitude = [42.139690, 33.000000]*1e-6;  % 2026-05-29T12:47:29 (tFlip90 = 37.659 us @ 3.700 V @ 24.618240 MHz) from 1d Spin Echo by Find_PulseDuration
 HW.TX(1).PaUout2Amplitude = [42.642504, 33.000000]*1e-6;  % 2026-06-01T12:06:40 (tFlip90 = 37.215 us @ 3.700 V @ 24.603260 MHz) from 1d Spin Echo by Find_PulseDuration
 HW.TX(1).PaUout2Amplitude = [42.408953, 33.000000]*1e-6;  % 2026-06-05T10:34:11 (tFlip90 = 37.420 us @ 3.700 V @ 24.614189 MHz) from 1d Spin Echo by Find_PulseDuration
+HW.TX(1).PaUout2Amplitude = [42.177946, 33.000000]*1e-6;  % 2026-06-12T09:08:23 (tFlip90 = 37.625 us @ 3.700 V @ 24.575698 MHz) from 1d Spin Echo by Find_PulseDuration
+HW.TX(1).PaUout2Amplitude = [40.102726, 33.000000]*1e-6;  % 2026-06-16T13:10:04 (tFlip90 = 39.572 us @ 3.700 V @ 24.645032 MHz) from 1d Spin Echo by Find_PulseDuration
+HW.TX(1).PaUout2Amplitude = [41.296896, 33.000000]*1e-6;  % 2026-06-25T13:24:47 (tFlip90 = 38.427 us @ 3.700 V @ 24.624767 MHz) from 1d Spin Echo by Find_PulseDuration
+HW.TX(1).PaUout2Amplitude = [38.812872, 33.000000]*1e-6;  % 2026-06-26T11:48:35 (tFlip90 = 40.887 us @ 3.700 V @ 24.655498 MHz) from 1d Spin Echo by Find_PulseDuration
+HW.TX(1).PaUout2Amplitude = [42.006336, 33.000000]*1e-6;  % 2026-07-03T10:36:56 (tFlip90 = 37.778 us @ 3.700 V @ 24.589809 MHz) from 1d Spin Echo by Find_PulseDuration

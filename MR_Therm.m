@@ -16,13 +16,13 @@ LoadSystem;
 %% --- Sequence parameters ---
 Seq.Loops = 1;        % s
 Seq.T1 = 3;           % T1 for water (s)
-Seq.tEcho = 15e-3;     % TE (s)
-Seq.tRep = 200e-3;    % TR (s)
-Seq.CorrectPhaseDuration = 8e-3;  %try 0.6 for te 3ms and 13 for te 15 ms, 15 for Te of 18 ms
+Seq.tEcho = 5e-3;     % TE (s)
+Seq.tRep = 800e-3;    % TR (s)
+Seq.CorrectPhaseDuration = 3e-3;  %try 0.6 for te 3ms and 13 for te 15 ms, 15 for Te of 18 ms
 resolution = 32;       
 thickness = 0.002;            
 position = resolution/2; 
-measurement_time = 300; % s
+measurement_time = 550; % s
 
 %% --- Naming convention ---
 dateStr = datestr (now, 'yyyymmdd');
@@ -206,10 +206,13 @@ DeltaT_final_MRI_mean  = DeltaPhi_roi  / (gamma_val * alpha_used * B0 * TE);
 % Osensa ΔT
 DeltaT_final_Osensa = TemperatureData(end) - TemperatureData(refIdx);
 
+fprintf('Echo time: %.5f s\n', Seq.tEcho);
+fprintf('Repetition time: %.5f s\n', Seq.tRep);
+fprintf('Correct Phase duration: %.5f s', Seq.CorrectPhaseDuration);
 fprintf('\nFinal Temperature Change:\n');
-fprintf('MRI (pixel): %.3f °C\n', DeltaT_final_MRI_pixel);
-fprintf('MRI (mean ROI): %.3f °C\n', DeltaT_final_MRI_mean);
-fprintf('Osensa: %.3f °C\n', DeltaT_final_Osensa);
+fprintf('MRI (pixel): %.5f °C\n', DeltaT_final_MRI_pixel);
+fprintf('MRI (mean ROI): %.5f °C\n', DeltaT_final_MRI_mean);
+fprintf('Osensa: %.5f °C\n', DeltaT_final_Osensa);
 
 %% --- Plot MRI vs Osensa ΔT ---
 DeltaT_MRI_pixel = Deltaphase_p ./ (gamma_val * alpha_used * B0 * TE);
