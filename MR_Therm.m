@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 %% MRI Thermometry Acquisition Script 
+=======
+%% MRI Thermometry Acquisition Script
+>>>>>>> Stashed changes
 clear; close all;
 
 %% --- Set up save directory ---
@@ -22,6 +26,7 @@ Seq.CorrectPhaseDuration = 3e-3;  %try 0.6 for te 3ms and 13 for te 15 ms, 15 fo
 resolution = 32;       
 thickness = 0.002;            
 position = resolution/2; 
+<<<<<<< Updated upstream
 measurement_time = 550; % s
 
 %% --- Naming convention ---
@@ -47,6 +52,9 @@ baseName = sprintf('%s_%s_TE%dms_TR%dms_RES%d_%s_%s', ...
     dateStr, sample, TE_ms, TR_ms, resolution, orientation, runID);
 
 fName = fullfile(saveDir, baseName);
+=======
+measurement_time = 300; % s
+>>>>>>> Stashed changes
 
 %% --- Acquisition parameters ---
 Seq.AQSlice(1).nRead = resolution;
