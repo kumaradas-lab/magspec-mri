@@ -46,7 +46,7 @@ Seq.AQSlice(1).sizeRead = 0.010;
 Seq.AQSlice(1).sizePhase(2) = 0.010;
 Seq.AQSlice(1).thickness = thickness;
 Seq.AQSlice(1).excitationPulse = @Pulse_Rect;
-
+ 
 % % Oversampling %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Seq.AQSlice(1).PhaseOS(2) = 2;                      % oversampling phase(2)  1...
 
