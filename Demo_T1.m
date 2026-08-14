@@ -8,7 +8,7 @@
 LoadSystem;                                     % Load system parameters
 
 % Define parameters required for the measurement, e.g. oil T1 ~100e-3 sec
-Seq.T1Estimated   = 2600e-3;                     % estimated mean T1
+Seq.T1Estimated   = 1110e-3;                     % estimated mean T1
 % Seq.T1EstimatedMin = Seq.T1Estimated/3;         % minimum estimated T1,                         e.g. Seq.T1Estimated/3
 % Seq.T1EstimatedMax = Seq.T1Estimated*3;         % maximum estimated T1,                         e.g. Seq.T1Estimated*3
 

@@ -1,4 +1,5 @@
 %% Calibration values for gradient amplifier DC-600 V2
+% output port: RJ-45
 
 if ~exist('iDevice', 'var'), iDevice = 1; end
 

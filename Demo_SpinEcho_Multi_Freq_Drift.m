@@ -30,8 +30,8 @@ Seq.fSampleFID  = HW.RX(1).fSample/125/10;                    % sample frequency
 
 Seq.average     = 1;                                          % averages
 Seq.averageBreak= 1;                                          % waiting time in seconds between two measurements for averaging
-Seq.loops       = 100;                                         % loops; measurements are repeated, no averaging
-Seq.LoopBreak   = 3;                                        % waiting time in seconds between two loops
+Seq.loops       = 50;                                         % loops; measurements are repeated, no averaging
+Seq.LoopBreak   = 0.5;                                        % waiting time in seconds between two loops
 Seq.fOffsetTime = 0.5e-3;                                     % maximum time used to determine the frequency offset for every loop
 
 
@@ -98,24 +98,14 @@ for loop = 1:Seq.loops
     if loop == 1
       hl = plot(hax, LoopData.StartTime(1:loop)-LoopData.StartTime(1), ...
         LoopData.fLarmor(1:loop)/1e6);
-      hlfit = plot(hax, LoopData.StartTime(1:loop)-LoopData.StartTime(1), ...
-        LoopData.fLarmor(1:loop)/1e6);
     else
       set(hl, 'XData', LoopData.StartTime(1:loop)-LoopData.StartTime(1), ...
         'YData', LoopData.fLarmor(1:loop)/1e6);
-      A = [ones(size(LoopData.StartTime(1:loop))), (LoopData.StartTime(1:loop) - LoopData.StartTime(1))];
-      lin_regress = A \ LoopData.fLarmor.';
-      set(hlfit, 'XData', LoopData.StartTime(1:loop)-LoopData.StartTime(1), ...
-        'YData', A * lin_regress / 1e6);
     end
   end
 end
 
-
-fprintf('average linear frequency drift: %.3f Hz/s\n', lin_regress(2));
-
-
 %% -----------------------------------------------------------------------------
-% (C) Copyright 2011-2026 Pure Devices GmbH, Wuerzburg, Germany
+% (C) Copyright 2011-2021 Pure Devices GmbH, Wuerzburg, Germany
 % www.pure-devices.com
 % ------------------------------------------------------------------------------

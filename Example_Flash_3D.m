@@ -8,12 +8,12 @@ Seq.Loops = 1;                                  % number of loop averages 1...
 
 Seq.T1 = 100e-3;                                % T1 of sample; excitation angle is acos(exp(-Seq.tRep/Seq.T1))/pi*180
 Seq.tEcho = 3e-3;                               % echo time in seconds e.g. 4e-3
-Seq.tRep = 5e-3;                               % repetition time in seconds (default is Seq.tEcho*2) changed from 8 because of the warning
+Seq.tRep = 8e-3;                               % repetition time in seconds (default is Seq.tEcho*2)
 
 % % Pixels and size %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Seq.AQSlice(1).nRead = 16;                      % number of pixels in read direction
-Seq.AQSlice(1).nPhase(1) = 16;                  % number of pixels in phase(1) direction
-Seq.AQSlice(1).nPhase(2) = 16;                  % number of pixels in phase(2) direction
+Seq.AQSlice(1).nRead = 32;                      % number of pixels in read direction
+Seq.AQSlice(1).nPhase(1) = 32;                  % number of pixels in phase(1) direction
+Seq.AQSlice(1).nPhase(2) = 32;                  % number of pixels in phase(2) direction
 Seq.AQSlice(1).HzPerPixMin = 0;                 % bandwidth per pixel in Hz (1/HzPerPixMin = duration of AQ window, 0: longest possible)
 Seq.AQSlice(1).sizeRead = 0.01;                 % size in read direction in meter (for CSI set to 1e12)
 Seq.AQSlice(1).sizePhase(1) = 0.01;             % size in phase(1) direction in meter
@@ -37,9 +37,9 @@ Seq.plotSeq = 1:3;                              % plot sequence on real timeline
 Seq.LoopPlot = 1;                               % plot every loop
 Seq.AQSlice(1).plotkSpace = 0;                  % plot k-space
 Seq.AQSlice(1).plotImage = 1;                   % plot image
-Seq.AQSlice(1).plotPhase = 1;                   % plot phase of k-space or image
-Seq.AQSlice(1).plotB0ppm = 1;                   % plot B0 ppm (only 3D)
-Seq.AQSlice(1).plotB0Hz = 1;                    % plot B0 Hz
+Seq.AQSlice(1).plotPhase = 0;                   % plot phase of k-space or image
+Seq.AQSlice(1).plotB0ppm = 0;                   % plot B0 ppm (only 3D)
+Seq.AQSlice(1).plotB0Hz = 0;                    % plot B0 Hz
 Seq.AQSlice(1).ZeroFillWindowSize = 1.4;        % zero fill window size (high k-space values are damped by a cos^2 law)
 Seq.AQSlice(1).ZeroFillFactor = 2;              % zero fill resolution factor
 
