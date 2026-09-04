@@ -369,6 +369,32 @@ else
   SeqOut.Correct_poffsetBothStd = poffsetSamplesStd ...
     - repelem(reshape(pOffset_InvPulseStd_step,1,[]), size(SeqOut.Correct_poffsetSamples,1), 1);
 end
+fprintf('\n===== FREQUENCY CORRECTION DEBUG =====\n');
+
+fprintf('CorrectPhaseDuration = %.6f ms\n', ...
+    SeqOut.CorrectPhaseDuration*1e3);
+
+fprintf('foffset mean = %.6f Hz\n', mean(foffset(:)));
+fprintf('foffset std  = %.6f Hz\n', std(foffset(:)));
+
+fprintf('foffsetStd min = %.6f Hz\n', min(foffsetStd(:)));
+fprintf('foffsetStd max = %.6f Hz\n', max(foffsetStd(:)));
+fprintf('foffsetStd mean = %.6f Hz\n', mean(foffsetStd(:)));
+
+fprintf('foffsetSamplesStd min = %.6f Hz\n', ...
+    min(foffsetSamplesStd(:)));
+
+fprintf('foffsetSamplesStd max = %.6f Hz\n', ...
+    max(foffsetSamplesStd(:)));
+
+fprintf('foffsetSamplesStd mean = %.6f Hz\n', ...
+    mean(foffsetSamplesStd(:)));
+
+fprintf('Correct_poffsetBothStd max = %.6f rad\n', ...
+    max(abs(SeqOut.Correct_poffsetBothStd(:))));
+
+fprintf('======================================\n\n');
+
 
 if any(any(abs(SeqOut.Correct_poffsetBothStd) > SeqOut.CorrectPhase_maxPhaseOffset))
   maxDev = max(abs(SeqOut.Correct_poffsetBothStd(:)));
