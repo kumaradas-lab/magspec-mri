@@ -17,14 +17,14 @@ LoadSystem;
 %% --- Sequence parameters ---
 Seq.Loops = 1;        % s
 Seq.T1 = 3;           % T1 for water (s)
-Seq.tEcho = 3e-3;     % TE (s)
+Seq.tEcho = 15e-3;     % TE (s)
 Seq.tRep = 150e-3;    % TR (s)
-Seq.CorrectPhaseDuration = 0.7e-3;  % try 0.6 for TE 3ms and 13 for TE 15ms, 15 for TE 18ms
+Seq.CorrectPhaseDuration = 9e-3;  % try 0.6 for TE 3ms and 13 for TE 15ms, 15 for TE 18ms
 
 resolution = 32;       
 thickness = 0.002;            
 position = resolution/2; 
-measurement_time = 100; % s
+measurement_time = 500; % s
 
 %% --- Naming convention ---
 dateStr = datestr(now, 'yyyymmdd');
