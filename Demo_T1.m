@@ -8,7 +8,7 @@
 LoadSystem;                                     % Load system parameters
 
 % Define parameters required for the measurement, e.g. oil T1 ~100e-3 sec
-Seq.T1Estimated   = 9500e-3;                     % estimated mean T1
+Seq.T1Estimated   = 3000e-3;                     % estimated mean T1
 % Seq.T1EstimatedMin = Seq.T1Estimated/3;         % minimum estimated T1,                         e.g. Seq.T1Estimated/3
 % Seq.T1EstimatedMax = Seq.T1Estimated*3;         % maximum estimated T1,                         e.g. Seq.T1Estimated*3
 
@@ -23,7 +23,7 @@ Seq.averageBreak  = Seq.tRelax;                 % time between two averages,    
 
 Seq.tAQFID        = 200e-6;                     % acquisition time in seconds,                  e.g. 200e-6
 Seq.tFlipLog      = 1;                          % increase wait time logarithmically (1) or linearly (0)
-Seq.Spoil.UseCoordinate = 1;                    % Coordinate direction of the spoiler,          e.g. 1 or 2         (0 for no spoiler)
+Seq.Spoil.UseCoordinate = 0;                    % Coordinate direction of the spoiler,          e.g. 1 or 2         (0 for no spoiler)
 
 Seq.fitExp.CorrectFrequencyOffset = 1;          % Correct frequency offset before averaging samples
 Seq.fitExp.CorrectFrequencyDrift = 0;           % Also correct linear frequency drift
