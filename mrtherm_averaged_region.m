@@ -3,16 +3,16 @@ close all;
 
 fName = 'exp1';
 % --- Set up save directory in Google Drive ---
-baseFolder = 'G:\My Drive\MR_Thermometry\My runs';             % main directory on Google Drive, can change this to match the path in your Google Drive
-todayFolder = datestr(now, 'yyyy-mm-dd');           % folder named with today's date
-saveDir = fullfile(baseFolder, todayFolder);         % full path for today's run
-
-if ~exist(saveDir, 'dir')
-    mkdir(saveDir);                                 % create folder if it doesn't exist
-end
-
-timestamp = datestr(now, 'HHMMSS');
-fName = fullfile(saveDir, ['exp1_' timestamp]);
+% baseFolder = 'G:\My Drive\MR_Thermometry\My runs';             % main directory on Google Drive, can change this to match the path in your Google Drive
+% todayFolder = datestr(now, 'yyyy-mm-dd');           % folder named with today's date
+% saveDir = fullfile(baseFolder, todayFolder);         % full path for today's run
+% 
+% if ~exist(saveDir, 'dir')
+%     mkdir(saveDir);                                 % create folder if it doesn't exist
+% end
+% 
+% timestamp = datestr(now, 'HHMMSS');
+% fName = fullfile(saveDir, ['exp1_' timestamp]);
 
 
 % Initialize Osensa temperature sensor
