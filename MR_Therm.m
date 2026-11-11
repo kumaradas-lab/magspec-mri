@@ -24,7 +24,7 @@ Seq.CorrectPhaseDuration = 7e-3;  % try 0.6 for TE 3ms and 13 for TE 15ms, 15 fo
 resolution = 32;       
 thickness = 0.002;            
 position = resolution/2; 
-measurement_time = 500; % s
+measurement_time = 200; % s
 
 %% --- Naming convention ---
 dateStr = datestr(now, 'yyyymmdd');
@@ -124,7 +124,17 @@ while true
     
     % Run MRI acquisition
     [SeqLoop, mySave] = sequence_Flash(HW, Seq, AQ, TX, Grad, mySave);
-    
+    if i == 1
+
+    disp('--- SeqLoop fields ---');
+    disp(fieldnames(SeqLoop));
+
+    if isfield(SeqLoop,'data')
+        disp('--- SeqLoop.data fields ---');
+        disp(fieldnames(SeqLoop.data));
+    end
+
+end
     Acquisitiondata{i} = SeqLoop;
     
     %% --- Extract ROI phase ---
@@ -459,6 +469,34 @@ else
     
 end
 
+%% --- ROI Signal Quality Analysis ---
+
+ROI_Magnitude = squeeze(mean(mean(abs(roi_complex_time),1),2));
+
+ROI_Complex_Mean = squeeze(mean(mean(roi_complex_time,1),2));
+
+ROI_Coherence = abs(ROI_Complex_Mean) ./ ...
+    (ROI_Magnitude + eps);
+
+figure;
+
+subplot(2,1,1);
+
+plot(Timedata, ROI_Magnitude, '-o');
+
+ylabel('ROI Magnitude');
+title('ROI Signal Stability');
+grid on;
+
+subplot(2,1,2);
+
+plot(Timedata, ROI_Coherence, '-o');
+
+xlabel('Time (s)');
+ylabel('Phase Coherence');
+ylim([0 1.05]);
+grid on;
+
 %% --- Frequency correction information ---
 
 % Use the last acquisition for diagnostics
@@ -518,6 +556,327 @@ osensa_dev.close();
 
 disp('Osensa Transmitter OFF');
 
+
+
+%% --- Frequency Drift Analysis ---
+
+nImages = length(FrequencyCorrectionData);
+
+FrequencyMean = nan(nImages,1);
+FrequencySpread = nan(nImages,1);
+FrequencyUncertainty = nan(nImages,1);
+
+for k = 1:nImages
+
+    f = FrequencyCorrectionData{k}.offset;
+    s = FrequencyCorrectionData{k}.std;
+
+    if ~isempty(f)
+        FrequencyMean(k) = mean(f(:));
+        FrequencySpread(k) = std(f(:));
+    end
+
+    if ~isempty(s)
+        FrequencyUncertainty(k) = mean(s(:));
+    end
+
+end
+
+%% --- Match all data lengths ---
+
+Timedata_col = Timedata(:);
+FrequencyMean = FrequencyMean(:);
+
+n = min(numel(Timedata_col), numel(FrequencyMean));
+
+t = Timedata_col(1:n);
+f = FrequencyMean(1:n);
+
+%% --- Remove invalid measurements ---
+
+valid = isfinite(t) & isfinite(f);
+
+t = t(valid);
+f = f(valid);
+
+%% --- Frequency drift relative to baseline ---
+
+refIdx = 5;
+
+% Find the corresponding reference measurement
+refTime = Timedata_col(refIdx);
+
+[~, refFrequencyIdx] = min(abs(t-refTime));
+
+DeltaFrequency = f - f(refFrequencyIdx);
+
+%% --- Plot frequency drift ---
+
+figure;
+
+plot(t, DeltaFrequency, '-o', ...
+    'LineWidth', 1.5);
+
+xlabel('Time (s)');
+ylabel('\Delta Frequency (Hz)');
+
+title('Frequency Drift During MRI Acquisition');
+
+grid on;
+
+%% --- Equivalent phase change ---
+
+DeltaPhase_frequency = ...
+    2*pi*Seq.tEcho*DeltaFrequency;
+
+figure;
+
+plot(t, DeltaPhase_frequency, '-s', ...
+    'LineWidth', 1.5);
+
+xlabel('Time (s)');
+ylabel('Equivalent phase change (rad)');
+
+title('Frequency-Related Phase Evolution');
+
+grid on;
+
+fprintf('\nFrequency drift analysis:\n');
+
+fprintf('Number of frequency measurements: %d\n', numel(f));
+
+fprintf('Total frequency change: %.4f Hz\n', ...
+    DeltaFrequency(end));
+
+fprintf('Equivalent phase change: %.4f rad\n', ...
+    DeltaPhase_frequency(end));
+
+
+%% --- DIAGNOSTIC: FREQUENCY-ADJUSTED PHASE ---
+
+% Frequency drift contribution
+% This is a diagnostic estimate, not yet a validated correction.
+
+FrequencyPhaseCorrection = ...
+    2*pi*Seq.tEcho*DeltaFrequency;
+
+% Match frequency data to phase data
+nCommon = min([ ...
+    numel(Deltaphase_p), ...
+    numel(FrequencyPhaseCorrection)]);
+
+PhaseOriginal = Deltaphase_p(1:nCommon);
+
+PhaseFrequencyAdjusted = ...
+    PhaseOriginal - FrequencyPhaseCorrection(1:nCommon);
+
+% Convert to temperature
+TemperatureMRI_original = ...
+    PhaseOriginal ./ ...
+    (gamma_val*alpha_used*B0*TE);
+
+TemperatureMRI_adjusted = ...
+    PhaseFrequencyAdjusted ./ ...
+    (gamma_val*alpha_used*B0*TE);
+
+% Plot comparison
+
+figure;
+
+plot(Timedata_p(1:nCommon), ...
+    TemperatureMRI_original(1:nCommon), ...
+    '-o','LineWidth',1.5);
+
+hold on;
+
+plot(Timedata_p(1:nCommon), ...
+    TemperatureMRI_adjusted, ...
+    '-s','LineWidth',1.5);
+
+plot(Timedata_p(1:nCommon), ...
+    DeltaT_Osensa(1:nCommon), ...
+    '-d','LineWidth',1.5);
+
+xlabel('Time (s)');
+ylabel('Temperature change (^oC)');
+
+legend('Original MRI',...
+       'Frequency-adjusted MRI',...
+       'Osensa');
+
+title('Effect of Frequency Drift Compensation');
+
+grid on;
+
+
+%% --- FREQUENCY VS MRI PHASE CORRELATION ---
+
+% Convert everything to column vectors
+t_all = Timedata(:);
+f_all = FrequencyMean(:);
+phase_all = Phasedata_unwrapped(:);
+
+% Check original lengths
+fprintf('\n--- ARRAY LENGTH CHECK ---\n');
+
+fprintf('Timedata: %d\n',numel(t_all));
+fprintf('FrequencyMean: %d\n',numel(f_all));
+fprintf('Phasedata_unwrapped: %d\n',numel(phase_all));
+
+% Match array lengths
+nCommon = min([ ...
+    numel(t_all), ...
+    numel(f_all), ...
+    numel(phase_all)]);
+
+t = t_all(1:nCommon);
+f = f_all(1:nCommon);
+phase = phase_all(1:nCommon);
+
+% Remove invalid measurements
+valid = isfinite(t) & ...
+        isfinite(f) & ...
+        isfinite(phase);
+
+% Apply the SAME logical index to all arrays
+t = t(valid);
+f = f(valid);
+phase = phase(valid);
+
+% Reference measurement
+refIdx = 5;
+
+if numel(t) < refIdx
+    error('Not enough valid measurements for reference index.');
+end
+
+DeltaF = f - f(refIdx);
+DeltaPhi = phase - phase(refIdx);
+
+%% Correlation
+
+R = corrcoef(DeltaF,DeltaPhi);
+
+fprintf('\n--- FREQUENCY / PHASE CORRELATION ---\n');
+
+fprintf('Correlation coefficient: %.5f\n',R(1,2));
+
+%% Plot
+
+figure;
+
+subplot(2,1,1);
+
+plot(t,DeltaF,'-o');
+
+ylabel('\Delta Frequency (Hz)');
+title('Frequency Drift');
+
+grid on;
+
+subplot(2,1,2);
+
+plot(t,DeltaPhi,'-s');
+
+xlabel('Time (s)');
+ylabel('\Delta Phase (rad)');
+
+title('MRI Phase Evolution');
+
+grid on;
+
+%% Linear relationship
+
+pFreqPhase = polyfit(DeltaF,DeltaPhi,1);
+
+fprintf('Phase/frequency slope: %.8f rad/Hz\n',...
+    pFreqPhase(1));
+
+fprintf('Theoretical slope at TE: %.8f rad/Hz\n',...
+    2*pi*Seq.tEcho);
+
+
+%% --- FREQUENCY / PHASE REGRESSION ---
+
+figure;
+
+scatter(DeltaF,DeltaPhi,60,'filled');
+
+hold on;
+
+% Measured regression
+xFit = linspace(min(DeltaF),max(DeltaF),100);
+
+yFit = polyval(pFreqPhase,xFit);
+
+plot(xFit,yFit,'r-','LineWidth',2);
+
+% Theoretical frequency-phase relationship
+theoreticalPhase = 2*pi*Seq.tEcho*xFit;
+
+plot(xFit,theoreticalPhase,'k--','LineWidth',2);
+
+xlabel('Frequency change (Hz)');
+ylabel('MRI phase change (rad)');
+
+title('Frequency Drift vs MRI Phase');
+
+legend('Measured data',...
+       'Measured regression',...
+       'Theoretical frequency relationship',...
+       'Location','best');
+
+grid on;
+
+saveas(gcf,fullfile(saveDir,...
+    ['FrequencyPhaseRegression_' baseName '.png']));
+
+%% --- Frequency Predicted Phase Correction ---
+
+% Frequency change relative to reference image
+DeltaFrequency = DeltaFrequency(:);
+
+% Theoretical phase caused by frequency drift
+DeltaPhasePredicted = ...
+    2*pi*Seq.tEcho*DeltaFrequency;
+
+% Compare with measured MRI phase
+MeasuredPhase = Deltaphase(:);
+
+% Match array lengths safely
+n = min(length(DeltaPhasePredicted), ...
+        length(MeasuredPhase));
+
+DeltaPhasePredicted = DeltaPhasePredicted(1:n);
+MeasuredPhase = MeasuredPhase(1:n);
+t = Timedata(1:n);
+
+% Remove reference offset
+DeltaPhasePredicted = ...
+    DeltaPhasePredicted - DeltaPhasePredicted(1);
+
+MeasuredPhase = ...
+    MeasuredPhase - MeasuredPhase(1);
+
+figure;
+
+plot(t, MeasuredPhase, '-o', ...
+    'LineWidth', 1.5);
+
+hold on;
+
+plot(t, DeltaPhasePredicted, '-s', ...
+    'LineWidth', 1.5);
+
+xlabel('Time (s)');
+ylabel('Phase (rad)');
+
+legend('Measured MRI phase', ...
+       'Predicted frequency phase');
+
+title('Measured Phase vs Frequency-Predicted Phase');
+
+grid on;
 %% --- Save data ---
 
 save([fName '.mat'], ...
@@ -529,32 +888,32 @@ save([fName '.mat'], ...
     'Acquisitiondata', ...
     'FrequencyCorrectionData');
 
+
+%% --- Export processed data to CSV ---
+
 % Force all variables into column vectors
 Timedata_p = Timedata_p(:);
-
 TemperatureData_p = TemperatureData_p(:);
-
-PhaseDate_p = Phasedata_p(:);  %new
+Phasedata_p = Phasedata_p(:);
 
 DeltaT_Osensa = DeltaT_Osensa(:);
-
 DeltaT_MRI_pixel = DeltaT_MRI_pixel(:);
-
 DeltaT_MRI_roi = DeltaT_MRI_roi(:);
 
 Deltaphase_p = Deltaphase_p(:);
 
-% Find common minimum length
-minLen = min([ ...
-    length(Timedata_p), ...
-    length(TemperatureData_p), ...
-    length(Phasedata_p), ...
-    length(DeltaT_Osensa), ...
-    length(DeltaT_MRI_pixel), ...
-    length(DeltaT_MRI_roi), ...
-    length(Deltaphase_p)]);
 
-% Build output matrix
+% Find common minimum number of elements
+minLen = min([ ...
+    numel(Timedata_p), ...
+    numel(TemperatureData_p), ...
+    numel(Phasedata_p), ...
+    numel(DeltaT_Osensa), ...
+    numel(DeltaT_MRI_pixel), ...
+    numel(DeltaT_MRI_roi), ...
+    numel(Deltaphase_p)]);
+
+% Construct output matrix
 data_out = [ ...
     Timedata_p(1:minLen), ...
     TemperatureData_p(1:minLen), ...
@@ -564,6 +923,20 @@ data_out = [ ...
     DeltaT_MRI_roi(1:minLen), ...
     Deltaphase_p(1:minLen)];
 
-% Write CSV
-writematrix(data_out, ...
-    [fName '_processed.csv']);
+% Column headers
+headers = { ...
+    'Time_s', ...
+    'Temperature_C', ...
+    'Phase_unwrapped_rad', ...
+    'DeltaT_Osensa_C', ...
+    'DeltaT_MRI_pixel_C', ...
+    'DeltaT_MRI_ROI_C', ...
+    'DeltaPhase_rad'};
+
+% Write CSV with headers
+csvFile = [fName '_processed.csv'];
+
+T = array2table(data_out, 'VariableNames', headers);
+
+writetable(T, csvFile);
+
